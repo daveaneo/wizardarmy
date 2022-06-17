@@ -16,7 +16,7 @@ def main():
 
     if DUMP_ABI:
         import os
-        print(f'dumping abi...')
+        print(f'dumping abi...')  # save for dApp
         dir = os.getcwd()
         path = os.path.join(dir, "abi_dump")
         # print(f'path: {path}')
