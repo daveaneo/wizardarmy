@@ -16,7 +16,7 @@ def main():
 
     if DUMP_ABI:
         import os
-        print(f'dumping abi...') # sdf
+        print(f'dumping abi...') # sdf sfd
         dir = os.getcwd()
         path = os.path.join(dir, "abi_dump")
         # print(f'path: {path}')
