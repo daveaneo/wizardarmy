@@ -40,6 +40,10 @@ contract Wizards is ERC721 {
 
     // 8 phases, must initiate first
 
+    ////////////////////
+    ////    Get       //
+    ////////////////////
+
 
     ///////////////////////////
     ////// Core Functions /////

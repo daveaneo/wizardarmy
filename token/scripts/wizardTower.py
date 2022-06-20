@@ -1,12 +1,13 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, accounts
+from brownie import Wizards, Token, WizardTower, accounts
 
 DUMP_ABI = True
 
 def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
     wizards = Wizards.deploy("Wizards", "WZD", token.address, {'from': accounts[0]})
+    wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     ts = wizards.totalSupply()
     print(f'total supply: {ts}')
     tx = wizards.mint({'from': accounts[0]})
@@ -21,7 +22,7 @@ def main():
         path = os.path.join(dir, "abi_dump")
         # print(f'path: {path}')
         abi = str(wizards.abi)
-        file_path = os.path.join(path, "wizardsABI.json")
+        file_path = os.path.join(path, "wizardTowerABI.json")
         with open(file_path, 'w') as file:
             file.write(abi)
 
