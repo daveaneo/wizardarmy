@@ -21,7 +21,7 @@ def main():
         dir = os.getcwd()
         path = os.path.join(dir, "abi_dump")
         # print(f'path: {path}')
-        abi = str(wizards.abi)
+        abi = str(wizard_tower.abi)
         file_path = os.path.join(path, "wizardTowerABI.json")
         with open(file_path, 'w') as file:
             file.write(abi)

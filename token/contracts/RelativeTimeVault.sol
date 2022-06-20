@@ -12,7 +12,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     IERC721 public NFT;
 
     uint256 totalTowerPower; // sum of power of all rooms
-    uint256 activeFloors = 0; //  10000;
+    uint256 public activeFloors = 0; //  10000;
     uint256 public constant DA = 10**6; // Decimals Added for better accuracy
     uint256 startTimestamp;
 
@@ -78,9 +78,14 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     // claim floor for wizard
     function claimFloor(uint256 _wizardId) external returns (uint256) {
         require(true, "must own NFT"); // todo implement
-        require(wizardIdToFloor[_wizardId] != 0, "already claimed.");
+        require(wizardIdToFloor[_wizardId] == 0, "already claimed.");
         activeFloors += 1;
+        FloorInfo memory floorInfo;
+        floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
+        floorInfo.element = ELEMENT(uint(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
+        floorInfo.occupyingWizardId = uint16(_wizardId);
         wizardIdToFloor[_wizardId] = activeFloors;
+        floorIdToInfo[activeFloors] = floorInfo;
         return activeFloors;
     }
 

@@ -1,0 +1,8 @@
+__pycache__
+.env
+.history
+.hypothesis/
+reports/
+/token/.pytest_cache
+/dapp/node_modules/
+/token/build/
