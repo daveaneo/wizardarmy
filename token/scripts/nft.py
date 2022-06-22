@@ -1,8 +1,10 @@
 #!/usr/bin/python3
 
 from brownie import Wizards, Token, accounts
+import json
 
 DUMP_ABI = True
+
 
 def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
@@ -21,8 +23,9 @@ def main():
         path = os.path.join(dir, "abi_dump")
         # print(f'path: {path}')
         abi = str(wizards.abi)
-        file_path = os.path.join(path, "wizardsABI.json")
+        file_path = os.path.join(path, "wizards.json")
         with open(file_path, 'w') as file:
-            file.write(abi)
+            # file.write(abi)
+            json.dump(abi, file)
 
     # return Wizards.deploy("Wizards", "WZD", {'from': accounts[0]})

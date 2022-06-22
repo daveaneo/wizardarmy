@@ -36,3 +36,16 @@
     transform: rotate(360deg);
   }
 }
+
+
+/* David */
+.DoubleBordered {
+  border-style: double;
+  color: blue;
+  background: green;
+  }
+
+
+body {
+  background-color: lightblue;
+}

@@ -17,6 +17,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     uint256 startTimestamp;
 
     address public tokenOperator; // Address to manage the Stake
+    address public switcher; // Address to manage the Stake
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
     // todo -- combine mappings
@@ -41,6 +42,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     // Events
     event NewOperator(address tokenOperator);
+    event NewSwitcher(address switcher);
     event DrainTower(address indexed tokenOperator, uint256 amount);
     event Withdraw(address indexed staker, uint256 totalAmount);
 
@@ -53,20 +55,55 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         _;
     }
 
+    // todo -- consider having this an array
+    modifier onlySwitcher() {
+        require(
+            msg.sender == switcher,
+            "Only switcher can call this function."
+        );
+        _;
+    }
+
+
+    ////////////////////
+    ////    Get       //
+    ////////////////////
+
+    function isOnTheTower(uint256 _wizardId) external returns(bool) {
+        return wizardIdToFloor[_wizardId] != 0;
+    }
+
+    function getWizardOnFloor(uint256 _floor) external returns(uint256) {
+        return uint256(floorIdToInfo[_floor].occupyingWizardId);
+    }
+
+
+    //////////////
+    ////  Core  //
+    //////////////
+
     constructor(address _token, address _NFTAddress)
     {
         token = IERC20(_token);
         NFT = IERC721(_NFTAddress);
         tokenOperator = msg.sender;
+        switcher = msg.sender;
         startTimestamp = block.timestamp;
     }
 
     // todo -- reconsider functionality of operator, owner
     function updateOperator(address newOperator) external onlyOwner {
-        require(newOperator != address(0), "Invalid operator address");
+        require(newOperator != address(0) && newOperator != tokenOperator, "Invalid operator address");
         tokenOperator = newOperator;
         emit NewOperator(newOperator);
     }
+
+    function updateSwitcher(address _switcher) external onlyOwner {
+        require(_switcher != address(0) && _switcher != switcher, "Invalid operator address");
+        switcher = _switcher;
+        emit NewSwitcher(_switcher);
+    }
+
 
     // For migration
     function drainTower() external onlyOwner {
@@ -88,6 +125,17 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         floorIdToInfo[activeFloors] = floorInfo;
         return activeFloors;
     }
+
+    function switchFloors(uint256 _floorA, uint256 _floorB) external onlySwitcher {
+        require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "must own NFT");
+        FloorInfo memory floorInfo;
+        uint256 previousFloorAWizard = floorIdToInfo[_floorA].occupyingWizardId;
+        floorIdToInfo[_floorA].occupyingWizardId = floorIdToInfo[_floorB].occupyingWizardId;
+        floorIdToInfo[_floorB].occupyingWizardId = uint16(previousFloorAWizard);
+        wizardIdToFloor[floorIdToInfo[_floorA].occupyingWizardId] = _floorA;
+        wizardIdToFloor[previousFloorAWizard] = _floorB;
+    }
+
 
     // todo -- make it so this conforms to active floors
     // todo -- make sure these are sorted

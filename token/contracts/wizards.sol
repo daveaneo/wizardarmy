@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
+import "./helpers/ERC721.sol";
 
-import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
+//import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
 
 contract Wizards is ERC721 {
@@ -43,6 +44,9 @@ contract Wizards is ERC721 {
     ////////////////////
     ////    Get       //
     ////////////////////
+    function isActive(uint256 _wizardId) public returns(bool) {
+        return true; // todo isActive
+    }
 
 
     ///////////////////////////

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import abi from './abi/wizardarmy.json';
+import WizardTower from './components/WizardTower';
+import "./App.css";
 
 function App() {
   let [text, setText] = useState("");
@@ -89,6 +91,8 @@ function App() {
       }}>Get Text</button>
 
       <span>{savedText}</span>
+      <WizardTower />
+
     </div>
   );
 }

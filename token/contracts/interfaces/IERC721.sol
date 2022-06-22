@@ -120,6 +120,9 @@ interface IERC721 is IERC165 {
      */
     function isApprovedForAll(address owner, address operator) external view returns (bool);
 
+//    function _exists(uint256 tokenId) public view returns (bool);
+//    function ownerOf(uint256 tokenId) public view returns (address);
+
     /**
      * @dev Safely transfers `tokenId` token from `from` to `to`.
      *
