@@ -20,13 +20,49 @@ function MyWizards(props) {
   const wizardTowerContract =window.wizardTowerContract;
   const wizardBattleContract =window.wizardBattleContract;
   const signer = window.signer;
+  const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
+  let isLoadingMyWizards = false;
+
+//        uint256 hp;
+//        uint256 mp;
+//        uint256 wins;
+//        uint256 losses;
+//        uint256 battles;
+//        uint256 tokensClaimed;
+//        uint256 goodness;
+//        uint256 badness;
+//        uint256 initiationTimestamp; // 0 if uninitiated
+//        uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
+//        ELEMENT element;
+    async function processWizardStruct(wiz, id) {
+        let processedWizard = {};
+        processedWizard.id = parseInt(id);
+        processedWizard.hp = parseInt(wiz.hp);
+        processedWizard.mp = parseInt(wiz.mp);
+        processedWizard.wins = parseInt(wiz.wins);
+        processedWizard.losses = parseInt(wiz.losses);
+        processedWizard.battles = parseInt(wiz.battles);
+        processedWizard.tokensClaimed = parseInt(wiz.tokensClaimed);
+        processedWizard.goodness = parseInt(wiz.goodness);
+        processedWizard.badness = parseInt(wiz.badness);
+        processedWizard.initiationTimestamp = parseInt(wiz.initiationTimestamp);
+        processedWizard.protectedUntilTimestamp = parseInt(wiz.protectedUntilTimestamp);
+        processedWizard.element = ELEMENTS[parseInt(wiz.element)];
+        return processedWizard;
+    }
+
 
     async function LoadMyWizards() {
-      // get balance
-      console.log("(MyWizards) - my address: ", address);
+      if(isLoadingMyWizards == true){
+          return;
+      }
+      else {
+        isLoadingMyWizards = true;
+      }
+
       setWizardIDs([]);
       setWizards([]);
-      let newWiz = [];
+      let newWizArray = [];
       if(address !== undefined) {
           let bal = await wizardNFTContract.balanceOf(address);
           setMyNumWizards(parseInt(bal));
@@ -34,19 +70,18 @@ function MyWizards(props) {
           setWizardIDs([]);
           // iterate through balance
           for(let i=0; i< bal; i++) {
-//            wizardNFTContract.tokenOfOwnerByIndex(address, i).then( (id) =>{
-//              console.log("I own id: ", parseInt(id));
-//              setWizards([...wizards, {"id": parseInt(id), "element": "fire", "hp": 100 + parseInt(id)}]);
-//              console.log("wizards: ", wizards)
-//            });
                 let id = await wizardNFTContract.tokenOfOwnerByIndex(address, i);
-                newWiz.push({"id": parseInt(id), "element": "fire", "hp": 100 + parseInt(id)});
+                let wiz = await wizardNFTContract.tokenIdToStats(id);
+                await processWizardStruct(wiz, id).then( (processed) => {
+                    newWizArray.push(processed);
+                });
             }
-            setWizards(newWiz);
+            setWizards(newWizArray);
       }
       else {
         console.log("Not connected.");
       }
+        isLoadingMyWizards = false;
     }
 
     useEffect(() => {
@@ -74,6 +109,8 @@ function MyWizards(props) {
                     <td>ID: {wizard.id}</td>
                     <td>element: {wizard.element}</td>
                     <td>HP: {wizard.hp}</td>
+                    <td>MP: {wizard.mp}</td>
+                    <td>Tokens Claimed: {wizard.tokensClaimed}</td>
                 </div>
             </tr>
         )}

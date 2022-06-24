@@ -69,7 +69,9 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     function mint() external {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
-        Stats memory myStats =  Stats(1, 2, 0, 0, 0, 0, 0, 0, 0, 0, ELEMENT.FIRE); // todo -- add randomness
+        // todo -- randomly create stats
+        Stats memory myStats =  Stats(100, 100, 0, 0, 0, 0, 0, 0, 0, 0,
+            ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4));
         tokenIdToStats[totalSupply()] = myStats;
         _safeMint(msg.sender, totalSupply());
 //        unchecked { totalSupply() += 1; }
