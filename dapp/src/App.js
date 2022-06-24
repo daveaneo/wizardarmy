@@ -1,45 +1,77 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import abi from './abi/wizardarmy.json';
+//import WizardsNFTabi from './abi/wizards.json';
 import WizardTower from './components/WizardTower';
+import MyWizards from './components/MyWizards';
 import "./App.css";
+import "./Contracts.js";
+
+// todo -- get components to rerender with address change
+// todo -- have address change something else after, then use this to signal state change
 
 function App() {
-  let [text, setText] = useState("");
-  let [savedText, setSavedText] = useState("");
-  let [connected, setConnected] = useState(false);
+  const [text, setText] = useState("");
+  const [savedText, setSavedText] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [numWizards, setNumWizards] = useState(0);
+//  const [signer, setSigner] = useState(window.signer);
+  const [address, setAddress] = useState(undefined);
+  const [counter, setCounter] = useState(1);
 
-  let { ethereum } = window;
-  let contract = null;
+  const { ethereum } = window;
+  const ecosystemTokenAddress = window.ecosystemToken;
+  const wizardNFTContract = window.wizardNFTContract;
+  const wizardTowerContract =window.wizardTowerContract;
+  const wizardBattleContract =window.wizardBattleContract;
 
-  if (ethereum) {
-    // let abi = JSON.parse('[{"inputs": [{"internalType": "string","name": "newText","type": "string"}],"name": "changeText","outputs": [],"stateMutability": "nonpayable","type": "function"},{"inputs": [],"stateMutability": "nonpayable","type": "constructor"},{"inputs": [],"name": "text","outputs": [{"internalType": "string","name": "","type": "string"}],"stateMutability": "view","type": "function"}]')
 
-    // console.log(ethereum.ethereum.networkVersion);
-    let address = '0x4101fd97ee6d781bce214896d854ad79c5cffd3d';
-    let provider = new ethers.providers.Web3Provider(ethereum);
-    let signer = provider.getSigner();
-    contract = new ethers.Contract(address, abi, signer);
-    // const { chainId } = provider.getNetwork();    
-    console.log("in ethereum if statement");
-    console.log(ethereum);
-    console.log(provider);
-    console.log(signer);
-    console.log("out ethereum if statement");
+//  let myAddress = window.address;
+
+  async function loadAddress() {
+        let provider = new ethers.providers.Web3Provider(ethereum);
+        let signer = provider.getSigner();
+        signer.getAddress().then((prom) => {
+          setAddress(prom);
+        });
   }
 
-  async function asyncCall() {
-    // expected output: "resolved"
+  async function mintWizard() {
+     wizardNFTContract.mint().then( tx => {
+         tx.wait(1).then( () => {
+         if(tx.status !=0 ){
+           setNumWizards(numWizards + 1);
+         }
+         });
+     });
   }
 
-  // testing
+  async function updateNumWizards() {
+    let num = parseInt((await wizardNFTContract.totalSupply()).toString());
+    setNumWizards(num);
+  }
+
+
   useEffect(() => {
-  }, [text]); //
+  }, [numWizards]); //
+
+  useEffect(() => {
+    setCounter(counter+1);
+  }, [address]); //
+
+
+  useEffect(() => {
+    updateNumWizards();
+    if(window.address!==undefined) {
+      setConnected(true);
+      loadAddress();
+    }
+  }, []); //
+
 
   // Detect change in Metamask account
   useEffect(() => {
+
     if (window.ethereum) {
-      console.log('in use Effect');
       window.ethereum.on("chainChanged", () => {
         console.log("chain changed.");
         let networkId = parseInt(window.ethereum.chainId);
@@ -48,7 +80,12 @@ function App() {
         }
       });
       window.ethereum.on("accountsChanged", () => {
-        console.log("account changed.")
+        console.log("account changed.");
+        let signer = window.provider.getSigner();
+        window.signer = signer;
+        signer.getAddress().then((addr) => {
+          window.address = addr;
+        });
       });
     }
   });
@@ -56,43 +93,36 @@ function App() {
 
   return (
     <div className="App">
-      <p>Wizard Army</p>
+      {address}
+      <p>Wizard Army, {numWizards} strong!</p>
       <button onClick={() => {
-        if (contract && !connected) {
+        if (wizardNFTContract && !connected) {
             ethereum.request({ method: 'eth_requestAccounts'})
                 .then(accounts => {
                     setConnected(true);
+                    loadAddress();
                 })
         }
-      }}>{!connected ? 'Connect wallet' : 'Connected' }</button>
-
-
-      <form onSubmit={(e) => {
-        e.preventDefault();
-        console.log("hello");
-        if (contract && connected) {
-          contract.setmyString(text)
-            .then(() => {
-              setText("");
-            });
+        else { // disconnecting
+            window.address = undefined;
+            setConnected(false);
         }
-      }}>
-          <input type="text" placeholder="Enter text" onChange={e => setText(e.currentTarget.value)} value={text} />
-          <input type="submit" value="save to contract" />
-      </form>
+      }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
 
       <button onClick={() => {
-        if (contract && connected) {
-          contract.myString()
-            .then(text => {
-              setSavedText(text);
-            })
+        if (connected) {
+            mintWizard().then(res => {
+                })
         }
-      }}>Get Text</button>
-
-      <span>{savedText}</span>
+        else{
+        }
+      }}>{'mint' }</button>
+      {address != undefined && <MyWizards
+          connected = {connected}
+          numWizards = {numWizards}
+          address = {address}
+       />}
       <WizardTower />
-
     </div>
   );
 }

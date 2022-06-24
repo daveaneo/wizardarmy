@@ -8,3 +8,4 @@ reports/
 /token/build/
 /token/build/contracts/
 testing.py
+/token/.env

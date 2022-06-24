@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./helpers/ERC721.sol";
+//import "./helpers/ERC721.sol";
+import "./helpers/Ownable.sol";
+import "./helpers/ERC721Enumerable.sol";
 
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
 
-contract Wizards is ERC721 {
+contract Wizards is ERC721Enumerable, Ownable {
     // cull the herd and reduce to 1000?
-    uint256 public totalSupply = 0;
+//    uint256 public totalSupply = 0;
     mapping (uint256 => Stats) public tokenIdToStats;
+    address public battler; /// contract address to update stats
+    address public verifier; /// contract address to update stats
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
@@ -33,13 +37,16 @@ contract Wizards is ERC721 {
         uint256 maxSupply;
         uint256 protectionTimeExtension;
         address ecosystemTokenAddress;
-
     }
 
     ContractSettings public contractSettings;
     // 8 images
 
     // 8 phases, must initiate first
+
+    event NewVerifier(address battler);
+    event NewBattler(address verifier);
+
 
     ////////////////////
     ////    Get       //
@@ -61,11 +68,11 @@ contract Wizards is ERC721 {
     }
 
     function mint() external {
-        require(totalSupply < contractSettings.maxSupply, "at max supply.");
+        require(totalSupply() < contractSettings.maxSupply, "at max supply.");
         Stats memory myStats =  Stats(1, 2, 0, 0, 0, 0, 0, 0, 0, 0, ELEMENT.FIRE); // todo -- add randomness
-        tokenIdToStats[totalSupply] = myStats;
-        _safeMint(msg.sender, totalSupply);
-        unchecked { totalSupply += 1; }
+        tokenIdToStats[totalSupply()] = myStats;
+        _safeMint(msg.sender, totalSupply());
+//        unchecked { totalSupply() += 1; }
     }
 
     /**
@@ -78,6 +85,21 @@ contract Wizards is ERC721 {
         Stats storage myStats = tokenIdToStats[_tokenId];
         myStats.initiationTimestamp = block.timestamp;
         myStats.protectedUntilTimestamp = block.timestamp + contractSettings.protectionTimeExtension;
+    }
+
+    function reportBattle(uint256 _attackerId, uint256 _defenderId, uint256 _won, uint256 _tokensWon,
+        uint256 _tokensWaged) external onlyBattler {
+        tokenIdToStats[_attackerId].wins += _won;
+        tokenIdToStats[_attackerId].losses += _won==0 ? 1 : 0;
+        tokenIdToStats[_attackerId].tokensClaimed += _tokensWon;
+        // todo -- tokens waged?
+        tokenIdToStats[_defenderId].wins += _won==0 ? 1 : 0;
+        tokenIdToStats[_defenderId].losses += _won;
+        tokenIdToStats[_defenderId].tokensClaimed += _tokensWon;
+
+        if(_won==0) {
+            tokenIdToStats[_defenderId].tokensClaimed += _tokensWaged; // todo -- this ignores commission
+        }
     }
 
     /**
@@ -168,6 +190,30 @@ contract Wizards is ERC721 {
     modifier onlyHolder() {
         require(msg.sender != address(this), 'only verifier'); // todo -- decide who will verify--one or many addresses
         _;
+    }
+
+    modifier onlyBattler() {
+        require(
+            msg.sender == battler,
+            "Only battler can call this function."
+        );
+        _;
+    }
+
+    ///////////////////////////
+    ////// Admin      /////
+    ///////////////////////////
+
+    function updateBattler(address _battler) external onlyOwner {
+        require(_battler != address(0) && _battler != battler, "Invalid operator address");
+        battler = _battler;
+        emit NewBattler(_battler);
+    }
+
+    function updateVerifier(address _verifier) external onlyOwner {
+        require(_verifier != address(0) && _verifier != verifier, "Invalid operator address");
+        verifier = _verifier;
+        emit NewVerifier(_verifier);
     }
 
 }

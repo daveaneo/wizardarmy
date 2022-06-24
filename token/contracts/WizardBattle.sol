@@ -41,11 +41,32 @@ contract WizardBattle is Ownable {
         require(_floor <= wizardTower.activeFloors(), "must valid floor");
         uint256 occupyingWizard = wizardTower.getWizardOnFloor(_floor);
         uint256 tokensOnFloor = wizardTower.floorBalance(_floor);
+        uint256 tokensWaged = wizardTower.floorBalance(_floor)*(10000 - DAOShare)/10/10000;
+        uint256 attackingFromFloor = wizardTower.wizardIdToFloor(_attackerId);
         require(ecosystemToken.balanceOf(msg.sender) > _floor/10, "insuffcient tokens to attack"); // only if other user is valid
         require(ecosystemToken.transferFrom(msg.sender, address(this), _floor/10), "transfer failed"); // only if other user is valid
-        require(ecosystemToken.transfer(wizardToken.ownerOf(occupyingWizard), _floor*(10000 - DAOShare)/10/10000), "transfer failed"); // only if other user is valid
-        require(true, "must be NFT holder");
-        // automatically clean out BOTH floors if successful
+        require(ecosystemToken.transfer(wizardToken.ownerOf(occupyingWizard), tokensWaged), "transfer failed"); // only if other user is valid
+
+        // todo -- randomness, battle dynamics
+        uint256 won = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty, _floor))) % 2;
+        if(won!=0) {
+            // withdraw tokens before leaving floor
+            if(wizardTower.floorBalance(_floor) > 0) {
+                wizardTower.withdraw(_floor);
+            }
+            // switch places
+            wizardTower.switchFloors(attackingFromFloor, _floor);
+            // withdraw tokens at new floor
+            if(wizardTower.floorBalance(attackingFromFloor) > 0) {
+                wizardTower.withdraw(attackingFromFloor);
+            }
+           // update NFT stats for wons/loses/tokens
+        }
+        else {
+            // nothing else to do
+        }
+
+        wizardToken.reportBattle(_attackerId, occupyingWizard, won, tokensOnFloor, tokensWaged);
     }
 
     // for use when wizard has deserted

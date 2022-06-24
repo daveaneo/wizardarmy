@@ -9,7 +9,7 @@ import "./RelativeTimeVault.sol";
 
 contract WizardTower is RelativeTimeVault {
 
-    uint256 floors = 10000;
+    uint256 maxFloors = 10000;
 //    IERC20 ecosystemToken;
 //    IERC721 wizardToken;
 

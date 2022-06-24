@@ -1,50 +1,64 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-import wizardarmyabi from '../abi/wizardarmy.json';
-import wizardtowerabi from '../abi/wizardtower.json';
+//import wizardarmyabi from '../abi/wizardarmy.json';
+//import wizardtowerabi from '../abi/wizardtower.json';
 
 
 
 function WizardTower() {
-  let [text, setText] = useState("");
-  let [savedText, setSavedText] = useState("");
   let [connected, setConnected] = useState(false);
+  let [floors, setFloors] = useState([]);
+  let [numFloors, setNumFloors] = useState(0);
+  let [stateCounter, setStateCounter] = useState(0);
+  let [towerBalance, setTowerBalance] = useState(0);
 
+  const [time, setTime] = useState(Date.now());
+
+  // contracts
   let { ethereum } = window;
-  let contract = null;
-  let Floors = [
-      {"id": 1, "Element": "Fire", "Occupant": 6, "Tokens": 15212},
-      {"id": 2, "Element": "Water", "Occupant": 7, "Tokens": 75732},
-      {"id": 3, "Element": "Earth", "Occupant": 8, "Tokens": 783},
-      {"id": 4, "Element": "Wind", "Occupant": 9, "Tokens": 3891334}
-  ];
-  console.log("Flooors...")
-  console.log(Floors);
+  let ecosystemTokenContract = window.ecosystemToken;
+  let wizardNFTContract = window.wizardNFTContract;
+  let wizardTowerContract =window.wizardTowerContract;
+  let wizardBattleContract =window.wizardBattleContract;
 
-  if (ethereum) {
-    // let wizardarmyabi = JSON.parse('[{"inputs": [{"internalType": "string","name": "newText","type": "string"}],"name": "changeText","outputs": [],"stateMutability": "nonpayable","type": "function"},{"inputs": [],"stateMutability": "nonpayable","type": "constructor"},{"inputs": [],"name": "text","outputs": [{"internalType": "string","name": "","type": "string"}],"stateMutability": "view","type": "function"}]')
+    async function LoadNumTowerFloors() {
+      wizardTowerContract.activeFloors().then((activeFloors) => {
+//        console.log("active Floors %i", parseInt(activeFloors));
+        setNumFloors(parseInt(activeFloors));
+//        console.log("numFloors: %i", numFloors);
+      });
+//      let newFloors = numFloors;
+//      numFloors +=1;
+//      newFloors.push({"id": numFloors, "Element": "Wind", "Occupant": 9, "Tokens": 3891334});
+//      setFloors(newFloors);
+//      setStateCounter(numFloors);
+    }
 
-    // console.log(ethereum.ethereum.networkVersion);
-    let address = '0x4101fd97ee6d781bce214896d854ad79c5cffd3d';
-    let provider = new ethers.providers.Web3Provider(ethereum);
-    let signer = provider.getSigner();
-    contract = new ethers.Contract(address, wizardarmyabi, signer);
-    // const { chainId } = provider.getNetwork();
-    console.log("in ethereum if statement");
-    console.log(ethereum);
-    console.log(provider);
-    console.log(signer);
-    console.log("out ethereum if statement");
-  }
+    async function LoadTowerBalance() {
+//      let tempBalance = await ecosystemTokenContract.balanceOf(wizardTowerContract.address);
+//      console.log("Tower Balance: ", tempBalance);
+//      setTowerBalance(tempBalance);
+      ecosystemTokenContract.balanceOf(wizardTowerContract.address).then( (bal) => {
+//          console.log("Tower Balance: ", parseInt(bal));
+          setTowerBalance(parseInt(bal));
+      });
 
-  // testing
-  useEffect(() => {
-  }, [text]); //
+    }
 
+
+    async function LoadFloors() {
+
+        for(let i=1;i <= numFloors; i++){
+//          console.log("in for loop ABC");
+          wizardTowerContract.floorIdToInfo(i).then( (floorInfo) => {
+//            console.log('floor %i: %o,', i, floorInfo );
+          });
+        }
+    }
   // Detect change in Metamask account
+/*
   useEffect(() => {
     if (window.ethereum) {
-      console.log('in use Effect');
       window.ethereum.on("chainChanged", () => {
         console.log("chain changed.");
         let networkId = parseInt(window.ethereum.chainId);
@@ -57,12 +71,40 @@ function WizardTower() {
       });
     }
   });
+*/
+
+    // update every second
+//    useEffect(() => {
+//      const interval = setInterval(() => setTime(Date.now()), 1000);
+//      return () => {
+//        clearInterval(interval);
+//      };
+//    }, []);
+
+
+    useEffect(() => {
+      const interval = setInterval(() => {
+//        console.log('Refreshing numFloors');
+        LoadNumTowerFloors();
+        LoadTowerBalance();
+      }, 60000);
+      return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
+      LoadNumTowerFloors();
+      LoadTowerBalance();
+    }, []);
+
+    useEffect(() => {
+         LoadFloors();
+    }, [numFloors]);
 
 
   return (
     <div className="">
-      <p className="DoubleBordered">Wizard Tower</p>
-        {Floors && Floors.map(floor =>
+      <p className="DoubleBordered">Wizard Tower has {numFloors} floors and {towerBalance} tokens.</p>
+        {floors && floors.map(floor =>
             <tr key={floor.id} className="Double">
                 <div className="DoubleBordered">
                     <td>{floor.id}</td>

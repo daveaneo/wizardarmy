@@ -17,7 +17,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     uint256 startTimestamp;
 
     address public tokenOperator; // Address to manage the Stake
-    address public switcher; // Address to manage the Stake
+    address public battler; // Address to manage the Stake
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
     // todo -- combine mappings
@@ -42,7 +42,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     // Events
     event NewOperator(address tokenOperator);
-    event NewSwitcher(address switcher);
+    event NewBattler(address battler);
     event DrainTower(address indexed tokenOperator, uint256 amount);
     event Withdraw(address indexed staker, uint256 totalAmount);
 
@@ -56,10 +56,10 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     }
 
     // todo -- consider having this an array
-    modifier onlySwitcher() {
+    modifier onlyBattler() {
         require(
-            msg.sender == switcher,
-            "Only switcher can call this function."
+            msg.sender == battler,
+            "Only battler can call this function."
         );
         _;
     }
@@ -87,7 +87,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         token = IERC20(_token);
         NFT = IERC721(_NFTAddress);
         tokenOperator = msg.sender;
-        switcher = msg.sender;
+        battler = msg.sender;
         startTimestamp = block.timestamp;
     }
 
@@ -98,10 +98,10 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         emit NewOperator(newOperator);
     }
 
-    function updateSwitcher(address _switcher) external onlyOwner {
-        require(_switcher != address(0) && _switcher != switcher, "Invalid operator address");
-        switcher = _switcher;
-        emit NewSwitcher(_switcher);
+    function updateBattler(address _battler) external onlyOwner {
+        require(_battler != address(0) && _battler != battler, "Invalid operator address");
+        battler = _battler;
+        emit NewBattler(_battler);
     }
 
 
@@ -119,14 +119,14 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         activeFloors += 1;
         FloorInfo memory floorInfo;
         floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
-        floorInfo.element = ELEMENT(uint(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
+        floorInfo.element = ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
         floorInfo.occupyingWizardId = uint16(_wizardId);
         wizardIdToFloor[_wizardId] = activeFloors;
         floorIdToInfo[activeFloors] = floorInfo;
         return activeFloors;
     }
 
-    function switchFloors(uint256 _floorA, uint256 _floorB) external onlySwitcher {
+    function switchFloors(uint256 _floorA, uint256 _floorB) external onlyBattler {
         require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "must own NFT");
         FloorInfo memory floorInfo;
         uint256 previousFloorAWizard = floorIdToInfo[_floorA].occupyingWizardId;
