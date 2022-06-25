@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
-
+import {Link} from "react-router-dom";
 
 function MyWizards(props) {
   const connected = props.connected;
@@ -104,15 +104,18 @@ function MyWizards(props) {
     <div className="">
       <p className="DoubleBordered">I own {wizards.length} wizards:</p>
         {wizards && wizards.map(wizard =>
-            <tr key={wizard.id} className="Double">
+            <div key={wizard.id} className="Double">
+                <br/>
+                <Link to={"wizard/" + wizard.id}>Wizard {wizard.id}
                 <div className="DoubleBordered">
-                    <td>ID: {wizard.id}</td>
-                    <td>element: {wizard.element}</td>
-                    <td>HP: {wizard.hp}</td>
-                    <td>MP: {wizard.mp}</td>
-                    <td>Tokens Claimed: {wizard.tokensClaimed}</td>
+                    <div>ID: {wizard.id}</div>
+                    <div>element: {wizard.element}</div>
+                    <div>HP: {wizard.hdiv}</div>
+                    <div>MP: {wizard.mdiv}</div>
+                    <div>Tokens Claimed: {wizard.tokensClaimed}</div>
                 </div>
-            </tr>
+                </Link>
+            </div>
         )}
         {wizards.length != myNumWizards && 'loading...'}
         {myNumWizards == 0 && "you have no wizards."}

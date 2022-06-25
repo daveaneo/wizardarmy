@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
+import { BrowserRouter, Link, Route, Routes} from "react-router-dom";
 //import WizardsNFTabi from './abi/wizards.json';
 import WizardTower from './components/WizardTower';
 import MyWizards from './components/MyWizards';
+import Wizard from './components/Wizard';
+import Home from './components/Home';
+import NavBar from './components/NavBar';
 import "./App.css";
 import "./Contracts.js";
 
@@ -92,38 +96,42 @@ function App() {
 
 
   return (
-    <div className="App">
-      {address}
-      <p>Wizard Army, {numWizards} strong!</p>
-      <button onClick={() => {
-        if (wizardNFTContract && !connected) {
-            ethereum.request({ method: 'eth_requestAccounts'})
-                .then(accounts => {
-                    setConnected(true);
-                    loadAddress();
-                })
-        }
-        else { // disconnecting
-            window.address = undefined;
-            setConnected(false);
-        }
-      }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
+    <BrowserRouter>
+        <div className="App">
+          <NavBar />
+          <button onClick={() => {
+            if (wizardNFTContract && !connected) {
+                ethereum.request({ method: 'eth_requestAccounts'})
+                    .then(accounts => {
+                        setConnected(true);
+                        loadAddress();
+                    })
+            }
+            else { // disconnecting
+                window.address = undefined;
+                setConnected(false);
+                setAddress(undefined);
+            }
+          }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
 
-      <button onClick={() => {
-        if (connected) {
-            mintWizard().then(res => {
-                })
-        }
-        else{
-        }
-      }}>{'mint' }</button>
-      {address != undefined && <MyWizards
-          connected = {connected}
-          numWizards = {numWizards}
-          address = {address}
-       />}
-      <WizardTower />
-    </div>
+        <Routes>
+            <Route path="/"
+              element = {<Home address={address} connected={connected} numWizards={numWizards} / >}
+              />
+
+
+            <Route path="/tower"
+              element = {<WizardTower />}
+            />
+
+            <Route path="/wizard/:id"
+                element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}
+            />
+
+
+        </Routes>
+        </div>
+    </BrowserRouter>
   );
 }
 
