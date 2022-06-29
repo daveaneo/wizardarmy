@@ -5,10 +5,12 @@ import { BrowserRouter, Link, Route, Routes} from "react-router-dom";
 import WizardTower from './components/WizardTower';
 import MyWizards from './components/MyWizards';
 import Wizard from './components/Wizard';
+import Battle from './components/Battle';
 import Home from './components/Home';
 import NavBar from './components/NavBar';
+import ContractSettings from './components/ContractSettings';
 import "./App.css";
-import "./Contracts.js";
+//import "./Contracts.js";
 
 // todo -- get components to rerender with address change
 // todo -- have address change something else after, then use this to signal state change
@@ -34,9 +36,8 @@ function App() {
   async function loadAddress() {
         let provider = new ethers.providers.Web3Provider(ethereum);
         let signer = provider.getSigner();
-        signer.getAddress().then((prom) => {
-          setAddress(prom);
-        });
+        const newAddr = signer.getAddress();
+        setAddress(newAddr);
   }
 
   async function mintWizard() {
@@ -50,17 +51,11 @@ function App() {
   }
 
   async function updateNumWizards() {
-    let num = parseInt((await wizardNFTContract.totalSupply()).toString());
-    setNumWizards(num);
+    if(wizardNFTContract!==undefined){
+        let num = parseInt((await wizardNFTContract.totalSupply()).toString());
+        setNumWizards(num);
+    }
   }
-
-
-  useEffect(() => {
-  }, [numWizards]); //
-
-  useEffect(() => {
-    setCounter(counter+1);
-  }, [address]); //
 
 
   useEffect(() => {
@@ -77,14 +72,12 @@ function App() {
 
     if (window.ethereum) {
       window.ethereum.on("chainChanged", () => {
-        console.log("chain changed.");
         let networkId = parseInt(window.ethereum.chainId);
         if (networkId !== 4) {
           console.log("WRONG NETWORK!");
         }
       });
       window.ethereum.on("accountsChanged", () => {
-        console.log("account changed.");
         let signer = window.provider.getSigner();
         window.signer = signer;
         signer.getAddress().then((addr) => {
@@ -96,39 +89,24 @@ function App() {
 
 
   return (
+
     <BrowserRouter>
         <div className="App">
-          <NavBar />
-          <button onClick={() => {
-            if (wizardNFTContract && !connected) {
-                ethereum.request({ method: 'eth_requestAccounts'})
-                    .then(accounts => {
-                        setConnected(true);
-                        loadAddress();
-                    })
-            }
-            else { // disconnecting
-                window.address = undefined;
-                setConnected(false);
-                setAddress(undefined);
-            }
-          }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
-
+          <ContractSettings connected={connected} address={address} setAddress={setAddress} loadAddress={loadAddress} setConnected={setConnected}/>
+          <NavBar connected={connected} address={address} setAddress={setAddress} loadAddress={loadAddress} setConnected={setConnected}/>
         <Routes>
-            <Route path="/"
-              element = {<Home address={address} connected={connected} numWizards={numWizards} / >}
-              />
-
-
             <Route path="/tower"
               element = {<WizardTower />}
             />
-
+            <Route path="/wizard/:id/battle/"
+                element = {<Battle connected={connected} address={address} />}
+            />
             <Route path="/wizard/:id"
                 element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}
             />
-
-
+            <Route path="/"
+              element = {<Home address={address} connected={connected} numWizards={numWizards} / >}
+              />
         </Routes>
         </div>
     </BrowserRouter>

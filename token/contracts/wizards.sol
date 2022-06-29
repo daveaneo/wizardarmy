@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 //import "./helpers/ERC721.sol";
 import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
+import "./libraries/Strings.sol";
 
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
@@ -17,7 +18,9 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
+    // todo -- add level (will affect dApp)
     struct Stats { // todo refine and move to bitencoding
+        uint256 level;
         uint256 hp;
         uint256 mp;
         uint256 wins;
@@ -70,18 +73,29 @@ contract Wizards is ERC721Enumerable, Ownable {
     function mint() external {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
         // todo -- randomly create stats
-        Stats memory myStats =  Stats(100, 100, 0, 0, 0, 0, 0, 0, 0, 0,
-            ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4));
+        //
+        // hp, base = 25
+        // mp base = 25
+
+        uint256 addOn = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp))) % 26;
+        uint256 hp = 25 + addOn;
+        uint256 mp = 50 - addOn;
+
+        ELEMENT element = ELEMENT(uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp+1, hp))) % 4);
+
+        Stats memory myStats =  Stats(1, hp, mp, 0, 0, 0, 0, 0, 0, 0, 0, element);
         tokenIdToStats[totalSupply()] = myStats;
         _safeMint(msg.sender, totalSupply());
 //        unchecked { totalSupply() += 1; }
     }
+
 
     /**
      * @dev Moves NFT from inactive to active
      */
     function initiate(uint256 _tokenId) external {
         require(ownerOf(_tokenId) == msg.sender, "must be owner");
+        require(tokenIdToStats[_tokenId].initiationTimestamp == 0, "already initiated");
         // todo -- receive fee
 
         Stats storage myStats = tokenIdToStats[_tokenId];
@@ -133,51 +147,89 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
         require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
-        return formatTokenURI(_tokenId, "https://static01.nyt.com/images/2019/02/05/world/05egg/15xp-egg-promo-superJumbo-v2.jpg");
+        // todo -- update image
+        return formatTokenURI(_tokenId, "https://as2.ftcdn.net/v2/jpg/03/12/77/03/1000_F_312770349_4lkFN3e2UlO43kQlFemFNIpVkG5Zwytq.jpg");
     }
 
     function formatTokenURI(uint256 _tokenId, string memory imageURI) public view returns (string memory) {
 //        Data memory _myData = unpackData(_tokenId);
+        Stats memory myStats = tokenIdToStats[_tokenId];
+
         string memory json_str = string(abi.encodePacked(
-            '{"description": "The NFT limit order that earns money!"',
-            ', "external_url": "https://webuythedip.com"',
+            '{"description": "WizardArmy"',
+            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
             ', "image": "',
              imageURI, '"',
-            ', "name": "BuyTheDip"',
+            ', "name": "Wizard"',
             // attributes
-            ', "attributes": [{"display_type": "number", "trait_type": "Dip Level", "value": ',
-            uint2str(uint256(9)),   ' }'
+            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
+            Strings.toString(myStats.level), ' }'
         ));
+
+        // use this format to add extra properties
         json_str = string(abi.encodePacked(json_str,
-            ', {"display_type": "number", "trait_type": "Strike Price", "value": ',
-            uint2str(uint256(333)),   ' }',
-            ', {"display_type": "number", "trait_type": "USDC Balance", "value": ',
-            uint2str(uint256(111)),   ' }',
-                ', {"display_type": "number", "trait_type": "Energy", "value": ',
-            uint2str(uint256(222)),   ' }',
-            ']', // End Attributes
-            '}'
+            ', {"display_type": "number", "trait_type": "hp", "value": ',
+            Strings.toString(myStats.hp),   ' }',
+            ', {"display_type": "number", "trait_type": "mp", "value": ',
+            Strings.toString(myStats.mp),   ' }',
+                ', {"display_type": "number", "trait_type": "wins", "value": ',
+            Strings.toString(myStats.wins),   ' }'
         ));
+
+        // use this format to add extra properties
+        json_str = string(abi.encodePacked(json_str,
+            ', {"display_type": "number", "trait_type": "losses", "value": ',
+            Strings.toString(myStats.losses),   ' }',
+            ', {"display_type": "number", "trait_type": "battles", "value": ',
+            Strings.toString(myStats.battles),   ' }',
+                ', {"display_type": "number", "trait_type": "tokensClaimed", "value": ',
+            Strings.toString(myStats.tokensClaimed),   ' }'
+        ));
+
+        // end string
+        json_str = string(abi.encodePacked(json_str, ']','}'));
+
+//        string memory json_str = string(abi.encodePacked(
+//            '{"description": "WizardArmy"',
+//            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
+//            ', "image": "',
+//             imageURI, '"',
+//            ', "name": "Wizard"',
+//            // attributes
+//            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
+//            '11111111',   ' }'
+//        ));
+//        json_str = string(abi.encodePacked(json_str,
+//            ', {"display_type": "number", "trait_type": "hp", "value": ',
+//            '2222222222',   ' }',
+//            ', {"display_type": "number", "trait_type": "mp", "value": ',
+//            '33333333333333333',   ' }',
+//                ', {"display_type": "number", "trait_type": "wins", "value": ',
+//            '4444444444',   ' }',
+//            ']', // End Attributes
+//            '}'
+//        ));
+        return json_str;
     }
 
-    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
-        if (_i == 0) {
-            return "0";
-        }
-        uint j = _i;
-        uint len;
-        while (j != 0) {
-            len++;
-            j /= 10;
-        }
-        bytes memory bstr = new bytes(len);
-        uint k = len - 1;
-        while (_i != 0) {
-            bstr[k--] = bytes1(uint8(48 + _i % 10));
-            _i /= 10;
-        }
-        return string(bstr);
-    }
+//    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+//        if (_i == 0) {
+//            return "0";
+//        }
+//        uint j = _i;
+//        uint len;
+//        while (j != 0) {
+//            len++;
+//            j /= 10;
+//        }
+//        bytes memory bstr = new bytes(len);
+//        uint k = len - 1;
+//        while (_i != 0) {
+//            bstr[k--] = bytes1(uint8(48 + _i % 10));
+//            _i /= 10;
+//        }
+//        return string(bstr);
+//    }
 
 
     ///////////////////////////

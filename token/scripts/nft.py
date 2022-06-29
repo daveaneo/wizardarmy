@@ -1,9 +1,12 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, accounts
+from brownie import Wizards, Token, accounts, config
 import json
 
 DUMP_ABI = True
+
+dev = accounts.add(config["wallets"]["from_key"]) # accounts[0]
+secondary = accounts.add(config["wallets"]["secondary"]) # accounts[1]
 
 
 def main():

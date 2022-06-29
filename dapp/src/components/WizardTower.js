@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 //import wizardarmyabi from '../abi/wizardarmy.json';
 //import wizardtowerabi from '../abi/wizardtower.json';
-
+import { Link } from 'react-router-dom';
 
 
 function WizardTower() {
@@ -55,31 +55,7 @@ function WizardTower() {
           });
         }
     }
-  // Detect change in Metamask account
-/*
-  useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on("chainChanged", () => {
-        console.log("chain changed.");
-        let networkId = parseInt(window.ethereum.chainId);
-        if (networkId !== 4) {
-          console.log("WRONG NETWORK!");
-        }
-      });
-      window.ethereum.on("accountsChanged", () => {
-        console.log("account changed.")
-      });
-    }
-  });
-*/
 
-    // update every second
-//    useEffect(() => {
-//      const interval = setInterval(() => setTime(Date.now()), 1000);
-//      return () => {
-//        clearInterval(interval);
-//      };
-//    }, []);
 
 
     useEffect(() => {

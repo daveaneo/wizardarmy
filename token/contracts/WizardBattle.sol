@@ -6,7 +6,7 @@ import "./interfaces/IERC20.sol";
 //import "./interfaces/IERC721.sol";
 import "./RelativeTimeVault.sol";
 import "./WizardTower.sol";
-import "./Wizards.sol";
+//import "./Wizards.sol";
 
 
 contract WizardBattle is Ownable {
@@ -32,6 +32,7 @@ contract WizardBattle is Ownable {
     ////    Battle    //
     ////////////////////
 
+    // todo -- default victory if defender  is not active
     function attack(uint256 _attackerId, uint256 _floor) external {
         // get both wizard ids
 
