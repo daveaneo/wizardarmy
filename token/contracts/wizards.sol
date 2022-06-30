@@ -49,6 +49,7 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     event NewVerifier(address battler);
     event NewBattler(address verifier);
+    event Initiated(address initiater, uint256 indexed wizardId, uint256 timestamp);
 
 
     ////////////////////
@@ -101,6 +102,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         Stats storage myStats = tokenIdToStats[_tokenId];
         myStats.initiationTimestamp = block.timestamp;
         myStats.protectedUntilTimestamp = block.timestamp + contractSettings.protectionTimeExtension;
+
+        emit Initiated(msg.sender, _tokenId, block.timestamp);
     }
 
     function reportBattle(uint256 _attackerId, uint256 _defenderId, uint256 _won, uint256 _tokensWon,

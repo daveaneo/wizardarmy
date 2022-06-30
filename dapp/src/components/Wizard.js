@@ -97,13 +97,19 @@ function Wizard(props) {
     async function Initiate() {
         let tx = await wizardNFTContract.initiate(wizardId);
         let res = await tx.wait(1);
+        let tempWizard = {...myWizard}; // this creates a shallow copy (not nested arrays)
         if(res){
-            myWizard.initiationTimestamp = res;
-            setMyWizard(myWizard);
+            const timestamp = parseInt(res.events[0].args[2]);
+            tempWizard.initiationTimestamp = timestamp;
+            setMyWizard(tempWizard);
         }
         else {
           console.log("error.");
         }
+
+
+       const floor = parseInt(res.events[0].args[1]);
+
     }
 
     async function LoadTowerTokens() {
@@ -164,7 +170,7 @@ function Wizard(props) {
 
     useEffect(() => {
       SetIsOwner();
-    }, [connected]);
+    }, [connected, address]);
 
     useEffect(() => {
     }, [isOwner]);
@@ -196,13 +202,17 @@ function Wizard(props) {
         {!myWizard && 'loading...'}
         {isOwner &&
         <div>
-          {isOnTheTower==false && <button onClick={GetOnTheTower}>Get on the tower</button> }
           {myWizard.initiationTimestamp === 0 && <button onClick={Initiate}>Initiate</button> }
-          <button>Complete Task</button>
-          {myTowerTokens} <button onClick={WithdrawFromTower}>Withdraw from Tower</button>
-          <Link to={"battle/"}>
-            <button>Battle (Wizard tower Floors)</button>
-          </Link>
+          {myWizard.initiationTimestamp !== 0 &&
+            <div>
+                 { isOnTheTower==false && <button onClick={GetOnTheTower}>Get on the tower</button> }
+                <button>Complete Task</button>
+                <button onClick={WithdrawFromTower}>Withdraw from Tower</button>
+                <Link to={"battle/"}>
+                  <button>Battle (Wizard tower Floors)</button>
+                </Link>
+            </div>
+          }
         </div>
         }
     </div>

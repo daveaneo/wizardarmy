@@ -18,7 +18,7 @@ import "./App.css";
 function App() {
   const [text, setText] = useState("");
   const [savedText, setSavedText] = useState("");
-  const [connected, setConnected] = useState(false);
+  const [connected, setConnected] = useState(undefined);
   const [numWizards, setNumWizards] = useState(0);
 //  const [signer, setSigner] = useState(window.signer);
   const [address, setAddress] = useState(undefined);
@@ -60,10 +60,10 @@ function App() {
 
   useEffect(() => {
     updateNumWizards();
-    if(window.address!==undefined) {
-      setConnected(true);
-      loadAddress();
-    }
+//    if(window.address!==undefined) {
+//      setConnected(true);
+//      loadAddress();
+//    }
   }, []); //
 
 

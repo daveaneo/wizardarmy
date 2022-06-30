@@ -6,10 +6,10 @@ const WizardTowerabi = require('../abi/wizardtower.json').abi;
 const WizardBattleabi = require('../abi/wizardbattle.json').abi;
 const ERC20abi = require('../abi/ERC20.json').abi;
 
-let ecosystemTokenAddress = '0x69dCeccbc22A30d7f215A364e7475395EB8F1141';
-let wizardNFTAddress = '0xf397C5d01b9bC2f221127579C508af6c58a1Db32';
-let wizardTowerAddress = '0x6946614a78e43De296766C45eaE5177a80FD24fe';
-let wizardBattleAddress = '0x1941F8cAcc32Dfc41468f7E0c83940238c71dce5';
+let ecosystemTokenAddress = '0xA55B9C38a7b4caA01A1F9B118c8F8e3688D6b01D';
+let wizardNFTAddress = '0x26f4e2Fc2e49638197BAE42c9Ab09E863BCf2F59';
+let wizardTowerAddress = '0x9fF44712b244F3a42E60B8803e77F0D4fFb51709';
+let wizardBattleAddress = '0xb6680a1203A8a3AFDFB1807c6881e5704C505E47';
 
 
 function ContractSettings(props) {

@@ -46,7 +46,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     mapping (uint256 => FloorInfo) public floorIdToInfo; // floor id to floor info
     mapping (uint256 => uint256 ) public wizardIdToFloor; // floor 0 DNE
-    FloorPlans[] public floorPlans;
+//    FloorPlans[] public floorPlans;
 
     // Events
     event NewOperator(address tokenOperator);
