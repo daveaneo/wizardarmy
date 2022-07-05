@@ -111,6 +111,7 @@ function MyWizards(props) {
             }
 
             await Promise.all(myPromises).then(() => {
+                newWizArray.sort((a, b) => (a.id - b.id));
                 setWizards(newWizArray);
             });
       }

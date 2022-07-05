@@ -14,9 +14,10 @@ function Battle(props) {
   const [floors, setFloors] = useState([]);
   const [activeFloors, setActiveFloors] = useState([]);
   const [myNumNeighboringFloors, setMyNumNeighboringFloors] = useState(0);
-  const [myFloor, setMyFloor] = useState(0);
+  const [myFloor, setMyFloor] = useState(undefined);
 
   const [time, setTime] = useState(Date.now());
+  const [contractsLoaded, setContractsLoaded] = useState(false);
 
   // contracts
   const { ethereum } = window;
@@ -27,7 +28,7 @@ function Battle(props) {
   const signer = window.signer;
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   let isLoadingMyFloors = false;
-
+  var loadingContracts = false;
 
     // todo improve async flow
     async function processFloorStruct(floorNumber) {
@@ -69,7 +70,9 @@ function Battle(props) {
       }
 
       // get my floor
-
+      if(myFloor===undefined){
+        return;
+      }
 
       // set floor IDs
       let ids = [];
@@ -95,7 +98,7 @@ function Battle(props) {
                 myPromises.push(processFloorStruct(_floorNumber));
             }
             Promise.all(myPromises).then(() => {
-                console.log("newFloorArray: ", newFloorArray)
+                newFloorArray.sort((a, b) => (a.floorNumber - b.floorNumber));
                 setFloors(newFloorArray);
             });
       }
@@ -106,33 +109,65 @@ function Battle(props) {
         isLoadingMyFloors = false;
     }
 
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+  async function LoadContracts() {
+      if(loadingContracts) { return}
+      loadingContracts = true;
+
+      while(window.ecosystemToken == undefined &&
+         window.wizardNFTContract == undefined &&
+         window.wizardTowerContract == undefined &&
+         window.wizardBattleContract == undefined
+      ) {
+          await sleep(100);
+      }
+      var ecosystemTokenContract = window.ecosystemToken;
+      var wizardNFTContract = window.wizardNFTContract;
+      var wizardTowerContract =window.wizardTowerContract;
+      var wizardBattleContract =window.wizardBattleContract;
+      loadingContracts = false;
+      setContractsLoaded(true);
+  }
+
+
     useEffect(() => {
+      LoadContracts();
       const interval = setInterval(() => {
-        LoadNeighborhood();
-        LoadMyFloor();
+        if(contractsLoaded===true){
+//            LoadNeighborhood();
+            LoadMyFloor();
+        }
       }, 60000);
       return () => clearInterval(interval);
     }, []);
 
     useEffect(() => {
-      LoadNeighborhood();
-      LoadMyFloor();
+      if(contractsLoaded===true){
+//          LoadNeighborhood();
+          LoadMyFloor();
+      }
     }, [connected, address]);
 
     useEffect(() => {
-      LoadMyFloor();
-      LoadNeighborhood();
+      LoadContracts();
     }, []);
 
     useEffect(() => {
-      LoadNeighborhood();
+      if(contractsLoaded===true){
+          LoadMyFloor();
+      }
+    }, [contractsLoaded]);
+
+    useEffect(() => {
+      if(contractsLoaded===true && (myFloor!==0 || myFloor !==undefined)){
+          LoadNeighborhood();
+      }
     }, [myFloor]);
 
-
-//        uint16 floorPower; // todo -- may not use it this way (function, instead)
-//        uint40 lastWithdrawalTimestamp;
-//        uint16 occupyingWizardId;
-//        ELEMENT element;
   return (
     <div className="">
       <p className="DoubleBordered">Neighboring Floors</p>

@@ -6,11 +6,12 @@ function Wizard(props) {
   const connected = props.connected;
   const numWizards = props.numWizards;
   const address = props.address;
+
   let params = useParams();
   const wizardId = params.id;
 
   const [myWizard, setMyWizard] = useState({});
-  const [myFloor, setMyFloor] = useState(0);
+  const [myFloor, setMyFloor] = useState(undefined);
   const [isInitiated, setIsInitiated] = useState(false);
   const [isActive, setIsActive] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
@@ -18,28 +19,47 @@ function Wizard(props) {
   const [myTowerTokens, setMyTowerTokens] = useState(0);
   const [totalTowerTokens, setTotalTowerTokens] = useState(0);
   const [totalWizards, setTotalWizards] = useState(0);
+  const [contractsLoaded, setContractsLoaded] = useState(false);
 
   // contracts
   const { ethereum } = window;
-  const ecosystemTokenContract = window.ecosystemToken;
-  const wizardNFTContract = window.wizardNFTContract;
-  const wizardTowerContract =window.wizardTowerContract;
-  const wizardBattleContract =window.wizardBattleContract;
+  var ecosystemTokenContract = window.ecosystemToken;
+  var wizardNFTContract = window.wizardNFTContract;
+  var wizardTowerContract =window.wizardTowerContract;
+  var wizardBattleContract =window.wizardBattleContract;
+  var NFTContractNoSigner =window.NFTContractNoSigner;
+  var loadingContracts = false;
+
+
+
   const signer = window.signer;
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   let isLoadingMyWizards = false;
 
-//        uint256 hp;
-//        uint256 mp;
-//        uint256 wins;
-//        uint256 losses;
-//        uint256 battles;
-//        uint256 tokensClaimed;
-//        uint256 goodness;
-//        uint256 badness;
-//        uint256 initiationTimestamp; // 0 if uninitiated
-//        uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//        ELEMENT element;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+  async function LoadContracts() {
+      if(loadingContracts) { return}
+      loadingContracts = true;
+
+      while(window.ecosystemToken == undefined &&
+         window.wizardNFTContract == undefined &&
+         window.wizardTowerContract == undefined &&
+         window.wizardBattleContract == undefined
+      ) {
+          await sleep(100);
+      }
+      var ecosystemTokenContract = window.ecosystemToken;
+      var wizardNFTContract = window.wizardNFTContract;
+      var wizardTowerContract =window.wizardTowerContract;
+      var wizardBattleContract =window.wizardBattleContract;
+      loadingContracts = false;
+      setContractsLoaded(true);
+  }
+
     // todo -- could combine this or import this function in MyWizards.js
     async function processWizardStruct(wiz, id) {
         let processedWizard = {};
@@ -56,17 +76,27 @@ function Wizard(props) {
         processedWizard.initiationTimestamp = parseInt(wiz.initiationTimestamp);
         processedWizard.protectedUntilTimestamp = parseInt(wiz.protectedUntilTimestamp);
         processedWizard.element = ELEMENTS[parseInt(wiz.element)];
+
+        // todo -- update smart contract
+        processedWizard.isActive = true;
+//        processedWizard.isActive = parseInt(await wizardNFTContract.isActive(id));
+
         return processedWizard;
     }
 
+    async function CompleteTask() {
+        console.log("What is 5 + 9?");
+        // todo -- backend work. Load a task and submit the hashed details to the blockchain
+        // todo -- confirm smart contracts comply -- may need a verifier contract
+    }
 
     async function LoadMyWizard() {
+
+        if(wizardNFTContract===undefined) { return }
         let wiz = await wizardNFTContract.tokenIdToStats(wizardId);
         await processWizardStruct(wiz, wizardId).then( (processed) => {
                 setMyWizard(processed);
         });
-        // set isInitiated
-        // set isActivated / not a Deserter
     }
 
     async function LoadTotalWizards() {
@@ -76,7 +106,7 @@ function Wizard(props) {
 
 
     async function SetIsOwner() {
-        if(!connected || wizardId===undefined){
+        if(!connected || wizardId===undefined || wizardNFTContract ===undefined ){
           setIsOwner(false);
         }
         else {
@@ -91,6 +121,10 @@ function Wizard(props) {
         if (_floor!= 0){
             setIsOnTheTower(true);
         }
+        else if(isOnTheTower==true){
+            setIsOnTheTower(false);
+        }
+
         setMyFloor(_floor);
     }
 
@@ -106,8 +140,6 @@ function Wizard(props) {
         else {
           console.log("error.");
         }
-
-
        const floor = parseInt(res.events[0].args[1]);
 
     }
@@ -115,7 +147,7 @@ function Wizard(props) {
     async function LoadTowerTokens() {
         const towerBalance = parseInt(await ecosystemTokenContract.balanceOf(wizardTowerContract.address));
         setTotalTowerTokens(towerBalance);
-        if(myFloor==0) {return;}
+        if(myFloor==0 || myFloor ==undefined) {return;}
 
         const myBalance = parseInt(await wizardTowerContract.floorBalance(myFloor));
         setMyTowerTokens(myBalance);
@@ -123,13 +155,7 @@ function Wizard(props) {
 
 
     async function WithdrawFromTower() {
-        console.log("Withdrawiing from tower...")
-        //
         const activeFloors = parseInt(await wizardTowerContract.activeFloors());
-        console.log("myFloor: ", myFloor);
-        console.log("activeFloors: ", activeFloors);
-
-
         const tx = await wizardTowerContract.withdraw(myFloor);
         const res = await tx.wait(1);
         if(res){
@@ -148,25 +174,31 @@ function Wizard(props) {
     }
 
 
-
-//    useEffect(() => {
-//      const interval = setInterval(() => {
-//        LoadMyWizards();
-//      }, 60000);
-//      return () => clearInterval(interval);
-//    }, []);
-
     useEffect(() => {
-      LoadTotalWizards();
-      LoadMyWizard();
-      LoadMyFloor();
-      SetIsOwner();
-      LoadTowerTokens();
+      LoadContracts();
     }, []);
 
     useEffect(() => {
-      LoadTowerTokens();
+        if(contractsLoaded===true){
+            LoadTotalWizards();
+            LoadMyWizard();
+            LoadMyFloor();
+            SetIsOwner();
+            LoadTowerTokens();
+        }
+    }, [contractsLoaded]);
+
+
+    useEffect(() => {
+      if(wizardTowerContract!==undefined){
+        LoadTowerTokens();
+      }
     }, [myFloor]);
+
+    useEffect(() => {
+      LoadContracts();
+    }, [address]);
+
 
     useEffect(() => {
       SetIsOwner();
@@ -185,6 +217,7 @@ function Wizard(props) {
                 <div className="DoubleBordered">
                     <div>element: {myWizard.element}</div>
                     <div>Level: {myWizard.level}</div>
+                    <div>Floor: {myFloor}</div>
                     <div>HP: {myWizard.hp}</div>
                     <div>MP: {myWizard.mp}</div>
                     <div>Tokens Claimed: {myWizard.tokensClaimed}</div>
@@ -200,17 +233,30 @@ function Wizard(props) {
 
         {wizardId >= totalWizards && 'Wizard does not exist.'}
         {!myWizard && 'loading...'}
+        {!myWizard &&
+          <div>
+          {myWizard.isActive ? "Active" : "Inactive"}
+          </div>
+        }
         {isOwner &&
         <div>
+          {myWizard.initiationTimestamp === 0 ? "Not initiated" : "Initiated" } <br/>
+          {myWizard.isActive === false ? "Not active" : "Active" } <br/>
+          {isOnTheTower==false ? "Not on the tower" : "On the tower" } <br/>
+
           {myWizard.initiationTimestamp === 0 && <button onClick={Initiate}>Initiate</button> }
           {myWizard.initiationTimestamp !== 0 &&
             <div>
-                 { isOnTheTower==false && <button onClick={GetOnTheTower}>Get on the tower</button> }
-                <button>Complete Task</button>
-                <button onClick={WithdrawFromTower}>Withdraw from Tower</button>
-                <Link to={"battle/"}>
-                  <button>Battle (Wizard tower Floors)</button>
-                </Link>
+                 <button onClick={CompleteTask}>Complete Task</button>   <br/>
+                 { isOnTheTower===false && <button onClick={GetOnTheTower}>Get on the tower</button> }  <br/>
+                 { isOnTheTower===true &&
+                 <div>
+                     {myTowerTokens} <button onClick={WithdrawFromTower}>Withdraw from Tower</button> <br/>
+                    <Link to={"battle/"}>
+                      <button>Battle (Wizard tower Floors)</button> <br/>
+                    </Link>
+                  </div>
+                }
             </div>
           }
         </div>

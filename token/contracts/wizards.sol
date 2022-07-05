@@ -55,8 +55,8 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////////////////////
     ////    Get       //
     ////////////////////
-    function isActive(uint256 _wizardId) public returns(bool) {
-        return true; // todo isActive
+    function isActive(uint256 _wizardId) public view returns(bool) {
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
 
