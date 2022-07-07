@@ -115,6 +115,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         tokenIdToStats[_defenderId].wins += _won==0 ? 1 : 0;
         tokenIdToStats[_defenderId].losses += _won;
         tokenIdToStats[_defenderId].tokensClaimed += _tokensWon;
+        // todo -- add stat for last time attacked to limit attack frequency?
 
         if(_won==0) {
             tokenIdToStats[_defenderId].tokensClaimed += _tokensWaged; // todo -- this ignores commission

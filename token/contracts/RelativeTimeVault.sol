@@ -12,12 +12,12 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     IERC20 public token; // Address of token contract and same used for rewards
     Wizards public wizardsNFT;
 
-    uint256 totalTowerPower; // sum of power of all rooms
+//    uint256 totalTowerPower; // sum of power of all rooms
     uint256 public activeFloors = 0; //  10000;
     uint256 public constant DA = 10**6; // Decimals Added for better accuracy
     uint256 startTimestamp;
-    uint256 totalPowerSnapshot;
-    uint256 totalPowerSnapshotTimestamp;
+    uint256 public totalPowerSnapshot;
+    uint256 public totalPowerSnapshotTimestamp;
     uint256 DUST = 10**6; // min ecosystem tokens to do certain actions like auto withdraw
 
     // Geometric sequence
@@ -98,6 +98,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         tokenOperator = msg.sender;
         battler = msg.sender;
         startTimestamp = block.timestamp;
+        totalPowerSnapshotTimestamp = block.timestamp;
     }
 
     // todo -- reconsider functionality of operator, owner
@@ -137,53 +138,62 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         return activeFloors;
     }
 
-
-    function captureFloor(uint256 _floorAttacked, uint256 _floorAttackedFrom) external returns (uint256) {
-        uint256 attacker = floorIdToInfo[_floorAttackedFrom].occupyingWizardId;
-        require((wizardsNFT.ownerOf(attacker)==msg.sender) || (msg.sender == battler), "not owner of attacking wizard");
-        _captureFloor(_floorAttacked, _floorAttackedFrom);
-    }
-
-    // removes deserter from tower
-    // todo -- note, there is no option for battler and so could combine this as only external function
-    // todo -- consider reducing number of state changes
-    function _captureFloor(uint256 _floorAttacked, uint256 _floorAttackedFrom) internal returns (uint256) {
-        uint256 defender = floorIdToInfo[_floorAttacked].occupyingWizardId;
-        uint256 attacker = floorIdToInfo[_floorAttackedFrom].occupyingWizardId;
+    function captureFloor(uint256 _floorCaptured) external onlyBattler {
+        uint256 capturedId = floorIdToInfo[_floorCaptured].occupyingWizardId;
         uint256 bottom =   floorIdToInfo[activeFloors].occupyingWizardId;
-
-        require(wizardsNFT.isActive(defender) == false && wizardsNFT.isActive(attacker) == true, "def must be inactive; att active");
-
-        // happens within battle or separate?
-        // drain current floor for attacking wizard
-        if(floorBalance(_floorAttackedFrom) > DUST) {
-            _withdraw(_floorAttackedFrom, wizardsNFT.ownerOf(attacker));
-        }
-        // drain captured floor to attacking wizard
-        if(floorBalance(_floorAttacked) > DUST) {
-            _withdraw(_floorAttacked, wizardsNFT.ownerOf(attacker));
-        }
-        // drain bottom floor to bottom wizard
         if(floorBalance(activeFloors) > DUST) {
             _withdraw(activeFloors, wizardsNFT.ownerOf(bottom));
         }
 
-        // put attacking wizard in attacking floor
-        FloorInfo storage floorAttacked = floorIdToInfo[_floorAttacked];
-        floorAttacked.occupyingWizardId = uint16(attacker);
-        floorAttacked.lastWithdrawalTimestamp = uint40(block.timestamp);
-
         // put bottom wizard in attacking wizard spot
-        FloorInfo storage floorAttackedFrom = floorIdToInfo[_floorAttackedFrom];
-        floorAttackedFrom.occupyingWizardId = uint16(bottom);
-        floorAttackedFrom.lastWithdrawalTimestamp = uint40(block.timestamp);
-
-        // floorIdToInfo[activeFloors] still points to bottom, but will be rewritten when new floor is activated
+        FloorInfo storage floorCaptured = floorIdToInfo[_floorCaptured];
+        floorCaptured.occupyingWizardId = uint16(bottom);
+        floorCaptured.lastWithdrawalTimestamp = uint40(block.timestamp);
 
 
         activeFloors -= 1;
         _updateTotalPowerSnapshot(0); // reductions happened automatically in withdraw
     }
+
+//    // removes deserter from tower
+//    // todo -- note, there is no option for battler and so could combine this as only external function
+//    // todo -- consider reducing number of state changes
+//    function _captureFloor(uint256 _floorAttacked, uint256 _floorAttackedFrom) internal {
+//        uint256 defender = floorIdToInfo[_floorAttacked].occupyingWizardId;
+//        uint256 attacker = floorIdToInfo[_floorAttackedFrom].occupyingWizardId;
+//        uint256 bottom =   floorIdToInfo[activeFloors].occupyingWizardId;
+//
+//        require(wizardsNFT.isActive(defender) == false && wizardsNFT.isActive(attacker) == true, "def must be inactive; att active");
+//
+//        // happens within battle or separate?
+//        // drain current floor for attacking wizard
+//        if(floorBalance(_floorAttackedFrom) > DUST) {
+//            _withdraw(_floorAttackedFrom, wizardsNFT.ownerOf(attacker));
+//        }
+//        // drain captured floor to attacking wizard
+//        if(floorBalance(_floorAttacked) > DUST) {
+//            _withdraw(_floorAttacked, wizardsNFT.ownerOf(attacker));
+//        }
+//        // drain bottom floor to bottom wizard
+//        if(floorBalance(activeFloors) > DUST) {
+//            _withdraw(activeFloors, wizardsNFT.ownerOf(bottom));
+//        }
+//
+//        // put attacking wizard in attacking floor
+//        FloorInfo storage floorAttacked = floorIdToInfo[_floorAttacked];
+//        floorAttacked.occupyingWizardId = uint16(attacker);
+//        floorAttacked.lastWithdrawalTimestamp = uint40(block.timestamp);
+//
+//        // put bottom wizard in attacking wizard spot
+//        FloorInfo storage floorAttackedFrom = floorIdToInfo[_floorAttackedFrom];
+//        floorAttackedFrom.occupyingWizardId = uint16(bottom);
+//        floorAttackedFrom.lastWithdrawalTimestamp = uint40(block.timestamp);
+//
+//        // floorIdToInfo[activeFloors] still points to bottom, but will be rewritten when new floor is activated
+//
+//        activeFloors -= 1;
+//        _updateTotalPowerSnapshot(0); // reductions happened automatically in withdraw
+//    }
 
     function switchFloors(uint256 _floorA, uint256 _floorB) external onlyBattler {
         require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "must own wizardsNFT");
@@ -200,9 +210,17 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         return _floorBalance(_floor);
     }
 
+    function _floorBalance(uint256 _floor) internal view returns(uint256) {
+        require(activeFloors>0, "no active floors");
+        require(_floor <= activeFloors && _floor!= 0, "invalid floor");
+        FloorInfo memory floorInfo = floorIdToInfo[_floor];
+
+        return floorPower(_floor) * token.balanceOf((address(this))) / _totalFloorPower();
+    }
+
     // todo -- implement geometric series powered by: https://github.com/paulrberg/prb-math
     // todo -- tutorial -- https://www.smartcontractresearch.org/t/deep-diving-into-prbmath-a-library-for-advanced-fixed-point-math/686
-    function floorPower(uint256 _floor) private view returns(uint256) {
+    function floorPower(uint256 _floor) public view returns(uint256) {
         // Geometric series -- todo
 //        return aFirst * (relativeIncrease ** (_floor - 1)); // A(n) for geometric series
 
@@ -214,17 +232,9 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         return aFirst * (block.timestamp - timestamp);
     }
 
-    function _totalFloorPower() internal view returns(uint256) {
+    function _totalFloorPower() public view returns(uint256) {
         // Geometric series -- todo
         return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * aFirst * activeFloors;
-    }
-
-    function _floorBalance(uint256 _floor) internal view returns(uint256) {
-        require(activeFloors>0, "no active floors");
-        require(_floor <= activeFloors && _floor!= 0, "invalid floor");
-        FloorInfo memory floorInfo = floorIdToInfo[_floor];
-
-        return floorPower(_floor) * token.balanceOf((address(this))) / _totalFloorPower();
     }
 
     // called when adding/removing floors or withdrawing
@@ -237,8 +247,8 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         // require owner owns wizardsNFT on that floor
         require(_floor!= 0 && _floor <= activeFloors, "invalid floor");
         uint256 wizardId = floorIdToInfo[_floor].occupyingWizardId;
-        require(wizardsNFT.ownerOf(wizardId) == msg.sender, "You do not own the wizard there.");
-        _withdraw(_floor, msg.sender);
+        require(wizardsNFT.ownerOf(wizardId) == tx.origin, "You do not own the wizard there."); // todo -- confirm tx.origin is ok
+        _withdraw(_floor, tx.origin);
     }
 
     function _withdraw(uint256 _floor, address recipient) internal {

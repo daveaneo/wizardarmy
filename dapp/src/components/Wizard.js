@@ -169,8 +169,15 @@ function sleep(ms) {
     async function GetOnTheTower() {
        const tx = await wizardTowerContract.claimFloor(wizardId);
        const res = await tx.wait();
-       const floor = parseInt(res.events[0].args[1]);
+//       const floor = parseInt(res.events[0].args[1]);
+
+
+       const attackEvent = res.events?.filter((x) => {return x.event == "FloorClaimed"})[0];
+//       console.log("attackEvent:", attackEvent );
+       const floor = parseInt(attackEvent.args[1]);
+
        setMyFloor(floor)
+//       console.log("I am on floor: ", floor)
     }
 
 
@@ -248,7 +255,7 @@ function sleep(ms) {
           {myWizard.initiationTimestamp !== 0 &&
             <div>
                  <button onClick={CompleteTask}>Complete Task</button>   <br/>
-                 { isOnTheTower===false && <button onClick={GetOnTheTower}>Get on the tower</button> }  <br/>
+                 { isOnTheTower===false && <button onClick={GetOnTheTower}>Get on the Tower</button> }  <br/>
                  { isOnTheTower===true &&
                  <div>
                      {myTowerTokens} <button onClick={WithdrawFromTower}>Withdraw from Tower</button> <br/>

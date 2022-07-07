@@ -10,6 +10,7 @@ function MyWizards(props) {
   const [wizardIDs, setWizardIDs] = useState([]);
   const [wizards, setWizards] = useState([]);
   const [myNumWizards, setMyNumWizards] = useState(0);
+  const [myTokens, setMyTokens] = useState(undefined);
 
   const [time, setTime] = useState(Date.now());
 
@@ -23,17 +24,7 @@ function MyWizards(props) {
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   let isLoadingMyWizards = false;
 
-//        uint256 hp;
-//        uint256 mp;
-//        uint256 wins;
-//        uint256 losses;
-//        uint256 battles;
-//        uint256 tokensClaimed;
-//        uint256 goodness;
-//        uint256 badness;
-//        uint256 initiationTimestamp; // 0 if uninitiated
-//        uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//        ELEMENT element;
+
     async function processWizardStructByIndex(ind) {
         let id = parseInt(await wizardNFTContract.tokenOfOwnerByIndex(address, ind));
         let wiz = await wizardNFTContract.tokenIdToStats(id);
@@ -78,6 +69,13 @@ function MyWizards(props) {
     }
 
 
+    async function GetMyTokens() {
+        if(ecosystemTokenContract!= undefined){
+            const tkns = parseInt(await ecosystemTokenContract.balanceOf(address));
+            setMyTokens(tkns);
+        }
+    }
+
     async function LoadMyWizards() {
       if(isLoadingMyWizards == true){
           return;
@@ -95,14 +93,6 @@ function MyWizards(props) {
             let bal = await wizardNFTContract.balanceOf(address);
             setMyNumWizards(parseInt(bal));
             setWizardIDs([]);
-            // iterate through balance
-            //          for(let i=0; i< bal; i++) {
-            //                let id = parseInt(await wizardNFTContract.tokenOfOwnerByIndex(address, i));
-            //                let wiz = await wizardNFTContract.tokenIdToStats(id);
-            //                await processWizardStruct(wiz, id).then( (processed) => {
-            //                    newWizArray.push(processed);
-            //                });
-            //            }
             for(let i=0; i< bal; i++) {
                 myPromise = processWizardStructByIndex(i).then( (processed) => {
                     newWizArray.push(processed);
@@ -116,7 +106,7 @@ function MyWizards(props) {
             });
       }
       else {
-        console.log("Not connected.");
+//        console.log("Not connected.");
       }
         isLoadingMyWizards = false;
     }
@@ -130,7 +120,8 @@ function MyWizards(props) {
 
     useEffect(() => {
       LoadMyWizards();
-    }, [connected, address]);
+      GetMyTokens();
+    }, [connected, address, numWizards]);
 
     useEffect(() => {
       LoadMyWizards();
@@ -139,7 +130,7 @@ function MyWizards(props) {
 
   return (
     <div className="">
-      <p className="DoubleBordered">I own {wizards.length} wizards:</p>
+      <p className="DoubleBordered">I own {wizards.length} wizards and have {myTokens} tokens.</p>
         {wizards && wizards.map(wizard =>
             <div key={wizard.id} className="Double">
                 <br/>

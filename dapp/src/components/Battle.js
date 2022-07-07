@@ -46,9 +46,70 @@ function Battle(props) {
         return processedFloor;
     }
 
-    async function AttackTower() {
+    async function AttackTower(_floor) {
         // todo implement and add in specific floor
-        console.log("I am attacking..")
+//        console.log("I am attacking..")
+//        console.log("wizardId: ", wizardId);
+//        console.log("_floor: ", _floor);
+
+        // approve token
+        // todo -- approval is tricky as balance is changing constantly
+        const floorBalance = parseInt( await wizardTowerContract.floorBalance(_floor));
+//        const tx = await ecosystemTokenContract.approve(wizardBattleContract.address, parseInt(floorBalance/10));
+
+//        var res = await tx.wait();
+        console.log("flor balance: ", floorBalance);
+        const tx = await wizardBattleContract.attack(wizardId, _floor, {value: '10000000000'});//{value: parseInt(floorBalance*1.1)}); // send a little extra
+//        console.log("tx: ", tx)
+        const res = await tx.wait(1);
+//        console.log("res: ", res)
+//        console.log("events: ", res.events)
+        const attackEvent = res.events?.filter((x) => {return x.event == "Attack"})[0];
+//        const tokensWonLost = parseInt(res.events[0].args[3]);
+//        const outcome = parseInt(res.events[0].args[4]);
+//        console.log("You have won/lost. Coins: ", tokensWonLost);
+//        console.log("outcome: ", outcome);
+//        console.log("attackEvent: ", attackEvent);
+        const outcome = parseInt(attackEvent.args[4]);
+        const tokensWonLost = parseInt(attackEvent.args[3]);
+        console.log("You have won/lost. Coins: ", tokensWonLost);
+        console.log("outcome: ", outcome);
+
+        if(outcome==0){
+          console.log("You lost.")
+        }
+        else if(outcome==1){
+          console.log("You won.")
+        }
+        else if(outcome==2){
+          console.log("You drew.")
+        }
+        else if(outcome==3){
+          console.log("You captured enemy wizard, a deserter.")
+        }
+        else{
+          console.log("Unknown battle outcome.")
+        }
+        LoadNeighborhood();
+
+//        // todo -- make nice looking/functioning approval flow
+//        // if approved
+//        if(res) {
+//            const tx = await wizardBattleContract.attack(wizardId, _floor, {value: floorBalance*1.1}); // send a little extra
+//            res = await tx.wait();
+//            console.log("res: ", res)
+//            const tokensWonLost = parseInt(res.events[0].args[3]);
+//            const won = parseInt(res.events[0].args[4]);
+//            console.log("You have won/lost. Coins: ", tokensWonLost);
+//        }
+//        else{
+//            console.log("approval failed.")
+//        }
+
+
+
+//        update floor
+
     }
 
     async function LoadMyFloor() {
@@ -78,7 +139,7 @@ function Battle(props) {
       let ids = [];
       let startFloor = myFloor - 5 >0 ? myFloor - 5 : 1;
       let endFloor = myFloor + 5 <= activeFloors ? myFloor + 5 : activeFloors;
-      for(let i=startFloor; i<endFloor; i++){
+      for(let i=startFloor; i <= endFloor; i++){
         ids.push(i);
       }
       setFloorIDs([ids]); // be wary of infinite loop
@@ -145,11 +206,19 @@ function sleep(ms) {
       return () => clearInterval(interval);
     }, []);
 
+//    useEffect(() => {
+//        console.log("my address: ", address);
+//        LoadContracts()
+//        LoadMyFloor();
+//    }, [address]);
+
+
     useEffect(() => {
-      if(contractsLoaded===true){
-//          LoadNeighborhood();
-          LoadMyFloor();
-      }
+      LoadMyFloor();
+//      if(contractsLoaded===true){
+////          LoadNeighborhood();
+//          LoadMyFloor();
+//      }
     }, [connected, address]);
 
     useEffect(() => {
@@ -182,8 +251,9 @@ function sleep(ms) {
                     <div>element: {floor.element}</div>
                     <div>Occupying Wizard ID: {floor.occupyingWizardId}</div>
                     <div>Tokens: {floor.tokens}</div>
-                    <button onClick={AttackTower}> Attack </button>
-
+                    <div>
+                       {(myFloor!= floor.floorNumber) && <button onClick={() => AttackTower(floor.floorNumber)}> Attack </button>}
+                    </div>
                 </div>
             </div>
         )}
