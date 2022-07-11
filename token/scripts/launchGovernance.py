@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, WizardTower, WizardBattle, accounts, network, config
+from brownie import Governance, Wizards, Token, WizardTower, WizardBattle, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -21,21 +21,22 @@ def main():
     wizards = Wizards.deploy("Wizards", "WZD", token.address, {'from': accounts[0]})
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
+    governance = Governance.deploy(wizards.address, {'from': accounts[0]})
 
     # save addresses
     directory = os.getcwd()
     # path = os.path.join(directory, "abi_dump")
     # print(f'path: {path}')
-    abi = str(wizards.abi)
-    file_path = os.path.join(directory, "deployed_contracts.txt")
-    with open(file_path, 'a') as file:
-        file.write("\n\n******************************************")
-        file.write(f"\n*********   {date.today()}    **************")
-        file.write("\n******************************************")
-        file.write(f'\ntoken: {token}')
-        file.write(f'\nwizardsNFT: {wizards}')
-        file.write(f'\nwizard_tower: {wizard_tower}')
-        file.write(f'\nwizard_battle: {wizard_battle}')
+    # abi = str(wizards.abi)
+    # file_path = os.path.join(directory, "deployed_contracts.txt")
+    # with open(file_path, 'a') as file:
+    #     file.write("\n\n******************************************")
+    #     file.write(f"\n*********   {date.today()}    **************")
+    #     file.write("\n******************************************")
+    #     file.write(f'\ntoken: {token}')
+    #     file.write(f'\nwizardsNFT: {wizards}')
+    #     file.write(f'\nwizard_tower: {wizard_tower}')
+    #     file.write(f'\nwizard_battle: {wizard_battle}')
 
     # set modifier addresses
     tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
@@ -61,22 +62,18 @@ def main():
     # chain.sleep(60*9)
     # chain.mine(1)
 
-    for i in range(5):
-        outcome = wizard_battle.battle(0, 1)
-        print(f' battle outcome: {outcome}')
-        chain.sleep(60)
-        chain.mine(1)
+    hex_string = "QmQQCTSBhkmBtj23pNLJkg9rt7EWPtsmXcVbDz3efqXhuV"
+    # an_integer = int(hex_string, 16)
+    # hex_value = hex(an_integer)
+    print(f'len of chain: {len(chain)}')
 
-    for i in range(5):
-        outcome = wizard_battle.battle(1, 0)
-        print(f' battle outcome: {outcome}')
-        chain.sleep(60)
-        chain.mine(1)
+    tx = governance.createTaskType(hex_string, 0, 999999999999)
+    tx.wait(1)
+    tasks = governance.getMyAvailableTaskTypes()
+    print(f'my tasks: {tasks}')
 
-
-    # attack
-    tower_balance = token.balanceOf(wizard_tower.address)
-
+    t1 = governance.taskTypes(0)
+    print(f't1: {t1}')
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

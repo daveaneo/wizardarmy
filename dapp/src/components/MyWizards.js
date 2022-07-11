@@ -32,7 +32,9 @@ function MyWizards(props) {
         processedWizard.id = parseInt(id);
         processedWizard.level = parseInt(wiz.level);
         processedWizard.hp = parseInt(wiz.hp);
-        processedWizard.mp = parseInt(wiz.mp);
+        processedWizard.magicalPower = parseInt(wiz.magicalPower);
+        processedWizard.magicalDefense = parseInt(wiz.magicalDefense);
+        processedWizard.speed = parseInt(wiz.speed);
         processedWizard.wins = parseInt(wiz.wins);
         processedWizard.losses = parseInt(wiz.losses);
         processedWizard.battles = parseInt(wiz.battles);
@@ -143,7 +145,9 @@ function MyWizards(props) {
                     <div>ID: {wizard.id}</div>
                     <div>element: {wizard.element}</div>
                     <div>HP: {wizard.hp}</div>
-                    <div>MP: {wizard.mp}</div>
+                    <div>MagicalPower: {wizard.magicalPower}</div>
+                    <div>magicalDefense: {wizard.magicalDefense}</div>
+                    <div>MagicalSpeed: {wizard.magicalSpeed}</div>
                     <div>Tokens Claimed: {wizard.tokensClaimed}</div>
                 </div>
                 </Link>

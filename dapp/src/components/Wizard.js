@@ -66,7 +66,9 @@ function sleep(ms) {
         processedWizard.id = parseInt(id);
         processedWizard.level = parseInt(wiz.level);
         processedWizard.hp = parseInt(wiz.hp);
-        processedWizard.mp = parseInt(wiz.mp);
+        processedWizard.magicalPower = parseInt(wiz.magicalPower);
+        processedWizard.magicalDefense = parseInt(wiz.magicalDefense);
+        processedWizard.speed = parseInt(wiz.speed);
         processedWizard.wins = parseInt(wiz.wins);
         processedWizard.losses = parseInt(wiz.losses);
         processedWizard.battles = parseInt(wiz.battles);
@@ -226,7 +228,9 @@ function sleep(ms) {
                     <div>Level: {myWizard.level}</div>
                     <div>Floor: {myFloor}</div>
                     <div>HP: {myWizard.hp}</div>
-                    <div>MP: {myWizard.mp}</div>
+                    <div>Magical Power: {myWizard.magicalPower}</div>
+                    <div>Magical Defense: {myWizard.magicalDefense}</div>
+                    <div>Speed: {myWizard.magicalSpeed}</div>
                     <div>Tokens Claimed: {myWizard.tokensClaimed}</div>
                     <div>wins: {myWizard.wins}</div>
                     <div>losses: {myWizard.losses}</div>

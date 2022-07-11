@@ -26,14 +26,14 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     address public tokenOperator; // Address to manage the Stake
     address public battler; // Address to manage the Stake
-    enum ELEMENT {FIRE, WIND, WATER, EARTH}
+//    enum Wizards.ELEMENT {FIRE, WIND, WATER, EARTH}
 
     // todo -- combine mappings
     struct FloorInfo {
         uint16 floorPower; // todo -- may not use it this way (function, instead)
         uint40 lastWithdrawalTimestamp;
         uint16 occupyingWizardId;
-        ELEMENT element;
+        Wizards.ELEMENT element;
     }
 //    struct FloorPlans {
 //        uint16 begin;
@@ -78,14 +78,21 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     ////    Get       //
     ////////////////////
 
-    function isOnTheTower(uint256 _wizardId) external returns(bool) {
+    function isOnTheTower(uint256 _wizardId) external view returns(bool) {
         return wizardIdToFloor[_wizardId] != 0;
     }
 
-    function getWizardOnFloor(uint256 _floor) external returns(uint256) {
+    function getWizardOnFloor(uint256 _floor) external view returns(uint256) {
         return uint256(floorIdToInfo[_floor].occupyingWizardId);
     }
 
+    function getFloorInfoGivenFloor(uint256 _floor) external view returns(FloorInfo memory) {
+        return floorIdToInfo[_floor];
+    }
+
+    function getFloorInfoGivenWizard(uint256 _wizardId) external view returns(FloorInfo memory) {
+        return floorIdToInfo[wizardIdToFloor[_wizardId]];
+    }
 
     //////////////
     ////  Core  //
@@ -129,7 +136,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         activeFloors += 1;
         FloorInfo memory floorInfo;
         floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
-        floorInfo.element = ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
+        floorInfo.element = Wizards.ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
         floorInfo.occupyingWizardId = uint16(_wizardId);
         wizardIdToFloor[_wizardId] = activeFloors;
         floorIdToInfo[activeFloors] = floorInfo;

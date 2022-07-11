@@ -17,12 +17,15 @@ contract Wizards is ERC721Enumerable, Ownable {
     address public verifier; /// contract address to update stats
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
+    enum OUTCOME {LOSS, WIN, TIE, CAPTURE}
 
     // todo -- add level (will affect dApp)
     struct Stats { // todo refine and move to bitencoding
         uint256 level;
         uint256 hp;
-        uint256 mp;
+        uint256 magicalPower;
+        uint256 magicalDefense;
+        uint256 speed;
         uint256 wins;
         uint256 losses;
         uint256 battles;
@@ -59,6 +62,10 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
+    function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
+        return tokenIdToStats[_wizardId];
+    }
+
 
     ///////////////////////////
     ////// Core Functions /////
@@ -78,13 +85,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         // hp, base = 25
         // mp base = 25
 
-        uint256 addOn = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp))) % 26;
-        uint256 hp = 25 + addOn;
-        uint256 mp = 50 - addOn;
+        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp)));
+//        uint256 addOn = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp))) % 26;
+        uint256 hp = 25 + pseudoRandNum % 26;
+        uint256 magicalPower = 25 + (pseudoRandNum/100) % 26;
+        uint256 magicalDefense = 10 + (pseudoRandNum/10*4) % 10;
+        uint256 speed = 10 + (pseudoRandNum/10*5) % 10;
+        ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
 
-        ELEMENT element = ELEMENT(uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp+1, hp))) % 4);
-
-        Stats memory myStats =  Stats(1, hp, mp, 0, 0, 0, 0, 0, 0, 0, 0, element);
+        Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, 0, 0, 0, element);
         tokenIdToStats[totalSupply()] = myStats;
         _safeMint(msg.sender, totalSupply());
 //        unchecked { totalSupply() += 1; }
@@ -106,20 +115,28 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit Initiated(msg.sender, _tokenId, block.timestamp);
     }
 
-    function reportBattle(uint256 _attackerId, uint256 _defenderId, uint256 _won, uint256 _tokensWon,
+    function reportBattle(uint256 _attackerId, uint256 _defenderId, OUTCOME outcome, uint256 _tokensWon,
         uint256 _tokensWaged) external onlyBattler {
-        tokenIdToStats[_attackerId].wins += _won;
-        tokenIdToStats[_attackerId].losses += _won==0 ? 1 : 0;
+        if(outcome == OUTCOME.WIN){
+            tokenIdToStats[_attackerId].wins += 1;
+            tokenIdToStats[_defenderId].losses += 1;
+
+        }
+        else if(outcome == OUTCOME.LOSS){
+            tokenIdToStats[_attackerId].losses += 1;
+            tokenIdToStats[_defenderId].wins += 1;
+        }
+
         tokenIdToStats[_attackerId].tokensClaimed += _tokensWon;
+
         // todo -- tokens waged?
-        tokenIdToStats[_defenderId].wins += _won==0 ? 1 : 0;
-        tokenIdToStats[_defenderId].losses += _won;
-        tokenIdToStats[_defenderId].tokensClaimed += _tokensWon;
+//        tokenIdToStats[_defenderId].tokensClaimed += _tokensWon;
         // todo -- add stat for last time attacked to limit attack frequency?
 
-        if(_won==0) {
-            tokenIdToStats[_defenderId].tokensClaimed += _tokensWaged; // todo -- this ignores commission
-        }
+        // we switched to ETH
+//        if(_won==OUTCOME.LOSS) {
+//            tokenIdToStats[_defenderId].tokensClaimed += _tokensWaged; // todo -- this ignores commission
+//        }
     }
 
     /**
@@ -174,11 +191,20 @@ contract Wizards is ERC721Enumerable, Ownable {
         json_str = string(abi.encodePacked(json_str,
             ', {"display_type": "number", "trait_type": "hp", "value": ',
             Strings.toString(myStats.hp),   ' }',
+            ', {"display_type": "number", "trait_type": "magical power", "value": ',
+            Strings.toString(myStats.magicalPower),   ' }',
+                ', {"display_type": "number", "trait_type": "magical defense", "value": ',
+            Strings.toString(myStats.magicalDefense),   ' }'
+        ));
+
+        // use this format to add extra properties
+        json_str = string(abi.encodePacked(json_str,
+            ', {"display_type": "number", "trait_type": "speed", "value": ',
+            Strings.toString(myStats.speed),   ' }',
             ', {"display_type": "number", "trait_type": "mp", "value": ',
-            Strings.toString(myStats.mp),   ' }',
-                ', {"display_type": "number", "trait_type": "wins", "value": ',
             Strings.toString(myStats.wins),   ' }'
         ));
+
 
         // use this format to add extra properties
         json_str = string(abi.encodePacked(json_str,

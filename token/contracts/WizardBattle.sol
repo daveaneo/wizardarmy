@@ -26,8 +26,11 @@ contract WizardBattle is Ownable, ReentrancyGuard {
         wizardTower = WizardTower(_wizardTower);
     }
 
+//    enum Wizards.OUTCOME {LOSS, WIN, TIE, CAPTURE}
+//    enum ELEMENT {FIRE, WIND, WATER, EARTH}
+
     event Attack(uint256 attackerId, uint256 defenderId, uint256 floorAttacked,
-                 uint256 netTokensGainedOrLost, uint256 result, uint256 timestamp);
+                 uint256 netTokensGainedOrLost, Wizards.OUTCOME outcome, uint256 timestamp);
     event Capture(uint256 captured, uint256 capturer, uint256 timestamp);
 
     ////////////////////
@@ -118,26 +121,28 @@ contract WizardBattle is Ownable, ReentrancyGuard {
         // 10% fee for attacking
         require(ethValueOfTokensOnFloor*attackFee/10000 <= msg.value, "insuffcient tokens to attack"); // only if other user is valid
 
+        bool _success = false;
         // send extra back
         if((msg.value - ethValueOfTokensOnFloor*attackFee/10000) > dustThreshold){
-            (bool _success, ) = msg.sender.call{value: msg.value - ethValueOfTokensOnFloor*attackFee/10000}("");
+            (_success, ) = msg.sender.call{value: msg.value - ethValueOfTokensOnFloor*attackFee/10000}("");
         }
 
         // send Eth to defender
-        (bool _success, ) = wizardNFT.ownerOf(occupyingWizard).call{value: ethValueOfTokensOnFloor*attackFee*(10000 - DAOShare)/(10**8)}("");
+        (_success, ) = wizardNFT.ownerOf(occupyingWizard).call{value: ethValueOfTokensOnFloor*attackFee*(10000 - DAOShare)/(10**8)}("");
 
         // capture other wizard if they are not active
-        uint256 won; // 0 => loss, 1 => win, 2 => tie?, 3 => capture
+        Wizards.OUTCOME outcome; // 0 => loss, 1 => win, 2 => tie?, 3 => capture
         if(!wizardNFT.isActive(occupyingWizard)){
-            won = 3;
+            outcome = Wizards.OUTCOME.CAPTURE;
             // handle capture below
         }
         else {
             // todo -- randomness, battle dynamics
-            won = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty, _floor))) % 2;
+//            outcome = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp, block.difficulty, _floor))) % 2;
+            outcome = battle(_attackerId, occupyingWizard);
         }
 
-        if(won!=0) {
+        if(outcome!=Wizards.OUTCOME.LOSS) {
             // withdraw tokens before leaving floor
             if(wizardTower.floorBalance(attackingFromFloor) > dustThreshold) {
                 wizardTower.withdraw(attackingFromFloor);
@@ -148,26 +153,91 @@ contract WizardBattle is Ownable, ReentrancyGuard {
             if(wizardTower.floorBalance(_floor) > dustThreshold) {
                 wizardTower.withdraw(_floor);
             }
-           // update NFT stats for wons/loses/tokens
+           // update NFT stats for wins/loses/tokens
         }
         else {
             // nothing else to do
         }
 
-        if(won==3){
+        if(outcome==Wizards.OUTCOME.CAPTURE){
             // kick wizard off tower
             wizardTower.captureFloor(attackingFromFloor); // wizard now resides on other floor
             emit Capture(occupyingWizard,_attackerId, block.timestamp);
 
         }
 
-        wizardNFT.reportBattle(_attackerId, occupyingWizard, won, tokensOnFloor, msg.value);
+        wizardNFT.reportBattle(_attackerId, occupyingWizard, outcome, tokensOnFloor, msg.value);
 
-        uint256 tokensWonOrLost = (won == 1) || ( won== 3 ) ?  tokensOnFloor*(10000 - attackFee)/10000 : ethValueOfTokensOnFloor*attackFee/10000;
-        emit Attack(_attackerId, occupyingWizard, _floor, tokensWonOrLost, won, block.timestamp);
+        uint256 tokensWonOrLost = (outcome == Wizards.OUTCOME.WIN) || ( outcome== Wizards.OUTCOME.CAPTURE ) ?  tokensOnFloor*(10000 - attackFee)/10000 : ethValueOfTokensOnFloor*attackFee/10000;
+        emit Attack(_attackerId, occupyingWizard, _floor, tokensWonOrLost, outcome, block.timestamp);
     }
 
+    // todo -- return a number between 0 and 200 for all combinations
+    function getElementMultiplier(Wizards.ELEMENT attackingElement, Wizards.ELEMENT defendingElement) internal pure returns(uint256){
+        return 100;
+    }
 
+    // @dev find the outcome of _attackerId attacking
+    function battle(uint256 _attackerId, uint256 _defenderId) public view returns(Wizards.OUTCOME){
+        WizardTower.FloorInfo memory floor = wizardTower.getFloorInfoGivenWizard(_defenderId); // does not contain floor #!
+        Wizards.ELEMENT floorElement = floor.element;
+        Wizards.Stats[2] memory characters = [wizardNFT.getStatsGivenId(_attackerId), wizardNFT.getStatsGivenId(_defenderId)];
+
+        // todo -- convert this to arrays
+        Wizards.Stats memory attacker = wizardNFT.getStatsGivenId(_attackerId);
+        Wizards.Stats memory defender = wizardNFT.getStatsGivenId(_defenderId);
+
+        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp,
+            _attackerId, floor.lastWithdrawalTimestamp)));
+
+
+        // determine who fights first
+        uint256 firstToAttack; // 0 means attacker (aggressor)
+        uint256 firstAttackSelector = pseudoRandNum % (attacker.speed + defender.speed);
+        pseudoRandNum >>= 8; // shift 8 bits
+        if(firstAttackSelector > attacker.speed) {
+            firstToAttack = 1; // defender
+        }
+
+        // determine buffs ( out of 10**4 )
+        uint256[2] memory attackMultipliers =
+              [uint256((characters[0].element==floorElement ? 125 : 100) * getElementMultiplier(characters[0].element, characters[1].element)),
+               uint256((characters[1].element==floorElement ? 125 : 100) * getElementMultiplier(characters[1].element, characters[0].element))];
+
+        uint256 attackAmount;
+        uint256 attackLuck;
+        uint256 defenderIndex; // todo -- battle is only creating losses
+        for(uint256 i=0; i < 20; ){
+            attackLuck = uint256(uint8(pseudoRandNum));
+            attackLuck = attackLuck > 12 ? attackLuck : 0; // 12/256 likelihood of being 0
+            defenderIndex = (firstToAttack==0 ? 1 : 0);
+            attackAmount = attackLuck == 0 ? 0 : (characters[firstToAttack].magicalPower*attackMultipliers[firstToAttack] / 10**4) * (384 + attackLuck/4 ) / 512;
+            attackAmount = attackAmount > characters[defenderIndex].magicalDefense ? attackAmount - characters[defenderIndex].magicalDefense : 0;
+            characters[defenderIndex].hp = attackAmount > characters[defenderIndex].hp ? 0 : characters[defenderIndex].hp - attackAmount;
+            if(characters[defenderIndex].hp == 0) {break;}
+//            firstToAttack = defenderIndex;
+            unchecked{
+                (firstToAttack, defenderIndex) = (defenderIndex, firstToAttack);
+                i++;
+            }
+        }
+
+        if(characters[0].hp == 0 ) {
+            return Wizards.OUTCOME.LOSS; // 0
+        }
+        else if(characters[1].hp == 0 ) {
+            return Wizards.OUTCOME.WIN; // 1
+        }
+        else {
+            return Wizards.OUTCOME.TIE; // 2
+        }
+
+        // 10 rounds of fight or death
+
+        // report battle outcome
+
+
+    }
 
     ////////////////////
     ////    Admin     //
