@@ -9,6 +9,8 @@ import Home from './components/Home';
 import NavBar from './components/NavBar';
 import ContractSettings from './components/ContractSettings';
 import "./App.css";
+// Temp notes here
+
 
 function App() {
   const [text, setText] = useState("");
