@@ -5,6 +5,7 @@ import WizardTower from './components/WizardTower';
 import MyWizards from './components/MyWizards';
 import Wizard from './components/Wizard';
 import Battle from './components/Battle';
+import Tasks from './components/Tasks';
 import Home from './components/Home';
 import NavBar from './components/NavBar';
 import ContractSettings from './components/ContractSettings';
@@ -36,6 +37,9 @@ function App() {
             />
             <Route path="/wizard/:id/battle/"
                 element = {<Battle connected={connected} address={address} />}
+            />
+            <Route path="/wizard/:id/tasks/"
+                element = {<Tasks connected={connected} address={address} />}
             />
             <Route path="/wizard/:id"
                 element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}

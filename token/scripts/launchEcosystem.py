@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, WizardTower, WizardBattle, accounts, network, config
+from brownie import Wizards, Token, WizardTower, WizardBattle, Governance, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -21,6 +21,7 @@ def main():
     wizards = Wizards.deploy("Wizards", "WZD", token.address, {'from': accounts[0]})
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
+    governance = Governance.deploy(wizards.address, {'from': accounts[0]})
 
     # save addresses
     directory = os.getcwd()
@@ -61,21 +62,25 @@ def main():
     # chain.sleep(60*9)
     # chain.mine(1)
 
-    for i in range(5):
-        outcome = wizard_battle.battle(0, 1)
-        print(f' battle outcome: {outcome}')
-        chain.sleep(60)
-        chain.mine(1)
+    # for i in range(5):
+    #     outcome = wizard_battle.battle(0, 1)
+    #     print(f' battle outcome: {outcome}')
+    #     chain.sleep(60)
+    #     chain.mine(1)
+    #
+    # for i in range(5):
+    #     outcome = wizard_battle.battle(1, 0)
+    #     print(f' battle outcome: {outcome}')
+    #     chain.sleep(60)
+    #     chain.mine(1)
 
-    for i in range(5):
-        outcome = wizard_battle.battle(1, 0)
-        print(f' battle outcome: {outcome}')
-        chain.sleep(60)
-        chain.mine(1)
 
-
-    # attack
-    tower_balance = token.balanceOf(wizard_tower.address)
+# Governance
+    hex_string = "QmQQCTSBhkmBtj23pNLJkg9rt7EWPtsmXcVbDz3efqXhuV"
+    tx = governance.createTaskType(hex_string, 0, 999999999999)
+    tx.wait(1)
+    tasks = governance.getMyAvailableTaskTypes()
+    print(f'my tasks: {tasks}')
 
 
     if DUMP_ABI:

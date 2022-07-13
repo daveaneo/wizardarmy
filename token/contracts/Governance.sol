@@ -44,6 +44,8 @@ contract Governance is ReentrancyGuard, Ownable {
         bytes32 hash; // hashed input to be validated
         uint8 numFieldsToHash;
         uint24 timeBonus; // in seconds
+        uint8 strikes;
+        uint80 payment;
     }
 
     struct Proposal {
@@ -200,6 +202,36 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // todo --  emit event
     }
+
+    // todo -- we need IPFS info, lock the task, task ID
+    function verifyTask(uint256 _taskID, string memory _IPFSHash, bytes32[] _fields) external {
+        require(_fields.length > 0);
+        uint256 count = 0;
+        bytes32 myHash = _fields[0]; // note -- not hashed
+        for(uint256 i = 1; i < _fields;){
+            myHash = keccak256(myHash, _fields[i]);
+            unchecked{++i;}
+        }
+        // get task ID
+        for(uint256 i =0; i= tasks.length; ){
+            if(tasks[i].IPFSHash == _IPFSHash){
+                // check if hash is correct
+                if(tasks[i].hash == myHash){
+                    // todo -- approve and release funds
+                    // if strikes == 1, we will split the funds
+                }
+                else {
+                    // if it doesn't match the first, we want to compare it with the other
+                }
+                // check strikes
+
+            }
+            unchecked{++i;}
+        }
+        // verify hashes are equal
+        // emit event
+    }
+
     //////////////////////
     ////// Modifiers /////
     //////////////////////

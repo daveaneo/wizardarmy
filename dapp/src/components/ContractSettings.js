@@ -7,13 +7,15 @@ import { ethers } from "ethers";
 const WizardsNFTabi = require('../abi/wizards.json').abi;
 const WizardTowerabi = require('../abi/wizardtower.json').abi;
 const WizardBattleabi = require('../abi/wizardbattle.json').abi;
+const WizardGovernanceabi = require('../abi/wizardgovernance.json').abi;
 const ERC20abi = require('../abi/ERC20.json').abi;
 const myInfuraRPC = process.env.REACT_APP_RINKEBY_RPC;
 
-let ecosystemTokenAddress = '0x6B8D30bBC428d9a48BeBD4C15Cbf57c557AF5224';
-let wizardNFTAddress = '0x16DA619312DDcA2DC8F83944587Ea3c1D657dA01';
-let wizardTowerAddress = '0x9f80Da5Fb9a2b42274fce2193e41105532dE9378';
-let wizardBattleAddress = '0x4C17E8B087C661ED665D89AA57D22B6bFB5f3957';
+let ecosystemTokenAddress = '0x6BDE2b6d60AFB3e5CdDBFB016D075455c04e4A4F';
+let wizardNFTAddress = '0xA0B8Ba87D51D4c439BDec3EFa674E0D30bfb573C';
+let wizardTowerAddress = '0xba09CCCDB50817195E9FA4BEDfBeb244395C641D';
+let wizardBattleAddress = '0x2f2021a2c881130FDA90c9B688862A02F93FbB7e';
+let wizardGovernanceAddress = '0xFEfa00c21814861Cb67554EDc4bE15883C5377d0';
 
 
  // load some data without metamask or signer
@@ -62,12 +64,14 @@ function ContractSettings(props) {
             const wizardNFTContract = new ethers.Contract(wizardNFTAddress, WizardsNFTabi, signer);
             const wizardTowerContract = new ethers.Contract(wizardTowerAddress, WizardTowerabi, signer);
             const wizardBattleContract = new ethers.Contract(wizardBattleAddress, WizardBattleabi, signer);
+            const wizardGovernanceContract = new ethers.Contract(wizardGovernanceAddress, WizardGovernanceabi, signer);
 
 //              Promise.all([ecosystemTokenContract, wizardNFTContract, wizardTowerContract, wizardBattleContract]).then( () =>{
             window.ecosystemToken = ecosystemTokenContract;
             window.wizardNFTContract = wizardNFTContract;
             window.wizardTowerContract = wizardTowerContract;
             window.wizardBattleContract = wizardBattleContract;
+            window.wizardGovernanceContract = wizardGovernanceContract;
 //              })
         }
 

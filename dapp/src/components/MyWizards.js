@@ -145,9 +145,9 @@ function MyWizards(props) {
                     <div>ID: {wizard.id}</div>
                     <div>element: {wizard.element}</div>
                     <div>HP: {wizard.hp}</div>
-                    <div>MagicalPower: {wizard.magicalPower}</div>
-                    <div>magicalDefense: {wizard.magicalDefense}</div>
-                    <div>MagicalSpeed: {wizard.magicalSpeed}</div>
+                    <div>Magical Power: {wizard.magicalPower}</div>
+                    <div>Magical Defense: {wizard.magicalDefense}</div>
+                    <div>Speed: {wizard.speed}</div>
                     <div>Tokens Claimed: {wizard.tokensClaimed}</div>
                 </div>
                 </Link>

@@ -230,7 +230,7 @@ function sleep(ms) {
                     <div>HP: {myWizard.hp}</div>
                     <div>Magical Power: {myWizard.magicalPower}</div>
                     <div>Magical Defense: {myWizard.magicalDefense}</div>
-                    <div>Speed: {myWizard.magicalSpeed}</div>
+                    <div>Speed: {myWizard.speed}</div>
                     <div>Tokens Claimed: {myWizard.tokensClaimed}</div>
                     <div>wins: {myWizard.wins}</div>
                     <div>losses: {myWizard.losses}</div>
@@ -258,7 +258,10 @@ function sleep(ms) {
           {myWizard.initiationTimestamp === 0 && <button onClick={Initiate}>Initiate</button> }
           {myWizard.initiationTimestamp !== 0 &&
             <div>
-                 <button onClick={CompleteTask}>Complete Task</button>   <br/>
+                 <Link to={"/wizard/" + wizardId + "/tasks/"}>
+                   <button onClick={CompleteTask}>Complete Task</button>   <br/>
+                </Link>
+
                  { isOnTheTower===false && <button onClick={GetOnTheTower}>Get on the Tower</button> }  <br/>
                  { isOnTheTower===true &&
                  <div>
