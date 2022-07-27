@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
 // SPDX-License-Identifier: UNLICENSED
 
 // This will be where wizards receive ecosystem tokens

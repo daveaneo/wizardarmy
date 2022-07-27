@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
 
 //import "./helpers/ERC721.sol";
 import "./helpers/Ownable.sol";
@@ -106,6 +106,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     function initiate(uint256 _tokenId) external {
         require(ownerOf(_tokenId) == msg.sender, "must be owner");
         require(tokenIdToStats[_tokenId].initiationTimestamp == 0, "already initiated");
+        // todo -- must be beyond time limitation
         // todo -- receive fee
 
         Stats storage myStats = tokenIdToStats[_tokenId];

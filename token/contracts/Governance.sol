@@ -1,4 +1,4 @@
-pragma solidity ^0.8.0;
+pragma solidity 0.8.15;
 // SPDX-License-Identifier: Unlicensed
 
 
@@ -46,6 +46,8 @@ contract Governance is ReentrancyGuard, Ownable {
         uint24 timeBonus; // in seconds
         uint8 strikes;
         uint80 payment;
+        address verifier;
+        uint40 verificationReservedTimestamp;
     }
 
     struct Proposal {
@@ -60,6 +62,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     TaskType[] public taskTypes;
     Task[] public tasks;
+    Task[] public tasksVerifying;
 
     mapping (uint256 => Proposal) public proposals;
     uint256 totalProposals;
@@ -142,6 +145,8 @@ contract Governance is ReentrancyGuard, Ownable {
 //        ecosystemTokens = IERC20(_addy);
 //    }
 
+
+
     //////////////////////////////
     //////  Main Functions ///////
     //////////////////////////////
@@ -173,6 +178,7 @@ contract Governance is ReentrancyGuard, Ownable {
         proposals[proposalID].totalVotes += 1;
     }
 
+    // votes won't need to be confirmed
     function createProposal(string calldata _IPFSHash, uint16 _numberOfOptions, uint40 _begTimestamp, uint40 _endTimestamp) external onlyBoard {
         require(_numberOfOptions > 1 && _numberOfOptions < 257, "invalid number of options");
         totalProposals += 1; // keep nothing at 0
@@ -203,18 +209,38 @@ contract Governance is ReentrancyGuard, Ownable {
         // todo --  emit event
     }
 
+//        struct Task {
+//        string IPFSHash; // holds description
+//        uint40 NFTID;
+//        bytes32 hash; // hashed input to be validated
+//        uint8 numFieldsToHash;
+//        uint24 timeBonus; // in seconds
+//        uint8 strikes;
+//        uint80 payment;
+//        address verifier;
+//        uint40 verificationReservedTimestamp;
+//    }
+
+    function claimRandomTaskForVerification() external {
+        // issues --
+        for(uint256 i = 0; i < tasks.length; i++){
+
+        }
+    }
+
+    // todo -- we need to claim a random task
     // todo -- we need IPFS info, lock the task, task ID
-    function verifyTask(uint256 _taskID, string memory _IPFSHash, bytes32[] _fields) external {
+    function verifyTask(uint256 _taskID, string memory _IPFSHash, bytes32[] calldata _fields) external {
         require(_fields.length > 0);
         uint256 count = 0;
         bytes32 myHash = _fields[0]; // note -- not hashed
-        for(uint256 i = 1; i < _fields;){
-            myHash = keccak256(myHash, _fields[i]);
+        for(uint256 i = 1; i < _fields.length;){
+            myHash = keccak256(abi.encodePacked(myHash, _fields[i]));
             unchecked{++i;}
         }
         // get task ID
-        for(uint256 i =0; i= tasks.length; ){
-            if(tasks[i].IPFSHash == _IPFSHash){
+        for(uint256 i =0; i < tasks.length; ){
+            if(keccak256(bytes(tasks[i].IPFSHash)) == keccak256(bytes(_IPFSHash))){ // couldn't compare storage vs memory
                 // check if hash is correct
                 if(tasks[i].hash == myHash){
                     // todo -- approve and release funds

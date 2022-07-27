@@ -168,6 +168,7 @@ function sleep(ms) {
         }
     }
 
+// todo -- did not automatically change to show on the tower
     async function GetOnTheTower() {
        const tx = await wizardTowerContract.claimFloor(wizardId);
        const res = await tx.wait();
