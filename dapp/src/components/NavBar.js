@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
+import Onboard from '@web3-onboard/core'
+import injectedModule from '@web3-onboard/injected-wallets'
+import walletConnectModule from '@web3-onboard/walletconnect'
 //import axios;
+
 
 function NavBar(props) {
     const setAddress = props.setAddress;
@@ -15,7 +19,76 @@ function NavBar(props) {
   const wizardTowerContract =window.wizardTowerContract;
   const wizardBattleContract =window.wizardBattleContract;
   const signer = window.signer;
+  const myInfuraRPC = process.env.REACT_APP_RINKEBY_RPC;
+  const MAINNET_RPC_URL = process.env.REACT_APP_MAINNET_RPC;
+  const injected = injectedModule()
+  const walletConnect = walletConnectModule()
+  const [onboard, setOnboard] = useState(undefined);
+//  var myonboard = undefined;
 
+  async function setupOnboard() {
+       let myonboard = await Onboard({
+          wallets: [injected, walletConnect],
+          chains: [
+            {
+              id: '0x4',
+              token: 'rETH',
+              label: 'Rinkeby',
+              rpcUrl: myInfuraRPC
+            },
+            {
+              id: '0x89',
+              token: 'MATIC',
+              label: 'Polygon',
+              rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
+            },
+          ]
+        })
+
+       setOnboard(myonboard)
+       return myonboard;
+}
+
+  async function connectWallet() {
+    // todo connection errors: connect/disconnect/connect
+    var myonboard;
+    if (onboard==undefined){
+      myonboard = await setupOnboard();
+    }
+    else {
+      myonboard = onboard;
+    }
+
+    const wallets = await myonboard.connectWallet()
+//    const [primaryWallet] = myonboard.state.get().wallets
+    if (wallets[0]) {
+      // create an ethers provider with the last connected wallet provider
+      const ethersProvider = new ethers.providers.Web3Provider(
+        wallets[0].provider,
+        'any'
+      )
+
+      const signer = ethersProvider.getSigner()
+/*
+      // send a transaction with the ethers provider
+      const txn = await signer.sendTransaction({
+        to: wallets[0],
+        value: 100000000000000
+      })
+
+      const receipt = await txn.wait()
+      console.log(receipt)
+*/
+      setConnected(true);
+    }
+/*
+    ethereum.request({ method: 'eth_requestAccounts'})
+        .then(accounts => {
+            setConnected(true);
+        })
+*/
+
+}
 
   async function loadAddress() {
         let provider = new ethers.providers.Web3Provider(ethereum);
@@ -41,6 +114,7 @@ function NavBar(props) {
     setConnected(JSON.parse(window.sessionStorage.getItem("connected")));
     const temp = JSON.parse(window.sessionStorage.getItem("connected"));
     loadAddress();
+//    setupOnboard();
   }, []);
 
   useEffect(() => {
@@ -48,6 +122,12 @@ function NavBar(props) {
         window.sessionStorage.setItem("connected", connected);
     }
   }, [connected]);
+
+/*
+  useEffect(() => {
+    console.log("onboard has changed: ", onboard)
+  }, [onboard]);
+*/
 
   // Detect change in Metamask account
   useEffect(() => {
@@ -88,16 +168,17 @@ function NavBar(props) {
         </a>
         <button onClick={() => {
         if (wizardNFTContract && !connected) {
-            ethereum.request({ method: 'eth_requestAccounts'})
-                .then(accounts => {
-                    setConnected(true);
-        //                    loadAddress();
-                })
+            connectWallet();
         }
         else { // disconnecting
             window.address = undefined;
             setConnected(false);
             setAddress(undefined);
+            // onboard
+            let [primaryWallet] = onboard.state.get().wallets
+            onboard.disconnectWallet({ label: primaryWallet.label })
+
+
         }
         }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
         <button onClick={SendTokensToTowerContract}> Power Tower </button>
