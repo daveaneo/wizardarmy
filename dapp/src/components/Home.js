@@ -89,7 +89,7 @@ function sleep(ms) {
 
   return (
         <div className="App">
-          <button onClick={() => {
+          {connected && <button onClick={() => {
             if (connected) {
                 mintWizard().then(res => {
                     })
@@ -97,6 +97,7 @@ function sleep(ms) {
             else{
             }
           }}>{'mint' }</button>
+          }
           <p>Wizard Army, {numWizards} strong!</p>
 
             {connected && <MyWizards

@@ -38,12 +38,15 @@ function NavBar(props) {
               label: 'Rinkeby',
               rpcUrl: myInfuraRPC
             },
-            {
+
+// todo -- add Polygon
+/*            {
               id: '0x89',
               token: 'MATIC',
               label: 'Polygon',
               rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
             },
+*/
           ]
         })
 
@@ -152,7 +155,9 @@ function NavBar(props) {
 
   return (
     <div className="NavBar">
+    <div> USE ONLY RINKEBY (ETHEREUM)</div>
       <div>
+
         <Link to="/"> Home </Link>
 
         <Link to="/files/whitepaper.pdf" target="_blank" download>Whitepaper</Link>
@@ -175,11 +180,8 @@ function NavBar(props) {
             // onboard
             let [primaryWallet] = onboard.state.get().wallets
             onboard.disconnectWallet({ label: primaryWallet.label })
-
-
         }
         }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
-        <button onClick={SendTokensToTowerContract}> Power Tower </button>
         </div>
 
 
@@ -188,3 +190,5 @@ function NavBar(props) {
 }
 
 export default NavBar;
+
+//        </* <button onClick={SendTokensToTowerContract}> Power Tower </button> */>
