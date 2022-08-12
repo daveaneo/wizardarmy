@@ -10,6 +10,7 @@ import Home from './components/Home';
 import NavBar from './components/NavBar';
 import ContractSettings from './components/ContractSettings';
 import "./App.css";
+// temp for deploying
 
 function App() {
   const [text, setText] = useState("");
