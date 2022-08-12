@@ -12,6 +12,8 @@ function NavBar(props) {
     const address = props.address;
     const connected = props.connected;
     const setConnected = props.setConnected;
+    const onboard = props.onboard;
+    const setOnboard = props.setOnboard;
 
   const { ethereum } = window;
   const ecosystemTokenContract = window.ecosystemToken;
@@ -23,7 +25,7 @@ function NavBar(props) {
   const MAINNET_RPC_URL = process.env.REACT_APP_MAINNET_RPC;
   const injected = injectedModule()
   const walletConnect = walletConnectModule()
-  const [onboard, setOnboard] = useState(undefined);
+//  const [onboard, setOnboard] = useState(undefined);
 //  var myonboard = undefined;
 
   async function setupOnboard() {
@@ -62,6 +64,7 @@ function NavBar(props) {
     const wallets = await myonboard.connectWallet()
 //    const [primaryWallet] = myonboard.state.get().wallets
     if (wallets[0]) {
+
       // create an ethers provider with the last connected wallet provider
       const ethersProvider = new ethers.providers.Web3Provider(
         wallets[0].provider,
@@ -81,13 +84,6 @@ function NavBar(props) {
 */
       setConnected(true);
     }
-/*
-    ethereum.request({ method: 'eth_requestAccounts'})
-        .then(accounts => {
-            setConnected(true);
-        })
-*/
-
 }
 
   async function loadAddress() {
@@ -167,10 +163,12 @@ function NavBar(props) {
           Discord
         </a>
         <button onClick={() => {
-        if (wizardNFTContract && !connected) {
+        if (!connected) {
+            console.log("connecting...")
             connectWallet();
         }
         else { // disconnecting
+            console.log("disconnecting... ", wizardNFTContract, connected, !connected)
             window.address = undefined;
             setConnected(false);
             setAddress(undefined);

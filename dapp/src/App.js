@@ -19,6 +19,7 @@ function App() {
   const [numWizards, setNumWizards] = useState(0);
   const [address, setAddress] = useState(undefined);
   const [counter, setCounter] = useState(1);
+  const [onboard, setOnboard] = useState(undefined);
 
   return (
 
@@ -29,9 +30,12 @@ function App() {
            address={address}
            setAddress={setAddress}
            setConnected={setConnected}
+           onboard={onboard}
         />
 
-          <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected}/>
+          <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected}
+            onboard={onboard} setOnboard={setOnboard}
+          />
         <Routes>
             <Route path="/tower"
               element = {<WizardTower />}
