@@ -44,12 +44,7 @@ function ContractSettings(props) {
 
 
   if(ethereum){
-    console.log("ethereum is found in contract settings")
     UpdateAddress();
-  }
-  else{
-    console.log("ethereum is  NOT found in contract settings")
-
   }
     async function UpdateAddress() {
         let provider = new ethers.providers.Web3Provider(ethereum);
@@ -62,8 +57,6 @@ function ContractSettings(props) {
          // console.error("ERROR. No account signed in (likely).");
          }
 
-        console.log('newaddress: ', newAddress)
-        console.log('provider: ', provider)
         if(newAddress!== undefined){
             window.provider = provider;
             const ecosystemTokenContract = new ethers.Contract(ecosystemTokenAddress, ERC20abi, signer);
@@ -85,7 +78,6 @@ function ContractSettings(props) {
           setAddress(newAddress);
         }
 
-        console.log("wizardnftcontracts: ",window.wizardNFTContract)
 
     }
 

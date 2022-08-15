@@ -169,11 +169,9 @@ function NavBar(props) {
         </a>
         <button onClick={() => {
         if (!connected) {
-            console.log("connecting...")
             connectWallet();
         }
         else { // disconnecting
-            console.log("disconnecting... ", wizardNFTContract, connected, !connected)
             window.address = undefined;
             setConnected(false);
             setAddress(undefined);

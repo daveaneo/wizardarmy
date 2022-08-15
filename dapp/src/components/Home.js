@@ -10,6 +10,7 @@ import "../App.css";
 function Home(props) {
   const connected = props.connected;
   const address = props.address;
+  const onboard = props.onboard;
 //  const numWizards = props.numWizards;
 
   const [text, setText] = useState("");
@@ -82,7 +83,8 @@ function sleep(ms) {
 
   useEffect(() => {
     updateNumWizards();
-  }, [contractsLoaded]); //
+
+  }, [contractsLoaded, onboard]); //
 
   // Detect change in Metamask account
 

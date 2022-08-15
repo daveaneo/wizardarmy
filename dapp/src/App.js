@@ -50,7 +50,7 @@ function App() {
                 element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}
             />
             <Route path="/"
-              element = {<Home address={address} connected={connected} numWizards={numWizards} / >}
+              element = {<Home address={address} connected={connected} numWizards={numWizards} onboard={onboard}/ >}
               />
         </Routes>
         </div>
