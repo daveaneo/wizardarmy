@@ -19,8 +19,8 @@ contract Wizards is ERC721Enumerable, Ownable {
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
     enum OUTCOME {LOSS, WIN, TIE, CAPTURE}
 
-    // todo -- add level (will affect dApp)
-    struct Stats { // todo refine and move to bitencoding
+    // note -- stack gets too deep if add more
+    struct Stats { // todo -- reduce uint amount
         uint256 level;
         uint256 hp;
         uint256 magicalPower;
@@ -157,8 +157,16 @@ contract Wizards is ERC721Enumerable, Ownable {
     /**
      * @dev Verify duties of NFT. Not duty specific
      */
-    function verifyDuty(uint256 _tokenId) external onlyVerifier {
+    function verifyDuty(uint256 _tokenId, uint256 _timeReward) external onlyVerifier {
+        // add time entension to NFT
+        tokenIdToStats[_tokenId].protectedUntilTimestamp = _timeReward + (tokenIdToStats[_tokenId].protectedUntilTimestamp < block.timestamp
+                 ? block.timestamp : tokenIdToStats[_tokenId].protectedUntilTimestamp);
+
+        // increase stats of NFT
+//        tokenIdToStats[_tokenId].tasksCompleted +=1;
     }
+
+
 
     /**
      * @dev uninitiate an NFT that is negligent in duties. Reward crusher

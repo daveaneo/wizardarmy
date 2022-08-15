@@ -22,6 +22,9 @@ function Tasks(props) {
 
   const [time, setTime] = useState(Date.now());
   const [contractsLoaded, setContractsLoaded] = useState(false);
+  const [newTaskDescription, setNewTaskDescription] = useState("");
+  const [newProposalDescription, setNewProposalDescription] = useState("");
+  const [numFieldsForProposal, setNumFieldsForProposal] = useState(1);
 
   // contracts
   const { ethereum } = window;
@@ -98,25 +101,7 @@ function Tasks(props) {
         return json
 }
 
-    async function sendFileToIPFS(myFile) {
-        var data = JSON.stringify({
-          "pinataOptions": {
-            "cidVersion": 1
-          },
-          "pinataMetadata": {
-            "name": "MVP Task",
-            "keyvalues": {
-              "customkey": "key",
-              "customkey2": "key2"
-            }
-          },
-          "pinataContent": {
-            "name": "MVP Task",
-            "description": "what is 5 + 9?",
-            "fields": 1
-              }
-        });
-
+    async function sendFileToIPFS(data) {
         var config = {
           method: 'post',
           url: 'https://api.pinata.cloud/pinning/pinJSONToIPFS',
@@ -127,12 +112,14 @@ function Tasks(props) {
           data : data
         };
 
+        // todo -- error checking
         const res = await axios(config);
         console.log(res.data);
+        return res.data;
     }
 
 //    sendFileToIPFS(myJSONFileForIPFS)
-    loadJSONFromIPFS()
+//    loadJSONFromIPFS()
 
     // todo improve async flow
     async function processFloorStruct(floorNumber) {
@@ -154,6 +141,7 @@ function Tasks(props) {
         console.log("Task will be completed: ", _id);
     }
 
+
     async function LoadMyTasks() {
       if(isLoadingMyTasks == true){
           return;
@@ -173,18 +161,15 @@ function Tasks(props) {
 
       let newTaskTypes = [];
       let taskObjects = []
-      let taskObject = undefined;
       if(connected && (address !== undefined)) {
-          taskObject = {}
-          newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes();
+          newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(); // will need task ID too
           for(let i = 0; i< newTaskTypes.length; i++){
+            let taskObject = {};
             taskObject.id = i;
-            taskObject.IPFS = newTaskTypes;
+            taskObject.IPFS = newTaskTypes[i];
             taskObjects.push(taskObject);
           }
 
-//          newTaskTypes.sort((a, b) => (a.floorNumber - b.floorNumber));
-//          setTaskTypes(newTaskTypes);
           taskObjects.sort((a, b) => (a.id - b.id));
           setTaskTypes(taskObjects);
       }
@@ -199,14 +184,85 @@ function Tasks(props) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+  async function handleNewTaskSubmission() {
+      alert("received: ", newTaskDescription);
+      // create proposal or Task
+}
 
-  async function CreateTaskType() {
-    console.log("to do");
+  async function CreateProposal(description, numFields) {
+    console.log("details: ", description, numFields);
+//    sendFileToIPFS(myFile);
+
+    /// IPFS
+        var data = JSON.stringify({
+          "pinataOptions": {
+            "cidVersion": 1
+          },
+          "pinataMetadata": {
+            "name": "MVP Task",
+            "keyvalues": {
+              "customkey": "key",
+              "customkey2": "key2"
+            }
+          },
+          "pinataContent": {
+            "name": "MVP Task",
+            "description": description,
+            "fields": numFields
+              }
+        });
+      let ipfsHash = (await sendFileToIPFS(data)).IpfsHash;
+      console.log("res from ipfs:", ipfsHash);
+
+      let currentTime = parseInt(Date.now()/1000);
+      let endTime = currentTime +  7*3600*24;
+      console.log("currentTime, EndTime: ", currentTime, endTime);
+
+      // Send to contract
+      if(ipfsHash!=undefined){
+        console.log("sending to smart contract...");
+        let tx = await wizardGovernanceContract.createProposal(ipfsHash, numFields, 0, endTime); // assign a week
+        let res = await tx;
+        // update state
+      }
+
+  }
+
+  async function CreateTask(description) {
+    console.log("to do: ", description);
+//    wizardGovernanceContract.createTaskType(IPFSHash, begTimeStamp, endTimeStamp)
+//    sendFileToIPFS(myFile);
+
+    // IPFS
+        var data = JSON.stringify({
+          "pinataOptions": {
+            "cidVersion": 1
+          },
+          "pinataMetadata": {
+            "name": "MVP Task",
+            "keyvalues": {
+              "customkey": "key",
+              "customkey2": "key2"
+            }
+          },
+          "pinataContent": {
+            "name": "MVP Task",
+            "description": description,
+            "fields": 1 // to do
+              }
+        });
+      sendFileToIPFS(data);
+
+    // Send to contract
+
   }
 
   async function DeleteTaskType() {
     console.log("to do");
   }
+
+// Request task to confirm
+// confirmTask
 
 
   async function ConfirmCompletedTask() {
@@ -265,6 +321,37 @@ function sleep(ms) {
 
   return (
     <div className="">
+      <div>
+          <p> Board Functions </p>
+
+          {/* Create Task */}
+        <div>
+            <textarea value={newTaskDescription} onChange={(e) => { setNewTaskDescription(e.target.value);}} />
+            <button onClick={() => CreateTask(newTaskDescription)}> Create Task Type </button> {/* description, beg timestamp, end timestamp*/}
+        </div>
+
+          {/* Create Propsoal */}
+        <div>
+            <textarea value={newProposalDescription} onChange={(e) => { setNewProposalDescription(e.target.value);}} />
+              <input
+                type="number"
+                value={numFieldsForProposal}
+                onChange={e => {
+                  //bug
+                  setNumFieldsForProposal(Number(e.target.value));
+                }}
+              />
+            <button onClick={() => CreateProposal(newProposalDescription, numFieldsForProposal)}> Create Proposal </button> {/* description, num choices, beg timestamp, end timestamp*/}
+        </div>
+{/*
+          <form onSubmit={this.HandleNewTaskSubmission}>
+            <label>
+              Description:
+              <textarea value={this.state.newProposalDescription} onChange={this.HandleNewTaskDescriptionChange} />        </label>
+            <input type="submit" value="Submit" />
+          </form>
+*/}
+      </div>
       <p className="DoubleBordered">Available tasks</p>
         {taskTypes && taskTypes.map(taskType =>
             <div key={taskType.id} className="Double">
@@ -284,9 +371,7 @@ function sleep(ms) {
         <div>
            <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
         </div>
-        <div>
-           <button onClick={() => CreateTaskType()}> Create Task Type </button>
-        </div>
+
         <div>
            <button onClick={() => DeleteTaskType()}> Delete Task Type </button>
         </div>

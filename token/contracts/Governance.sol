@@ -1,7 +1,7 @@
 pragma solidity 0.8.15;
 // SPDX-License-Identifier: Unlicensed
 
-
+import "./wizards.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IERC165.sol";
 import "./interfaces/IERC721.sol";
@@ -22,7 +22,7 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 contract Governance is ReentrancyGuard, Ownable {
 
 //    IERC20  ecosystemTokens;
-    IERC721 ecosystemNFTs;
+    Wizards wizardsNFT;
 
     // the value stored here is shifted over by one because 0 means no vote, 1 means voting for slot 0
     mapping (uint256 => mapping (uint256 => uint256)) public proposalToNFTVotes;
@@ -43,12 +43,14 @@ contract Governance is ReentrancyGuard, Ownable {
         string IPFSHash; // holds description
         uint40 NFTID; // wizard ID of who is assigned task
         bytes32 hash; // hashed input to be validated
+        bytes32 refuterHash; // correct hash according to refuter
         uint8 numFieldsToHash; // input fields
         uint24 timeBonus; // increases Wizard's activation time, in seconds
 //        uint8 strikes; // number of times confirmation has failed, use existence of refuterID
         uint80 payment; //
         uint16 verifierID; // wizardId of Verifier
         uint16 refuterID; // wizardId of Verifier
+
         uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
@@ -77,8 +79,10 @@ contract Governance is ReentrancyGuard, Ownable {
     mapping (uint256 => Task) public tasks;
     uint256 tasksAttempted;
 
-
+    // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
+    uint256 taskVerificationTimeBonus = 1 days; // 1 day
+
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId);
     event VerificationFailed(uint256 VerifierIdFirst, uint256 VerifierIdSecond, uint256 taskId);
@@ -169,7 +173,7 @@ contract Governance is ReentrancyGuard, Ownable {
     /////////////////////////////
 
     function setNFTAddress(address _addy) external onlyOwner {
-        ecosystemNFTs = IERC721(_addy);
+        wizardsNFT = Wizards(_addy);
     }
 
 
@@ -188,7 +192,7 @@ contract Governance is ReentrancyGuard, Ownable {
       */
     constructor(address _nft){
 //        ecosystemTokens = IERC20(_erc20);
-        ecosystemNFTs = IERC721(_nft);
+        wizardsNFT = Wizards(_nft);
 
 //        contractSettings = ContractSettings({
 //        });
@@ -201,7 +205,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     function vote(uint256 proposalID, uint256 NFTID, uint256 _vote) external onlyMember {
         require(proposalID < totalProposals, "no such proposal");
-        require(ecosystemNFTs.ownerOf(NFTID)==msg.sender, "not owner of NFT");
+        require(wizardsNFT.ownerOf(NFTID)==msg.sender, "not owner of NFT");
         require(proposalToNFTVotes[proposalID][NFTID]==0, "already voted");
         require(_vote!=0 && _vote <= proposals[proposalID].numberOfOptions);
         require(block.timestamp < proposals[proposalID].endTimestamp);
@@ -258,8 +262,11 @@ contract Governance is ReentrancyGuard, Ownable {
         uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksSubmitted);
         Task memory myTask;
         uint256 taskId;
+        // todo --implement randomness
+//        uint256[25] memory potentialTasks;
         for(uint256 i =0; i < totalTasksSubmitted; ){
             if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizID && myTask.refuterID!= _wizID){ // todo -- make sure to start IDs at 1
+//                potentialTasks.push(uint256(DoubleEndedQueue.at(tasksSubmitted, i)));
                 taskId = uint256(DoubleEndedQueue.at(tasksSubmitted, i));
                 myTask = tasks[taskId];
 
@@ -300,48 +307,86 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // todo --
     function completeTask() external {
-        Task memory myTask = Task("0",1, keccak256("hi"), 3, 4, 5, 6, 7, 8);
+/*
+        Task memory myTask = Task("0",1, keccak256("hi"), bytes32(3), 4, 5, 6, 7, 8, 9);
         DoubleEndedQueue.pushBack(tasksSubmitted, bytes32(tasksAttempted)); // todo -- change to dequeue
         tasks[tasksAttempted] = myTask;
         tasksAttempted+=1;
+*/
     }
 
-    // todo -- we need to claim a random task
-    // todo -- we need IPFS info, lock the task, task ID
-    // todo -- troubles
-    // if first verification fails, we want to avoid gaming the system where anyone can submit any code
-    // arguments are apparent in blockchain and can be used to easily win reward
-    function submitVerification(uint256 _wizId, uint256 _taskID, string memory _IPFSHash, bytes32[] calldata _fields) external {
-        require(ecosystemNFTs.ownerOf(_wizId) == msg.sender && tasks[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
 
+    // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted tasks must send in hashed leafs. Refuted, unhashed.
+    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] calldata _fields) external {
+        require(wizardsNFT.ownerOf(_wizId) == msg.sender && tasks[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
         require(_fields.length > 0);
+
+        Task storage myTask = tasks[_taskID];
         uint256 count = 0;
-        bytes32 myHash = _fields[0]; // note -- not hashed
-        for(uint256 i = 1; i < _fields.length;){
-            myHash = keccak256(abi.encodePacked(myHash, _fields[i]));
+
+        // hash leaf if refuter exists
+        bytes32 myHash = myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[0])) : _fields[0] ; // note -- not hashed
+        for(uint256 i = 0; i < _fields.length;){
+            myHash = keccak256(abi.encodePacked(myHash, myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[i])) : _fields[i]));
             unchecked{++i;}
         }
 
-        //
-        Task storage myTask = tasks[_taskID];
-        // confirm hash is correct
-            // yes, no
-        // yes -> remove task, release rewards
-        // no  -> increase strikes, create new task
-
         uint256 correctHash = myTask.hash == myHash ? 1 : 0;
 
+
         if (correctHash ==1){
-            // if refuterId exists, then this person gets no refund
+            // if refuterId exists, then refuter gets no refund
+            uint256 split = myTask.payment/2;
+            address payable taskSubmitter = payable(wizardsNFT.ownerOf(myTask.verifierID));
+//            address payable verifier = msg.sender;
 
-            // release funds
 
+            wizardsNFT.verifyDuty(myTask.NFTID, myTask.timeBonus);
+            wizardsNFT.verifyDuty(myTask.verifierID, taskVerificationTimeBonus);
 
-
+            myTask.payment=0; // thwart reentrancy attacks
             delete tasks[_taskID];
+
+            // send to task submitter
+            (bool sent, bytes memory data) = taskSubmitter.call{value: split}("");
+            require(sent, "Failed to send Ether");
+
+            // send to verifier
+            (sent, data) = msg.sender.call{value: split}("");
+            require(sent, "Failed to send Ether");
+
         }
         else { // if incorrect Hash
+            // case 2 -- if no match, send to DAO
 
+            // case 1 -- if matches hash of refuter, split
+            if(myTask.refuterHash==myHash){
+                uint256 split = myTask.payment/2;
+                address payable taskRefuter = payable(wizardsNFT.ownerOf(myTask.refuterID));
+
+                wizardsNFT.verifyDuty(myTask.refuterID, taskVerificationTimeBonus);
+                wizardsNFT.verifyDuty(_wizId, taskVerificationTimeBonus);
+
+                myTask.payment=0; // thwart reentrancy attacks
+                delete tasks[_taskID];
+
+                // send to task submitter
+                (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
+                require(sent, "Failed to send Ether");
+
+                // send to verifier
+                (sent, data) = msg.sender.call{value: split}("");
+                require(sent, "Failed to send Ether");
+
+            }
+            else{
+                // no agreement in the 3 submissions
+                // send ETH to DAO
+                uint256 split = myTask.payment;
+                delete tasks[_taskID];
+                (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+                require(sent, "Failed to send Ether");
+            }
 
         }
 

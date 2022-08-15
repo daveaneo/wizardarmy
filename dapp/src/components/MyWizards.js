@@ -132,7 +132,7 @@ function MyWizards(props) {
 
   return (
     <div className="">
-      <p className="DoubleBordered">I own {wizards.length} wizards and have {myTokens} tokens.</p>
+      <p className="DoubleBordered">I own {wizards.length} wizards and have {isNaN(myTokens) ? "0" : myTokens} tokens.</p>
         {wizards && wizards.map(wizard =>
             <div key={wizard.id} className="Double">
                 <br/>
