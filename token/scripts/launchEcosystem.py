@@ -76,13 +76,41 @@ def main():
 
 
 # Governance
-    hex_string = "QmQQCTSBhkmBtj23pNLJkg9rt7EWPtsmXcVbDz3efqXhuV"
-    tx = governance.createTaskType(hex_string, 0, 999999999999)
+#     function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
+#                 uint40 _endTimestamp, uint40 _availableSlots) external onlyBoard {
+
+    '''
+    hex_string = "FirstOne"
+    tx = governance.createTaskType(hex_string, 1, 24*60*60, 0, 999999999999, 25)
     tx.wait(1)
     tasks = governance.getMyAvailableTaskTypes()
     print(f'my tasks: {tasks}')
+    print(f'events: {tx.events}')
+    tt = governance.getTaskTypeFields(0);
+    print(f'tt: {tt}')
 
+    hex_string = "SecondOne"
+    tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25)
+    tx.wait(1)
+    tasks = governance.getMyAvailableTaskTypes()
+    print(f'my tasks: {tasks}')
+    print(f'events: {tx.events}')
+    tt = governance.getTaskTypeFields(1)
+    print(f'tt: {tt}')
+    '''
+    # not refuted
+    # hex_string = 0xc9d2b9a1987d380a8c8b45cf8ad43d19ccea73584eb50c57bd601558fc64a404
+    bytes_array = ["0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8", "0x18e9b451e5bb9a4a819352109126d2346a89373c4522fc9538ca265404dae958" ]
 
+    # refuted
+    hex_string = 0xfdc8dd941e43d934262f1805847ae879102598ee969b05eee95efbe8d9c21646
+    # bytes_array = ["0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8", "0x18e9b451e5bb9a4a819352109126d2346a89373c4522fc9538ca265404dae958"]
+
+    # bytes_array = [ "0x00000000000000000000000000000000000000000000000000000068656c6c6f", "0x0000000000000000000000000000000000000000000000000000006d6f74746f" ]
+
+    tx = governance.testHashing(hex_string, bytes_array, True)
+    tx.wait(1)
+    print(f'events: {tx.events}')
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ethers } from "ethers";
+import { ethers, utils } from "ethers";
 import {Link, useParams} from "react-router-dom";
 import FormData from 'form-data';
 import axios from 'axios';
@@ -25,6 +25,10 @@ function Tasks(props) {
   const [newTaskDescription, setNewTaskDescription] = useState("");
   const [newProposalDescription, setNewProposalDescription] = useState("");
   const [numFieldsForProposal, setNumFieldsForProposal] = useState(1);
+  const [numFieldsForTask, setNumFieldsForTask] = useState(1);
+  const [maxSlotsForTask, setMaxSlotsForTask] = useState(2**40-1);
+  const [myInputs, setMyInputs] = useState([]);
+  const [activeTask, setActivedTask] = useState(undefined);
 
   // contracts
   const { ethereum } = window;
@@ -38,66 +42,21 @@ function Tasks(props) {
   var isInitiated = undefined;
   let isLoadingMyTasks = false;
   var loadingContracts = false;
-  var myJSONFileForIPFS = {"description": "What is 5 + 9?", "fields": 1}
 
   const PINATA_API = process.env.REACT_APP_PINATA_API;
   const PINATA_API_SECRET = process.env.REACT_APP_PINATA_API_SECRET;
   const PINATA_JWT = process.env.REACT_APP_PINATA_JWT;
 
-//  console.log(process.env)
-//  const IPFS = require('ipfs')
-//  const makeIpfsFetch = require('ipfs-fetch')
-
-    // todo -- create new tasks for board members
-//
-//    async function sendFileToIPFS(myFile) {
-//
-//        if (Object.keys(myFile).length >= 2) {
-//            try {
-//                const formData = new FormData();
-//                formData.append("file", myFile);
-//
-//                const resFile = await axios({
-//                    method: "post",
-//                    url: "https://api.pinata.cloud/pinning/pinFileToIPFS",
-//                    data: formData,
-//                    headers: {
-//                        'pinata_api_key': `${process.env.REACT_APP_PINATA_API_KEY}`,
-//                        'pinata_secret_api_key': `${process.env.REACT_APP_PINATA_API_SECRET}`,
-//                        "Content-Type": "application/json"
-//                    },
-//                });
-//
-//                const ImgHash = `ipfs://${resFile.data.IpfsHash}`;
-//             console.log(ImgHash);
-////Take a look at your Pinata Pinned section, you will see a new file added to you list.
-//
-//
-//
-//            } catch (error) {
-//                console.log("Error sending File to IPFS: ")
-//                console.log(error)
-//            }
-//        }
-//    }
-
-    // todo -- overview
-    // load tasks ( options to choose from)
-       // load task information, allow enter information.
-    // load (random) task to confirm
-        // pause task on blockchain (two calls. One to pause and pay, another to submit and confirm.)
-    // offer ability to create task types
-    // offer ability to delete task types
 
     // name, description, fields
     async function loadJSONFromIPFS(cid) {
-       const response = await fetch('https://blackmeta.mypinata.cloud/ipfs/bafkreifvdz4cbeur5i5og2bp3fz3fq72djjp7sabs5ebyvsuci2zei3v3i'); // todo create new ipfs account
-        if(!response.ok)
+       let link = 'https://ipfs.io/ipfs/' + cid;
+       const response = await fetch(link);
+        if(!response.ok){
           throw new Error(response.statusText);
+        }
 
         const json = await response.json();
-//        console.log(json)
-//        console.log(json.description)
         return json
 }
 
@@ -112,14 +71,22 @@ function Tasks(props) {
           data : data
         };
 
-        // todo -- error checking
         const res = await axios(config);
-        console.log(res.data);
+        if(res.status!=200){
+          throw new Error(res.statusText);
+        }
         return res.data;
     }
 
 //    sendFileToIPFS(myJSONFileForIPFS)
 //    loadJSONFromIPFS()
+
+
+    async function handleUserInputChange(data, inputId) {
+        let tempInputArray = myInputs;
+        tempInputArray[inputId] = data;
+        setMyInputs([...tempInputArray]);
+    }
 
     // todo improve async flow
     async function processFloorStruct(floorNumber) {
@@ -137,8 +104,57 @@ function Tasks(props) {
         return processedFloor;
     }
 
+/*
+    // Working for retuted and not refuted
+    async function TestHash() {
+        let refuted = false;
+        let leaves = ["hello", "motto"]
+        let unhashedLeaves = []
+        let hashedLeaves = []
+        let onceHashedLeaves = []
+        let twiceHashedLeaves = []
+        let hashTypes = []
+        // hash all leafs
+        for(let i =0; i < leaves.length; i++){
+            let temp = utils.keccak256(utils.toUtf8Bytes(leaves[i]))
+            onceHashedLeaves.push(utils.keccak256(utils.toUtf8Bytes(leaves[i])));
+            temp = utils.keccak256(temp);
+            twiceHashedLeaves.push(temp);
+            hashTypes.push("bytes");
+        }
+
+        let finalHash;
+        let tx = undefined;
+        if(refuted){
+            finalHash = ethers.utils.solidityKeccak256(hashTypes, twiceHashedLeaves)
+        }
+        else{
+            finalHash = ethers.utils.solidityKeccak256(hashTypes, onceHashedLeaves)
+        }
+
+        tx = await wizardGovernanceContract.testHashing(finalHash, onceHashedLeaves, refuted)
+        let res = await tx.wait(1)
+        console.log('res.events.args: ', res.events[0].args)
+    }
+*/
+
+
     async function CompleteTask(_id) {
         console.log("Task will be completed: ", _id);
+        console.log("input values: ", myInputs);
+        let hashedLeaves = []
+        let hashTypes = []
+        // hash all leafs
+        for(let i =0; i < myInputs.length; i++){
+            hashedLeaves.push(utils.keccak256(utils.toUtf8Bytes(myInputs[i])));
+            hashTypes.push("bytes");
+        }
+//        console.log('...hashedLeaves: ', hashTypes, hashedLeaves);
+        let finalHash = ethers.utils.solidityKeccak256(hashTypes, hashedLeaves)
+
+//        console.log('finalHash: ', finalHash);
+        let tx = await wizardGovernanceContract.completeTask(taskTypes[_id].IPFS, finalHash, wizardId);
+        let res = await tx.wait(1);
     }
 
 
@@ -151,7 +167,7 @@ function Tasks(props) {
       }
 
       if(wizardGovernanceContract===undefined || wizardNFTContract === undefined){
-        console.log("GovernanceContract or NFT is not defined.")
+        console.error("GovernanceContract or NFT is not defined.")
         return;
       }
       else if(isInitiated===undefined){
@@ -165,8 +181,14 @@ function Tasks(props) {
           newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(); // will need task ID too
           for(let i = 0; i< newTaskTypes.length; i++){
             let taskObject = {};
+            taskObject = await loadJSONFromIPFS(newTaskTypes[i]);
             taskObject.id = i;
             taskObject.IPFS = newTaskTypes[i];
+            let fields = [];
+            for (let i =0; i < taskObject.fields; i++){
+                fields.push({"type": "text", "id": i})
+            }
+            taskObject.fields = fields;
             taskObjects.push(taskObject);
           }
 
@@ -175,7 +197,7 @@ function Tasks(props) {
       }
 
       else {
-        console.log("Not connected.");
+        console.error("Not connected.");
       }
         isLoadingMyTasks = false;
     }
@@ -212,26 +234,22 @@ function sleep(ms) {
               }
         });
       let ipfsHash = (await sendFileToIPFS(data)).IpfsHash;
-      console.log("res from ipfs:", ipfsHash);
 
       let currentTime = parseInt(Date.now()/1000);
       let endTime = currentTime +  7*3600*24;
-      console.log("currentTime, EndTime: ", currentTime, endTime);
+      let timeBonus = 24*60*60; // 1 day
 
       // Send to contract
       if(ipfsHash!=undefined){
-        console.log("sending to smart contract...");
-        let tx = await wizardGovernanceContract.createProposal(ipfsHash, numFields, 0, endTime); // assign a week
-        let res = await tx;
+        let tx = await wizardGovernanceContract.createProposal(ipfsHash, numFields, timeBonus, 0, endTime, 2*40-1);
+        let res = await tx.wait(1);
         // update state
       }
 
   }
 
-  async function CreateTask(description) {
+  async function CreateTask(description, numFields, maxSlots) {
     console.log("to do: ", description);
-//    wizardGovernanceContract.createTaskType(IPFSHash, begTimeStamp, endTimeStamp)
-//    sendFileToIPFS(myFile);
 
     // IPFS
         var data = JSON.stringify({
@@ -248,12 +266,26 @@ function sleep(ms) {
           "pinataContent": {
             "name": "MVP Task",
             "description": description,
-            "fields": 1 // to do
+            "fields": numFields
               }
         });
-      sendFileToIPFS(data);
+      let ipfsHash = (await sendFileToIPFS(data)).IpfsHash;
 
-    // Send to contract
+      let currentTime = parseInt(Date.now()/1000);
+      let endTime = currentTime +  7*3600*24;
+
+      // Send to contract
+      // todo -- get timeBonus from user
+      let timeBonus = 24*60*60; // 1 day
+
+
+        console.log("infor for createTaskType: ", ipfsHash, numFields, timeBonus, endTime, maxSlots)
+      if(ipfsHash!=undefined){
+        let tx = await wizardGovernanceContract.createTaskType(ipfsHash, numFields, timeBonus, 0, endTime, maxSlots);
+        let res = await tx.wait(1);
+        // todo -- if res == fail, pull out the IPFS data
+        // update state
+      }
 
   }
 
@@ -265,11 +297,32 @@ function sleep(ms) {
 // confirmTask
 
 
+    // a lot of await
+  async function ClaimRandomTask() {
+    let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
+    let res = await tx.wait(1);
+    console.log("res: ", res);
+    console.log("res.events[0].args: ", res.events[0].args);
+
+    let taskId = res.events[0].args[1]
+    let task = await wizardGovernanceContract.getTaskById(taskId);
+    console.log("taskId, task: ", taskId, task);
+
+}
+
   async function ConfirmCompletedTask() {
     console.log("to do");
     // transact with blockchain, claiming one task (15 minute limit)
     // populate information in order to confirm
     // submit
+
+//    let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
+//    let res = await tx.wait(1);
+//    console.log("res: ", res);
+//    console.log("res.events[0].args: ", res.events[0].args);
+//
+//    let taskId = res.events[0].args[1]
+
   }
 
   async function LoadContracts() {
@@ -306,6 +359,22 @@ function sleep(ms) {
 
 
     useEffect(() => {
+        if(activeTask!=undefined){
+         console.log("activated task has changed. New num of fields: ", taskTypes[activeTask].fields.length, taskTypes[activeTask], activeTask)
+         // resize myInputs
+         let tempMyInputs = Array(taskTypes[activeTask].fields.length).fill('');
+         console.log("inputs have been created: ", tempMyInputs)
+         setMyInputs(tempMyInputs);
+        }
+    }, [activeTask]);
+
+    useEffect(() => {
+        console.log("myInputs have changed: ", myInputs);
+
+    }, [myInputs]);
+
+
+    useEffect(() => {
         LoadMyTasks();
     }, [connected, address]);
 
@@ -327,14 +396,36 @@ function sleep(ms) {
           {/* Create Task */}
         <div>
             <textarea value={newTaskDescription} onChange={(e) => { setNewTaskDescription(e.target.value);}} />
-            <button onClick={() => CreateTask(newTaskDescription)}> Create Task Type </button> {/* description, beg timestamp, end timestamp*/}
+              <label for="numFields"> Num Fields</label>
+              <input
+                id="numFields"
+                type="number"
+                value={numFieldsForTask}
+                onChange={e => {
+                  setNumFieldsForTask(Number(e.target.value));
+                }}
+              />
+
+              <label for="maxSlots"> Max Slots</label>
+              <input
+                type="number"
+                id="maxSlots"
+                value={maxSlotsForTask}
+                onChange={e => {
+                  setMaxSlotsForTask(Number(e.target.value));
+                }}
+              />
+            <button onClick={() => CreateTask(newTaskDescription, numFieldsForTask, maxSlotsForTask)}> Create Task Type </button> {/* description, beg timestamp, end timestamp*/}
         </div>
 
           {/* Create Propsoal */}
+            <br />
         <div>
             <textarea value={newProposalDescription} onChange={(e) => { setNewProposalDescription(e.target.value);}} />
+              <label for="numFields"> Num Fields</label>
               <input
                 type="number"
+                id="numFields"
                 value={numFieldsForProposal}
                 onChange={e => {
                   //bug
@@ -357,17 +448,45 @@ function sleep(ms) {
             <div key={taskType.id} className="Double">
                 <br/>
 
-                Task {taskType.id}
-                <br/>
-                <div className="DoubleBordered">
-                    <div>IPFS Link: {taskType.IPFS}</div>
-                    <div>Assignment: {taskType.IPFS}</div>
-                    <div>
-                       <button onClick={() => CompleteTask(taskType.ID)}> Complete </button>
+                Task {taskType.id}, {taskType.name}
+
+                {/* add line break if giving description, otherwise not */}
+                {activeTask==taskType.id ? <br/> : ""}
+
+                {activeTask==taskType.id ?
+                    <div className="DoubleBordered">
+                       {/* <div>IPFS Link: {taskType.IPFS}</div>  */}
+                        <div>Assignment: {taskType.description}</div>
+
+                       {/* Input Fields  */}
+                        {taskType.fields && taskType.fields.map(field =>
+                            <div key={field.id} className="Double">
+                                <label> {field.id}: </label>
+                                <input
+                                    type={field.type}
+                                    id={field.id}
+                                    value={myInputs[parseInt(field.id)]}
+                                    onChange={e => {handleUserInputChange(e.target.value, field.id)}}
+                                />
+                            </div>
+                        )}
+
+                        <div>
+                           <button onClick={() => CompleteTask(taskType.id)}> Complete </button>
+                        </div>
                     </div>
-                </div>
+                :
+                    <>
+                       <button onClick={() => setActivedTask(taskType.id)}> Activate </button>
+                    </>
+                } {/*  End Individual Task Details  */}
+
             </div>
         )}
+        <div>
+           <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
+        </div>
+
         <div>
            <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
         </div>

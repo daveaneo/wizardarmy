@@ -33,9 +33,11 @@ contract Governance is ReentrancyGuard, Ownable {
         string IPFSHash; // holds description
         bool paused;
         uint40 proposalID; // proposal ID or 0 if task
+        uint8 numFieldsToHash;
+        uint24 timeBonus;
         uint40 begTimestamp;
         uint40 endTimestamp;
-        // max activity; current activity
+        uint16 availableSlots;
     }
 
     // include parent???
@@ -50,7 +52,6 @@ contract Governance is ReentrancyGuard, Ownable {
         uint80 payment; //
         uint16 verifierID; // wizardId of Verifier
         uint16 refuterID; // wizardId of Verifier
-
         uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
@@ -86,6 +87,10 @@ contract Governance is ReentrancyGuard, Ownable {
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId);
     event VerificationFailed(uint256 VerifierIdFirst, uint256 VerifierIdSecond, uint256 taskId);
+    event VerificationSucceeded(uint256 taskDoer, uint256 Verifier, uint256 taskId, bytes32 hash, bool isHashCorrect);
+    event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
+    event NewTaskTypeCreated(string _IPFSHash,uint40 _proposalID, uint8 _numFieldsToHash, uint24 _timeBonus,
+          uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots);
 
     /////////////////////////////
     //////  TEMP Functions ///////
@@ -106,6 +111,16 @@ contract Governance is ReentrancyGuard, Ownable {
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
+
+/*
+// todo -- delete this helper function
+    function getTaskTypeFields(uint256 _id) external view returns (uint8 ) {
+        return taskTypes[_id].numFieldsToHash;
+    }
+*/
+    function getTaskById(uint256 _taskId) external view returns (Task memory) {
+        return tasks[_taskId];
+    }
 
     function getVotes(uint256 proposalID) external view returns (uint16[] memory) {
         require(proposalID < totalProposals, "no such proposal");
@@ -137,11 +152,14 @@ contract Governance is ReentrancyGuard, Ownable {
         return winningVote;
     }
 
-
+    // todo -- see if we need to include IDs here -- may not need to
     function getMyAvailableTaskTypes() external view returns (string[] memory) {
         uint256 count;
         for(uint256 i=0; i< taskTypes.length;){
-            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp){ // && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp) {
+            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp
+            && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
+            && taskTypes[i].availableSlots > 1
+            ) {
                 unchecked{++count;}
             }
             else {
@@ -155,7 +173,10 @@ contract Governance is ReentrancyGuard, Ownable {
         string[] memory myTasks = new string[](count);
         uint256 counter = 0;
         for(uint256 i=0; i< taskTypes.length;){
-            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp && taskTypes[i].begTimestamp < block.timestamp && taskTypes[i].endTimestamp > block.timestamp) {
+            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp
+            && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
+            && taskTypes[i].availableSlots > 1
+            ) {
                 myTasks[i] = taskTypes[i].IPFSHash;
                 unchecked{++counter;}
                 if(counter >= count) {
@@ -215,7 +236,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
     // votes won't need to be confirmed
-    function createProposal(string calldata _IPFSHash, uint16 _numberOfOptions, uint40 _begTimestamp, uint40 _endTimestamp) external onlyBoard {
+    function createProposal(string calldata _IPFSHash, uint16 _numberOfOptions, uint24 _timeBonus, uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots) external onlyBoard {
         require(_numberOfOptions > 1 && _numberOfOptions < 257, "invalid number of options");
         totalProposals += 1; // keep nothing at 0
         Proposal storage myProposal = proposals[totalProposals];
@@ -224,38 +245,32 @@ contract Governance is ReentrancyGuard, Ownable {
             myProposal.numberOfOptions = _numberOfOptions;
             myProposal.IPFSHash = _IPFSHash;
 
-        _createTaskType(_IPFSHash, uint40(totalProposals), _begTimestamp, _endTimestamp);
+        _createTaskType(_IPFSHash, uint40(totalProposals), 0, _timeBonus, _begTimestamp, _endTimestamp, _availableSlots);
         // todo --  emit event
     }
 
-    function createTaskType(string calldata _IPFSHash, uint40 _begTimestamp, uint40 _endTimestamp) external onlyBoard {
-        _createTaskType(_IPFSHash, 0, _begTimestamp, _endTimestamp);
+
+    function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
+                uint40 _endTimestamp, uint16 _availableSlots) external onlyBoard {
+        _createTaskType(_IPFSHash, 0, _numFieldsToHash, _timeBonus, _begTimestamp, _endTimestamp, _availableSlots);
     }
 
-    function _createTaskType(string calldata _IPFSHash, uint40 _proposalID, uint40 _begTimestamp, uint40 _endTimestamp) internal {
+    function _createTaskType(string calldata _IPFSHash, uint40 _proposalID, uint8 _numFieldsToHash, uint24 _timeBonus,
+             uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots) internal {
         uint256 taskTypesLength = taskTypes.length;
         taskTypes.push();
         TaskType storage newTaskType = taskTypes[taskTypesLength];
             newTaskType.IPFSHash =_IPFSHash;
             newTaskType.paused = false;
             newTaskType.proposalID = _proposalID;
+            newTaskType.numFieldsToHash = _numFieldsToHash;
+            newTaskType.timeBonus = _timeBonus;
             newTaskType.begTimestamp = _begTimestamp;
             newTaskType.endTimestamp = _endTimestamp;
-
+            newTaskType.availableSlots = _availableSlots;
         // todo --  emit event
+        emit NewTaskTypeCreated(_IPFSHash, _proposalID, _numFieldsToHash, _timeBonus, _begTimestamp, _endTimestamp, _availableSlots);
     }
-
-//        struct Task {
-//        string IPFSHash; // holds description
-//        uint40 NFTID;
-//        bytes32 hash; // hashed input to be validated
-//        uint8 numFieldsToHash;
-//        uint24 timeBonus; // in seconds
-//        uint8 strikes;
-//        uint80 payment;
-//        address verifier;
-//        uint40 verificationReservedTimestamp;
-//    }
 
 
     function claimRandomTaskForVerification(uint256 _wizID) external {
@@ -296,28 +311,62 @@ contract Governance is ReentrancyGuard, Ownable {
         string IPFSHash; // holds description
         uint40 NFTID; // wizard ID of who is assigned task
         bytes32 hash; // hashed input to be validated
+        bytes32 refuterHash; // correct hash according to refuter
         uint8 numFieldsToHash; // input fields
         uint24 timeBonus; // increases Wizard's activation time, in seconds
-        uint8 strikes; // number of times confirmation has failed
         uint80 payment; //
         uint16 verifierID; // wizardId of Verifier
+        uint16 refuterID; // wizardId of Verifier
         uint40 verificationReservedTimestamp; // time when verification period ends
 
 */
+    function completeTask(string memory _IPFSHash, bytes32 _hash, uint40 _wizID) external {
+        // IPFS, hash, wizardID
 
-    // todo --
-    function completeTask() external {
-/*
-        Task memory myTask = Task("0",1, keccak256("hi"), bytes32(3), 4, 5, 6, 7, 8, 9);
-        DoubleEndedQueue.pushBack(tasksSubmitted, bytes32(tasksAttempted)); // todo -- change to dequeue
-        tasks[tasksAttempted] = myTask;
-        tasksAttempted+=1;
-*/
+        // find the task type -- can't be too many
+        for(uint256 i = 0; i<taskTypes.length; i++){
+            if(keccak256(abi.encode(taskTypes[i].IPFSHash)) == keccak256(abi.encode(_IPFSHash))){ // hashed to compare
+                // verify it is viable
+                require(taskTypes[i].begTimestamp <= block.timestamp && block.timestamp <= taskTypes[i].endTimestamp, "Outside time period");
+                // create new task
+                Task memory myTask = Task(_IPFSHash,_wizID, _hash, 0, taskTypes[i].numFieldsToHash, taskTypes[i].timeBonus, 0, 0, 0, 0);
+                DoubleEndedQueue.pushBack(tasksSubmitted, bytes32(tasksAttempted));
+                tasks[tasksAttempted] = myTask;
+                tasksAttempted+=1;
+            }
+        }
     }
+
+    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
+        bytes memory unencoded = abi.encodePacked(_fields[0]);
+        if(_refuted) {
+            for(uint256 i = 0; i < _fields.length;){
+                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+                unchecked{++i;}
+            }
+        }
+        bytes32 myHash = keccak256(abi.encodePacked(_fields));
+        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
+    }
+
+// working for regular but not refuted.
+//    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
+//        bytes memory unencoded = abi.encodePacked(_fields[0]);
+//        if(_refuted) {
+//            for(uint256 i = 0; i < _fields.length;){
+//                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+//                unchecked{++i;}
+//            }
+//        }
+//        bytes32 myHash = keccak256(abi.encodePacked(_fields));
+//        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
+//    }
+
 
 
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted tasks must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] calldata _fields) external {
+    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) external {
+    //todo -- uncomment out requirement (testing)
         require(wizardsNFT.ownerOf(_wizId) == msg.sender && tasks[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
         require(_fields.length > 0);
 
@@ -325,14 +374,26 @@ contract Governance is ReentrancyGuard, Ownable {
         uint256 count = 0;
 
         // hash leaf if refuter exists
-        bytes32 myHash = myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[0])) : _fields[0] ; // note -- not hashed
-        for(uint256 i = 0; i < _fields.length;){
-            myHash = keccak256(abi.encodePacked(myHash, myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[i])) : _fields[i]));
-            unchecked{++i;}
+        // todo -- redo our hashes as we are hashing not same throughout
+
+//        bytes32 myHash = myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[0])) : _fields[0] ; // note -- not hashed
+//        for(uint256 i = 0; i < _fields.length;){
+//            myHash = keccak256(abi.encodePacked(myHash, myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[i])) : _fields[i]));
+//            unchecked{++i;}
+//        }
+
+        // hash leaves if there is a refuter
+        if(myTask.refuterID > 0) {
+            for(uint256 i = 0; i < _fields.length;){
+                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+                unchecked{++i;}
+            }
         }
+        bytes32 myHash = keccak256(abi.encodePacked(_fields));
 
         uint256 correctHash = myTask.hash == myHash ? 1 : 0;
 
+        emit VerificationSucceeded(_wizId, myTask.NFTID, _taskID, myHash, correctHash==1);
 
         if (correctHash ==1){
             // if refuterId exists, then refuter gets no refund
@@ -378,6 +439,7 @@ contract Governance is ReentrancyGuard, Ownable {
                 (sent, data) = msg.sender.call{value: split}("");
                 require(sent, "Failed to send Ether");
 
+                // emit event
             }
             else{
                 // no agreement in the 3 submissions
@@ -386,29 +448,10 @@ contract Governance is ReentrancyGuard, Ownable {
                 delete tasks[_taskID];
                 (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
                 require(sent, "Failed to send Ether");
+
+                // emit event
             }
-
         }
-
-        // get task ID
-//        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksSubmitted);
-//        for(uint256 i =0; i < totalTasksSubmitted; ){
-//            if(keccak256(bytes(tasks[uint256(DoubleEndedQueue.at(tasksSubmitted, i))].IPFSHash)) == keccak256(bytes(_IPFSHash))){ // couldn't compare storage vs memory
-//                // check if hash is correct
-//                if(tasks[uint256(DoubleEndedQueue.at(tasksSubmitted, i))].hash == myHash){
-//                    // todo -- approve and release funds
-//                    // if strikes == 1, we will split the funds
-//                }
-//                else {
-//                    // if it doesn't match the first, we want to compare it with the other
-//                }
-//                // check strikes
-//
-//            }
-//            unchecked{++i;}
-//        }
-        // verify hashes are equal
-        // emit event
     }
 
     //////////////////////

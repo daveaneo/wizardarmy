@@ -80,7 +80,7 @@ function sleep(ms) {
         processedWizard.element = ELEMENTS[parseInt(wiz.element)];
 
         // todo -- update smart contract
-        processedWizard.isActive = true;
+        processedWizard.isActive = processedWizard.protectedUntilTimestamp > Date.now()/1000; // todo -- this doesn't use the official time
 //        processedWizard.isActive = parseInt(await wizardNFTContract.isActive(id));
 
         return processedWizard;
