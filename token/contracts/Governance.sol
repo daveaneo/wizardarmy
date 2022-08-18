@@ -78,7 +78,7 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 totalProposals;
 
     mapping (uint256 => Task) public tasks;
-    uint256 tasksAttempted;
+    uint256 public tasksAttempted;
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
@@ -91,6 +91,7 @@ contract Governance is ReentrancyGuard, Ownable {
     event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
     event NewTaskTypeCreated(string _IPFSHash,uint40 _proposalID, uint8 _numFieldsToHash, uint24 _timeBonus,
           uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots);
+    event TaskCompleted(uint256 wizardId, uint256 taskId, string IPFSHash, uint256 data);
 
     /////////////////////////////
     //////  TEMP Functions ///////
@@ -371,7 +372,7 @@ contract Governance is ReentrancyGuard, Ownable {
         // IPFS, hash, wizardID
 
         // find the task type -- can't be too many
-        for(uint256 i = 0; i<taskTypes.length; i++){
+        for(uint256 i = 0; i<taskTypes.length;){
             if(keccak256(abi.encode(taskTypes[i].IPFSHash)) == keccak256(abi.encode(_IPFSHash))){ // hashed to compare
                 // verify it is viable
                 require(taskTypes[i].begTimestamp <= block.timestamp && block.timestamp <= taskTypes[i].endTimestamp, "Outside time period");
@@ -383,9 +384,13 @@ contract Governance is ReentrancyGuard, Ownable {
 
                 // update TaskTypes
                 taskTypes[i].nextActiveTimeThreshold[_wizID] = block.timestamp + 1 days;
-            }
-        }
 
+                emit TaskCompleted(_wizID,tasksAttempted -1, _IPFSHash, block.timestamp);
+                break;
+            }
+            unchecked{++i;}
+        }
+        // failed
 
 
     }

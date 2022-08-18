@@ -43,6 +43,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 maxSupply;
         uint256 protectionTimeExtension;
         address ecosystemTokenAddress;
+        uint256 phaseDuration;
+        string imageBaseURI;
     }
 
     ContractSettings public contractSettings;
@@ -70,12 +72,14 @@ contract Wizards is ERC721Enumerable, Ownable {
     ///////////////////////////
     ////// Core Functions /////
     ///////////////////////////
-    constructor(string memory name_, string memory symbol_, address _address) ERC721(name_, symbol_) {
+    constructor(string memory name_, string memory symbol_, address _address, string memory _imageBaseURI) ERC721(name_, symbol_) {
         contractSettings.maxSupply = 10000;
         contractSettings.initiationCost = 1;
         contractSettings.mintCost = 5; // todo -- do in less steps
         contractSettings.protectionTimeExtension = 1 days; // todo -- do in less steps
         contractSettings.ecosystemTokenAddress = _address; // todo -- do in less steps
+        contractSettings.phaseDuration = 60*60;// todo --
+        contractSettings.imageBaseURI = _imageBaseURI;// todo --
     }
 
     function mint() external {
@@ -95,7 +99,7 @@ contract Wizards is ERC721Enumerable, Ownable {
 
         Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, 0, 0, 0, element);
         tokenIdToStats[totalSupply()] = myStats;
-        _safeMint(msg.sender, totalSupply());
+        _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
 //        unchecked { totalSupply() += 1; }
     }
 
@@ -178,7 +182,10 @@ contract Wizards is ERC721Enumerable, Ownable {
     function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
         require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
-        return formatTokenURI(_tokenId, "https://as2.ftcdn.net/v2/jpg/03/12/77/03/1000_F_312770349_4lkFN3e2UlO43kQlFemFNIpVkG5Zwytq.jpg");
+        string memory linkExtension = tokenIdToStats[_tokenId].initiationTimestamp / contractSettings.phaseDuration
+                      > 7 ? "7" : Strings.toString(tokenIdToStats[_tokenId].initiationTimestamp / contractSettings.phaseDuration);
+        string memory imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
+        return formatTokenURI(_tokenId, imageURI);
     }
 
     function formatTokenURI(uint256 _tokenId, string memory imageURI) public view returns (string memory) {
@@ -270,6 +277,20 @@ contract Wizards is ERC721Enumerable, Ownable {
 //        return string(bstr);
 //    }
 
+
+    /////////////////////////////////
+    ////// Admin Functions      /////
+    /////////////////////////////////
+
+
+    function modifyContractSettings(string memory _imageBaseURI, uint256 _phaseDuration, uint256 _protectionTimeExtension, uint256 _mintCost,
+                    uint256 _initiationCost) external onlyOwner {
+        contractSettings.imageBaseURI;
+        contractSettings.phaseDuration;
+        contractSettings.protectionTimeExtension;
+        contractSettings.mintCost;
+        contractSettings.initiationCost;
+    }
 
     ///////////////////////////
     ////// Modifiers      /////

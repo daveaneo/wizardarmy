@@ -16,9 +16,12 @@ for i in range(2):
     print(f'accounts[{i}]: {accounts[i]}')
 
 
+# variables
+image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/"
+
 def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
-    wizards = Wizards.deploy("Wizards", "WZD", token.address, {'from': accounts[0]})
+    wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
     governance = Governance.deploy(wizards.address, {'from': accounts[0]})
@@ -44,12 +47,12 @@ def main():
     tx.wait(1)
 
     # create wizards
-    for i in range(2):
-        tx = wizards.mint({'from': accounts[1]})
+    for i in range(1, 3):
+        tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
         tx.wait(1)
-        tx = wizards.initiate(i, {'from': accounts[1]})
+        tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
         tx.wait(1)
-        tx = wizard_tower.claimFloor(i, {'from': accounts[1]})
+        tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
         tx.wait(1)
 
     ts = wizards.totalSupply()
@@ -75,9 +78,12 @@ def main():
     #     chain.mine(1)
 
 
-# Governance
-#     function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
-#                 uint40 _endTimestamp, uint40 _availableSlots) external onlyBoard {
+    uri = wizards.tokenURI(1)
+    print(f'uri: {uri}')
+
+    # Governance
+    #     function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
+    #                 uint40 _endTimestamp, uint40 _availableSlots) external onlyBoard {
 
     '''
     hex_string = "FirstOne"
@@ -98,6 +104,9 @@ def main():
     tt = governance.getTaskTypeFields(1)
     print(f'tt: {tt}')
     '''
+
+    # For testng hash
+    '''
     # not refuted
     # hex_string = 0xc9d2b9a1987d380a8c8b45cf8ad43d19ccea73584eb50c57bd601558fc64a404
     bytes_array = ["0x1c8aff950685c2ed4bc3174f3472287b56d9517b9c948127319a09a7a36deac8", "0x18e9b451e5bb9a4a819352109126d2346a89373c4522fc9538ca265404dae958" ]
@@ -111,6 +120,7 @@ def main():
     tx = governance.testHashing(hex_string, bytes_array, True)
     tx.wait(1)
     print(f'events: {tx.events}')
+    '''
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf
