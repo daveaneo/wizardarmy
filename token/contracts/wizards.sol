@@ -98,9 +98,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
 
         Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, 0, 0, 0, element);
-        tokenIdToStats[totalSupply()] = myStats;
+        tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
-//        unchecked { totalSupply() += 1; }
     }
 
 
@@ -182,8 +181,11 @@ contract Wizards is ERC721Enumerable, Ownable {
     function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
         require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
-        string memory linkExtension = tokenIdToStats[_tokenId].initiationTimestamp / contractSettings.phaseDuration
-                      > 7 ? "7" : Strings.toString(tokenIdToStats[_tokenId].initiationTimestamp / contractSettings.phaseDuration);
+        string memory linkExtension =
+                      Strings.toString(
+                      (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
+                      > 7 ? 7 : (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
+                      );
         string memory imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
         return formatTokenURI(_tokenId, imageURI);
     }

@@ -52,6 +52,7 @@ def main():
         tx.wait(1)
         tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
         tx.wait(1)
+        print(f'wizard {i} initiated, resulting in event: {tx.events}')
         tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
         tx.wait(1)
 
@@ -77,9 +78,14 @@ def main():
     #     chain.sleep(60)
     #     chain.mine(1)
 
+    try:
+        uri = wizards.tokenURI(1)
+        print(f'uri: {uri}')
 
-    uri = wizards.tokenURI(1)
-    print(f'uri: {uri}')
+        uri = wizards.tokenURI(2)
+        print(f'uri: {uri}')
+    except Exception as e:
+        print(f'failed get get uri. error: {e}')
 
     # Governance
     #     function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
