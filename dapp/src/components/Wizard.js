@@ -175,12 +175,13 @@ function sleep(ms) {
 //       const floor = parseInt(res.events[0].args[1]);
 
 
-       const attackEvent = res.events?.filter((x) => {return x.event == "FloorClaimed"})[0];
-//       console.log("attackEvent:", attackEvent );
-       const floor = parseInt(attackEvent.args[1]);
+       const towerEvent = res.events?.filter((x) => {return x.event == "FloorClaimed"})[0];
+       const floor = parseInt(towerEvent.args[1]);
 
        setMyFloor(floor)
-//       console.log("I am on floor: ", floor)
+       if(floor>0){
+         setIsOnTheTower(true);
+       }
     }
 
 

@@ -11,11 +11,11 @@ const WizardGovernanceabi = require('../abi/wizardgovernance.json').abi;
 const ERC20abi = require('../abi/ERC20.json').abi;
 const myInfuraRPC = process.env.REACT_APP_RINKEBY_RPC;
 
-let ecosystemTokenAddress = '0x5cB89CCf854B603b357685F60Da9477B21f0bE3c';
-let wizardNFTAddress = '0x06bbE541e5d53047cB3a4ffcaf7BfbfFe0C83181';
-let wizardTowerAddress = '0x1576Ed09E37b2052f0110Cc8816A1C0Aa82415F9';
-let wizardBattleAddress = '0xE4232E741eF69D62BCc48103A8e4EB115A4028F0';
-let wizardGovernanceAddress = '0x30F0648a1aE1Ae3B8a6808F6981b37D1c8A59F71';
+let ecosystemTokenAddress = '0x140DE39Cf52B64C1fA910A9e60da5076A5143971';
+let wizardNFTAddress = '0x4F09704687f3A02737394f6a540881c30BF5B3Ca';
+let wizardTowerAddress = '0x057c6e6a2DFd427B5C865D24644A8c7bF5E55631';
+let wizardBattleAddress = '0x859A390C14d33882fB5997E7392d38ED63B50FDb';
+let wizardGovernanceAddress = '0x106967Ee9c5F8c168d0c03D3AEa32CADB8ff4d86';
 
 
  // load some data without metamask or signer

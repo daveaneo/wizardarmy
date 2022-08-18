@@ -26,9 +26,12 @@ function Tasks(props) {
   const [newProposalDescription, setNewProposalDescription] = useState("");
   const [numFieldsForProposal, setNumFieldsForProposal] = useState(1);
   const [numFieldsForTask, setNumFieldsForTask] = useState(1);
-  const [maxSlotsForTask, setMaxSlotsForTask] = useState(2**40-1);
+  const [maxSlotsForTask, setMaxSlotsForTask] = useState(2**16-1);
   const [myInputs, setMyInputs] = useState([]);
   const [activeTask, setActivedTask] = useState(undefined);
+  const [taskToConfirm, setTaskToConfirm] = useState({});
+  const [areTasksAvailableToConfirm, setAreTasksAvailableToConfirm] = useState(undefined);
+  const [IPFSCidToDelete, setIPFSCidToDelete] = useState(undefined);
 
   // contracts
   const { ethereum } = window;
@@ -53,7 +56,8 @@ function Tasks(props) {
        let link = 'https://ipfs.io/ipfs/' + cid;
        const response = await fetch(link);
         if(!response.ok){
-          throw new Error(response.statusText);
+            //          throw new Error(response.statusText);
+            return null;
         }
 
         const json = await response.json();
@@ -138,6 +142,10 @@ function Tasks(props) {
     }
 */
 
+    async function updateAreTasksAvailableToConfirm() {
+        let available = await wizardGovernanceContract.areTasksAvailableToConfirm(wizardId);
+        setAreTasksAvailableToConfirm(available);
+    }
 
     async function CompleteTask(_id) {
         console.log("Task will be completed: ", _id);
@@ -155,6 +163,10 @@ function Tasks(props) {
 //        console.log('finalHash: ', finalHash);
         let tx = await wizardGovernanceContract.completeTask(taskTypes[_id].IPFS, finalHash, wizardId);
         let res = await tx.wait(1);
+        if(res){
+          // update tasks
+          LoadMyTasks();
+        }
     }
 
 
@@ -167,7 +179,7 @@ function Tasks(props) {
       }
 
       if(wizardGovernanceContract===undefined || wizardNFTContract === undefined){
-        console.error("GovernanceContract or NFT is not defined.")
+//        console.error("GovernanceContract or NFT is not defined.")
         return;
       }
       else if(isInitiated===undefined){
@@ -178,10 +190,12 @@ function Tasks(props) {
       let newTaskTypes = [];
       let taskObjects = []
       if(connected && (address !== undefined)) {
-          newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(); // will need task ID too
+          newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(wizardId); // will need task ID too
+          console.log("newTaskTypes: ", newTaskTypes);
           for(let i = 0; i< newTaskTypes.length; i++){
             let taskObject = {};
             taskObject = await loadJSONFromIPFS(newTaskTypes[i]);
+            if(taskObject==null){continue;}
             taskObject.id = i;
             taskObject.IPFS = newTaskTypes[i];
             let fields = [];
@@ -206,10 +220,21 @@ function Tasks(props) {
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
+
   async function handleNewTaskSubmission() {
       alert("received: ", newTaskDescription);
       // create proposal or Task
-}
+  }
+
+
+  async function DeleteTaskType(CID, numFields) {
+    let tx = await wizardGovernanceContract.deleteTaskTypeByIPFSHash(CID);
+    let res = await tx.wait(1);
+    if(res){
+        LoadMyTasks();
+    }
+  }
+
 
   async function CreateProposal(description, numFields) {
     console.log("details: ", description, numFields);
@@ -228,7 +253,7 @@ function sleep(ms) {
             }
           },
           "pinataContent": {
-            "name": "MVP Task",
+            "name": description.slice(0, 80),
             "description": description,
             "fields": numFields
               }
@@ -264,7 +289,7 @@ function sleep(ms) {
             }
           },
           "pinataContent": {
-            "name": "MVP Task",
+            "name": description.slice(0, 80),
             "description": description,
             "fields": numFields
               }
@@ -283,6 +308,13 @@ function sleep(ms) {
       if(ipfsHash!=undefined){
         let tx = await wizardGovernanceContract.createTaskType(ipfsHash, numFields, timeBonus, 0, endTime, maxSlots);
         let res = await tx.wait(1);
+        if(res){
+          // refresh
+          LoadMyTasks();
+        }
+        else{
+          // todo -- clean up unused IPFS data
+        }
         // todo -- if res == fail, pull out the IPFS data
         // update state
       }
@@ -307,6 +339,7 @@ function sleep(ms) {
     let taskId = res.events[0].args[1]
     let task = await wizardGovernanceContract.getTaskById(taskId);
     console.log("taskId, task: ", taskId, task);
+    setTaskToConfirm(task);
 
 }
 
@@ -369,12 +402,6 @@ function sleep(ms) {
     }, [activeTask]);
 
     useEffect(() => {
-        console.log("myInputs have changed: ", myInputs);
-
-    }, [myInputs]);
-
-
-    useEffect(() => {
         LoadMyTasks();
     }, [connected, address]);
 
@@ -434,6 +461,23 @@ function sleep(ms) {
               />
             <button onClick={() => CreateProposal(newProposalDescription, numFieldsForProposal)}> Create Proposal </button> {/* description, num choices, beg timestamp, end timestamp*/}
         </div>
+
+        {/* IPFSCidToDelete */}
+            <br />
+        <div>
+              <label for="numFields">IPFS Cid</label>
+              <input
+                type="text"
+                id="IPFSCIDField"
+                value={IPFSCidToDelete}
+                onChange={e => {
+                  //bug
+                  setIPFSCidToDelete(e.target.value);
+                }}
+              />
+            <button onClick={() => DeleteTaskType(IPFSCidToDelete)}> Delete TaskType </button>
+        </div>
+
 {/*
           <form onSubmit={this.HandleNewTaskSubmission}>
             <label>
@@ -483,13 +527,24 @@ function sleep(ms) {
 
             </div>
         )}
-        <div>
-           <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
-        </div>
 
-        <div>
-           <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
-        </div>
+        {areTasksAvailableToConfirm
+         ?
+            <div>
+               <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
+            </div>
+         :
+            <div>
+               No tasks available to confirm
+            </div>
+         }
+
+        {areTasksAvailableToConfirm &&
+
+            <div>
+               <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
+            </div>
+        }
 
         <div>
            <button onClick={() => DeleteTaskType()}> Delete Task Type </button>

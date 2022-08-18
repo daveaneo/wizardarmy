@@ -29,7 +29,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // used to find active tasks
     struct TaskType {
-        mapping (address => uint256) lastActiveTimestamp; // for recurring tasks -- todo -- add waitTime or ...
+        mapping (uint40 => uint256) nextActiveTimeThreshold; // for recurring tasks -- todo -- add waitTime or ...
         string IPFSHash; // holds description
         bool paused;
         uint40 proposalID; // proposal ID or 0 if task
@@ -152,11 +152,28 @@ contract Governance is ReentrancyGuard, Ownable {
         return winningVote;
     }
 
+    // todo -- delete tasktype function
+
+    function areTasksAvailableToConfirm(uint256 _wizID) external view returns (bool) {
+        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksSubmitted);
+        Task memory myTask;
+        uint256 taskId;
+        // todo --implement randomness
+//        uint256[25] memory potentialTasks;
+        for(uint256 i =0; i < totalTasksSubmitted; ){
+            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.NFTID != _wizID && myTask.refuterID!= _wizID){ // todo -- make sure to start IDs at 1
+                return true;
+            }
+            unchecked{++i;}
+        }
+        return false;
+    }
+
     // todo -- see if we need to include IDs here -- may not need to
-    function getMyAvailableTaskTypes() external view returns (string[] memory) {
+    function getMyAvailableTaskTypes(uint40 _wizId) external view returns (string[] memory) {
         uint256 count;
         for(uint256 i=0; i< taskTypes.length;){
-            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp
+            if(taskTypes[i].nextActiveTimeThreshold[_wizId] < block.timestamp
             && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
             && taskTypes[i].availableSlots > 1
             ) {
@@ -173,7 +190,7 @@ contract Governance is ReentrancyGuard, Ownable {
         string[] memory myTasks = new string[](count);
         uint256 counter = 0;
         for(uint256 i=0; i< taskTypes.length;){
-            if(taskTypes[i].lastActiveTimestamp[msg.sender] < block.timestamp
+            if(taskTypes[i].nextActiveTimeThreshold[_wizId] < block.timestamp
             && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
             && taskTypes[i].availableSlots > 1
             ) {
@@ -201,6 +218,34 @@ contract Governance is ReentrancyGuard, Ownable {
 //    function setERC20Address(address _addy) external onlyOwner {
 //        ecosystemTokens = IERC20(_addy);
 //    }
+
+    function deleteTaskTypeByIPFSHash(string memory _IPFSHash) external {
+        for(uint256 i=0; i<taskTypes.length;){
+            if(keccak256(abi.encodePacked(taskTypes[i].IPFSHash)) == keccak256(abi.encodePacked(_IPFSHash))){
+//                taskTypes[i] = taskTypes[taskTypes.length-1];
+                TaskType storage myTaskType = taskTypes[i];
+                TaskType storage displacedTaskType = taskTypes[taskTypes.length-1];
+//                myTaskType.nextActiveTimeThreshold = displacedTaskType.nextActiveTimeThreshold;
+                myTaskType = displacedTaskType;
+                delete taskTypes[taskTypes.length-1];
+                // todo see if this works at all
+//        mapping (uint40 => uint256) nextActiveTimeThreshold; // for recurring tasks -- todo -- add waitTime or ...
+//        string IPFSHash; // holds description
+//        bool paused;
+//        uint40 proposalID; // proposal ID or 0 if task
+//        uint8 numFieldsToHash;
+//        uint24 timeBonus;
+//        uint40 begTimestamp;
+//        uint40 endTimestamp;
+//        uint16 availableSlots;
+
+
+                delete taskTypes[taskTypes.length-1];
+                break;
+            }
+            unchecked{++i;}
+        }
+    }
 
 
 
@@ -281,6 +326,8 @@ contract Governance is ReentrancyGuard, Ownable {
 //        uint256[25] memory potentialTasks;
         for(uint256 i =0; i < totalTasksSubmitted; ){
             if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizID && myTask.refuterID!= _wizID){ // todo -- make sure to start IDs at 1
+            // todo -- use above  version (removed restriction for checking)
+//            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.refuterID!= _wizID){
 //                potentialTasks.push(uint256(DoubleEndedQueue.at(tasksSubmitted, i)));
                 taskId = uint256(DoubleEndedQueue.at(tasksSubmitted, i));
                 myTask = tasks[taskId];
@@ -333,8 +380,14 @@ contract Governance is ReentrancyGuard, Ownable {
                 DoubleEndedQueue.pushBack(tasksSubmitted, bytes32(tasksAttempted));
                 tasks[tasksAttempted] = myTask;
                 tasksAttempted+=1;
+
+                // update TaskTypes
+                taskTypes[i].nextActiveTimeThreshold[_wizID] = block.timestamp + 1 days;
             }
         }
+
+
+
     }
 
     function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
