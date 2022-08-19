@@ -4,7 +4,7 @@ __pycache__
 .hypothesis/
 reports/
 /token/.pytest_cache
-/dapp/node_modules/
+/dapp/node_modules_bak2/
 /token/build/
 /token/build/contracts/
 testing.py

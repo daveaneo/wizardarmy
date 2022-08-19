@@ -111,6 +111,45 @@ def main():
     print(f'tt: {tt}')
     '''
 
+
+    '''
+    // Task-claim testing
+    hex_string = "FirstOne"
+    tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25, {'from': accounts[0]})
+    tx.wait(1)
+    print(f'tasktype created.')
+
+    tx = governance.completeTask(hex_string, "0x0", 1, {'from': accounts[0]})
+    tx.wait(1)
+    print(f'task completed.')
+
+    hex_string = "SecondOne"
+    tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25, {'from': accounts[0]})
+    tx.wait(1)
+    print(f'tasktype created.')
+
+    tx = governance.completeTask(hex_string, "0x0", 1, {'from': accounts[0]})
+    tx.wait(1)
+    print(f'task completed.')
+
+
+    are_tasks_available_to_confirm = governance.areTasksAvailableToConfirm(2)
+    print(f'are_tasks_available_to_confirm: {are_tasks_available_to_confirm}')
+
+    tx = governance.claimRandomTaskForVerification(2)
+    if tx:
+        tx.wait(1)
+    print(f'tx.events: {tx.events}')
+
+    tx = governance.claimRandomTaskForVerification(2)
+    if tx:
+        tx.wait(1)
+    print(f'tx.events: {tx.events}')
+    // end Task-Claim testing
+    '''
+
+
+
     # For testng hash
     '''
     # not refuted

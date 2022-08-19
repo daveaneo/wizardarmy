@@ -28,9 +28,9 @@ function Tasks(props) {
   const [numFieldsForTask, setNumFieldsForTask] = useState(1);
   const [maxSlotsForTask, setMaxSlotsForTask] = useState(2**16-1);
   const [myInputs, setMyInputs] = useState([]);
-  const [activeTask, setActivedTask] = useState(undefined);
+  const [activeTask, setActivedTask] = useState(0);
   const [taskToConfirm, setTaskToConfirm] = useState({});
-  const [areTasksAvailableToConfirm, setAreTasksAvailableToConfirm] = useState(undefined);
+  const [areTasksAvailableToConfirm, setAreTasksAvailableToConfirm] = useState(false);
   const [IPFSCidToDelete, setIPFSCidToDelete] = useState(undefined);
 
   // contracts
@@ -51,10 +51,30 @@ function Tasks(props) {
   const PINATA_JWT = process.env.REACT_APP_PINATA_JWT;
 
 
+    async function fetchWithTimeout(resource, options = {}) {
+      const { timeout = 5000 } = options;
+
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), timeout);
+      const response = await fetch(resource, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(id);
+      return response;
+    }
+
     // name, description, fields
     async function loadJSONFromIPFS(cid) {
        let link = 'https://ipfs.io/ipfs/' + cid;
-       const response = await fetch(link);
+       var response = {"ok": false};
+       try{
+           response = await fetchWithTimeout(link);
+       }
+       catch (error){
+           console.log("fetching timeout for cid: ", cid);
+       }
+//       const response = await fetch(link);
         if(!response.ok){
             //          throw new Error(response.statusText);
             return null;
@@ -65,9 +85,15 @@ function Tasks(props) {
 }
 
     async function sendFileToIPFS(data) {
+//        setTimeout(function () {
+//            console.log('Function took too long');
+//        }, 2000); // after 5s
+
+
         var config = {
           method: 'post',
           url: 'https://api.pinata.cloud/pinning/pinJSONToIPFS',
+          timeout: 2000, // only wait for 10s
           headers: {
             'Content-Type': 'application/json',
             'Authorization': 'Bearer ' + `${process.env.REACT_APP_PINATA_JWT}`
@@ -75,7 +101,9 @@ function Tasks(props) {
           data : data
         };
 
-        const res = await axios(config);
+        // todo -- make timeout function
+        let res = await axios(config);
+//        myTimeout = await setTimeout();
         if(res.status!=200){
           throw new Error(res.statusText);
         }
@@ -142,14 +170,31 @@ function Tasks(props) {
     }
 */
 
+    async function updatePendingTasksToConfirm() {
+       let tasks = await wizardGovernanceContract.getTasksAssignedToWiz(wizardId);
+       console.log("TASKS: ", tasks);
+       if(tasks[0].IPFSHash==""){
+         console.log("no tasks assigned.")
+         if(taskToConfirm.IpfsHash!=undefined){
+           setTaskToConfirm({});
+         }
+       }
+       else{
+       console.log("my tasks already assigned: ", tasks);
+           for(let i=0;i<tasks.length;i++){
+               console.log("task: ", tasks[i]);
+           }
+           setTaskToConfirm({...tasks[0]});
+       }
+   }
+
     async function updateAreTasksAvailableToConfirm() {
+        if(wizardGovernanceContract==undefined){ return;}
         let available = await wizardGovernanceContract.areTasksAvailableToConfirm(wizardId);
         setAreTasksAvailableToConfirm(available);
     }
 
     async function CompleteTask(_id) {
-        console.log("Task will be completed: ", _id);
-        console.log("input values: ", myInputs);
         let hashedLeaves = []
         let hashTypes = []
         // hash all leafs
@@ -157,15 +202,23 @@ function Tasks(props) {
             hashedLeaves.push(utils.keccak256(utils.toUtf8Bytes(myInputs[i])));
             hashTypes.push("bytes");
         }
-//        console.log('...hashedLeaves: ', hashTypes, hashedLeaves);
-        let finalHash = ethers.utils.solidityKeccak256(hashTypes, hashedLeaves)
 
-//        console.log('finalHash: ', finalHash);
+        let finalHash = ethers.utils.solidityKeccak256(hashTypes, hashedLeaves)
         let tx = await wizardGovernanceContract.completeTask(taskTypes[_id].IPFS, finalHash, wizardId);
         let res = await tx.wait(1);
         if(res){
           // update tasks
-          LoadMyTasks();
+            console.log("events: ", res.events[0])
+            console.log("Task complete. Loading new tasks.")
+            let remTasks = taskTypes.filter(function(id) {
+                return id !== _id
+            });
+            console.log("remTasks: ", remTasks)
+            setTaskTypes(remTasks);
+            LoadMyTasks();
+        }
+        else{
+            console.log("task complete but res not passing...")
         }
     }
 
@@ -191,12 +244,20 @@ function Tasks(props) {
       let taskObjects = []
       if(connected && (address !== undefined)) {
           newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(wizardId); // will need task ID too
-          console.log("newTaskTypes: ", newTaskTypes);
+          if(newTaskTypes[0]==""){
+            return;
+          }
           for(let i = 0; i< newTaskTypes.length; i++){
             let taskObject = {};
             taskObject = await loadJSONFromIPFS(newTaskTypes[i]);
-            if(taskObject==null){continue;}
-            taskObject.id = i;
+            if(taskObject==null){
+//              console.log('error loading task from IPFS. CID: ', newTaskTypes[i])
+              continue;
+            }
+            else {
+            }
+
+            taskObject.id = taskObjects.length;
             taskObject.IPFS = newTaskTypes[i];
             let fields = [];
             for (let i =0; i < taskObject.fields; i++){
@@ -274,7 +335,6 @@ function sleep(ms) {
   }
 
   async function CreateTask(description, numFields, maxSlots) {
-    console.log("to do: ", description);
 
     // IPFS
         var data = JSON.stringify({
@@ -304,7 +364,7 @@ function sleep(ms) {
       let timeBonus = 24*60*60; // 1 day
 
 
-        console.log("infor for createTaskType: ", ipfsHash, numFields, timeBonus, endTime, maxSlots)
+//        console.log("infor for createTaskType: ", ipfsHash, numFields, timeBonus, endTime, maxSlots)
       if(ipfsHash!=undefined){
         let tx = await wizardGovernanceContract.createTaskType(ipfsHash, numFields, timeBonus, 0, endTime, maxSlots);
         let res = await tx.wait(1);
@@ -334,12 +394,25 @@ function sleep(ms) {
     let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
     let res = await tx.wait(1);
     console.log("res: ", res);
-    console.log("res.events[0].args: ", res.events[0].args);
+    if(res){
+        console.log("res.events[0].args: ", res.events[0].args);
+        // emit VerificationAssigned(_wizID, taskId, tasks[taskId]);
+        let taskId = res.events[0].args[1]
+        // note, we are passing task information in event
+        let taskFromEvent = res.events[0].args[2];
+        let task = await wizardGovernanceContract.getTaskById(taskId);
+        console.log("task: ", task, taskFromEvent);
 
-    let taskId = res.events[0].args[1]
-    let task = await wizardGovernanceContract.getTaskById(taskId);
-    console.log("taskId, task: ", taskId, task);
-    setTaskToConfirm(task);
+        // set stateVariable about tasks to confirm
+        setTaskToConfirm(task);
+
+        console.log("taskId, task: ", taskId, task);
+
+        // create function tasks assigned to me
+    }
+    else {
+      console.log("error claiming task.")
+    }
 
 }
 
@@ -392,11 +465,11 @@ function sleep(ms) {
 
 
     useEffect(() => {
-        if(activeTask!=undefined){
-         console.log("activated task has changed. New num of fields: ", taskTypes[activeTask].fields.length, taskTypes[activeTask], activeTask)
+        if(activeTask!=undefined && taskTypes[activeTask]!=undefined){
+//         console.log("activated task has changed. New num of fields: ", taskTypes[activeTask].fields.length, taskTypes[activeTask], activeTask)
          // resize myInputs
          let tempMyInputs = Array(taskTypes[activeTask].fields.length).fill('');
-         console.log("inputs have been created: ", tempMyInputs)
+//         console.log("inputs have been created: ", tempMyInputs)
          setMyInputs(tempMyInputs);
         }
     }, [activeTask]);
@@ -407,11 +480,14 @@ function sleep(ms) {
 
     useEffect(() => {
       LoadContracts();
+
     }, []);
 
     useEffect(() => {
       if(contractsLoaded===true){
          LoadMyTasks();
+         updateAreTasksAvailableToConfirm();
+         updatePendingTasksToConfirm();
       }
     }, [contractsLoaded]);
 
@@ -475,9 +551,11 @@ function sleep(ms) {
                   setIPFSCidToDelete(e.target.value);
                 }}
               />
-            <button onClick={() => DeleteTaskType(IPFSCidToDelete)}> Delete TaskType </button>
+          <button onClick={() => DeleteTaskType(IPFSCidToDelete)}> Delete TaskType </button>
         </div>
+        {/* End Admin Options */}
 
+        {/* Authenticated User  Options */}
 {/*
           <form onSubmit={this.HandleNewTaskSubmission}>
             <label>
@@ -488,6 +566,7 @@ function sleep(ms) {
 */}
       </div>
       <p className="DoubleBordered">Available tasks</p>
+        {taskTypes.length}
         {taskTypes && taskTypes.map(taskType =>
             <div key={taskType.id} className="Double">
                 <br/>
@@ -528,7 +607,7 @@ function sleep(ms) {
             </div>
         )}
 
-        {areTasksAvailableToConfirm
+        {areTasksAvailableToConfirm && taskToConfirm.IPFSHash==""
          ?
             <div>
                <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
@@ -539,16 +618,14 @@ function sleep(ms) {
             </div>
          }
 
-        {areTasksAvailableToConfirm &&
+        {taskToConfirm.IPFSHash!=undefined && taskToConfirm.IPFSHash!=""  &&
 
             <div>
+               {taskToConfirm.IPFSHash}
                <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
             </div>
         }
 
-        <div>
-           <button onClick={() => DeleteTaskType()}> Delete Task Type </button>
-        </div>
         {!connected && "Please Connect"}
         {connected && (taskTypes == undefined) && 'loading...'}
     </div>

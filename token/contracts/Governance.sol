@@ -69,7 +69,7 @@ contract Governance is ReentrancyGuard, Ownable {
     TaskType[] public taskTypes; // we must keep task types low in quantity to avoid gas issues
 
     // todo -- these should be dequeues
-    DoubleEndedQueue.Bytes32Deque public tasksSubmitted;
+    DoubleEndedQueue.Bytes32Deque public tasksWaitingConfirmation;
 //    uint256[] public tasksVerifying; // reduce size?
 
 //    DoubleEndedQueue.Bytes32Deque  public myQueue;
@@ -78,14 +78,13 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 totalProposals;
 
     mapping (uint256 => Task) public tasks;
-    uint256 public tasksAttempted;
+    uint256 public totalTasksAttempted;
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
     uint256 taskVerificationTimeBonus = 1 days; // 1 day
 
-
-    event VerificationAssigned(uint256 wizardId, uint256 taskId);
+    event VerificationAssigned(uint256 wizardId, uint256 taskId, Task myTask);
     event VerificationFailed(uint256 VerifierIdFirst, uint256 VerifierIdSecond, uint256 taskId);
     event VerificationSucceeded(uint256 taskDoer, uint256 Verifier, uint256 taskId, bytes32 hash, bool isHashCorrect);
     event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
@@ -155,20 +154,62 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // todo -- delete tasktype function
 
-    function areTasksAvailableToConfirm(uint256 _wizID) external view returns (bool) {
-        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksSubmitted);
+    function areTasksAvailableToConfirm(uint256 _wizId) external view returns (bool) {
+        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
         Task memory myTask;
-        uint256 taskId;
+//        uint256 taskId;
+
         // todo --implement randomness
 //        uint256[25] memory potentialTasks;
+
         for(uint256 i =0; i < totalTasksSubmitted; ){
-            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.NFTID != _wizID && myTask.refuterID!= _wizID){ // todo -- make sure to start IDs at 1
+            myTask = tasks[uint256(DoubleEndedQueue.at(tasksWaitingConfirmation,i))];
+            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizId && myTask.refuterID!= _wizId){
                 return true;
             }
             unchecked{++i;}
         }
         return false;
     }
+
+
+    function getTasksAssignedToWiz(uint40 _wizId) external view returns (Task[] memory) {
+        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
+        Task memory myTask;
+        uint256 taskId;
+        uint256 count=0;
+
+        for(uint256 i =0; i < totalTasksSubmitted; ){
+            taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+            myTask = tasks[taskId];
+            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.verifierID== _wizId){
+                unchecked{++count;}
+            }
+            unchecked{++i;}
+        }
+
+        // if no tasks, return empty array
+        if (count==0) {
+            Task[] memory myReturn= new Task[](1);
+//            myReturn[0] = "";
+            return myReturn;
+        }
+
+        uint256 counter = 0;
+        Task[] memory myTasks = new Task[](count);
+        for(uint256 i =0; i < totalTasksSubmitted; ){
+            taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+            myTask = tasks[taskId];
+            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.verifierID== _wizId){
+                myTasks[counter] = myTask;
+                unchecked{++counter;}
+                if(counter>count){break;}
+            }
+            unchecked{++i;}
+        }
+        return myTasks;
+    }
+
 
     // todo -- see if we need to include IDs here -- may not need to
     function getMyAvailableTaskTypes(uint40 _wizId) external view returns (string[] memory) {
@@ -180,12 +221,19 @@ contract Governance is ReentrancyGuard, Ownable {
             ) {
                 unchecked{++count;}
             }
-            else {
-                string[] memory myReturn= new string[](1);
-                myReturn[0] = "No luck.";
-                return myReturn;
-            }
+//            else {
+//                string[] memory myReturn= new string[](1);
+//                myReturn[0] = "";
+//                return myReturn;
+//            }
             unchecked{++i;}
+        }
+
+        // if no tasks, return empty array
+        if (count==0) {
+            string[] memory myReturn= new string[](1);
+            myReturn[0] = "";
+            return myReturn;
         }
 
         string[] memory myTasks = new string[](count);
@@ -195,7 +243,7 @@ contract Governance is ReentrancyGuard, Ownable {
             && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
             && taskTypes[i].availableSlots > 1
             ) {
-                myTasks[i] = taskTypes[i].IPFSHash;
+                myTasks[counter] = taskTypes[i].IPFSHash;
                 unchecked{++counter;}
                 if(counter >= count) {
                     break;
@@ -319,56 +367,33 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-    function claimRandomTaskForVerification(uint256 _wizID) external {
-        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksSubmitted);
+    function claimRandomTaskForVerification(uint256 _wizId) external {
+        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
         Task memory myTask;
         uint256 taskId;
-        // todo --implement randomness
-//        uint256[25] memory potentialTasks;
-        for(uint256 i =0; i < totalTasksSubmitted; ){
-            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizID && myTask.refuterID!= _wizID){ // todo -- make sure to start IDs at 1
-            // todo -- use above  version (removed restriction for checking)
-//            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.refuterID!= _wizID){
-//                potentialTasks.push(uint256(DoubleEndedQueue.at(tasksSubmitted, i)));
-                taskId = uint256(DoubleEndedQueue.at(tasksSubmitted, i));
-                myTask = tasks[taskId];
 
-                /*
-                // adjust dequeue
-                tasksSubmitted[0], tasksSubmitted[uint128(i)] = bytes32(0), tasksSubmitted[uint128(i)];
-                tasksVerifying.push(uint256(tasksSubmitted[uint128(i)]));
-                // shift head of dequeue to maintain structure (slight penalty for head)
-                if (i != 0) {
-                    tasksSubmitted._data[uint128(i)] = tasksSubmitted._data[tasksSubmitted.begin];
-                }
-                DoubleEndedQueue.pop(tasksSubmitted);
-                */
+        // todo --implement randomness
+        // uint256[25] memory potentialTasks;
+
+        for(uint256 i =0; i < totalTasksSubmitted; ){
+            taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+            myTask = tasks[taskId];
+            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizId && myTask.refuterID!= _wizId){
+//                taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+//                myTask = tasks[taskId];
 
                 // update task
-                // assign task to home boy
-                myTask.verifierID = uint16(_wizID);
+                myTask.verifierID = uint16(_wizId);
                 myTask.verificationReservedTimestamp = uint40(block.timestamp + verificationTime);
-                tasks[uint256(DoubleEndedQueue.at(tasksSubmitted, i))] = myTask;
+                tasks[taskId] = myTask;
+                emit VerificationAssigned(_wizId, taskId, tasks[taskId]);
             }
+            unchecked{++i;}
         }
-        // emit event with task
-        emit VerificationAssigned(_wizID, taskId);
+//        emit VerificationAssigned(_wizId, taskId);
     }
 
-/*
-        string IPFSHash; // holds description
-        uint40 NFTID; // wizard ID of who is assigned task
-        bytes32 hash; // hashed input to be validated
-        bytes32 refuterHash; // correct hash according to refuter
-        uint8 numFieldsToHash; // input fields
-        uint24 timeBonus; // increases Wizard's activation time, in seconds
-        uint80 payment; //
-        uint16 verifierID; // wizardId of Verifier
-        uint16 refuterID; // wizardId of Verifier
-        uint40 verificationReservedTimestamp; // time when verification period ends
-
-*/
-    function completeTask(string memory _IPFSHash, bytes32 _hash, uint40 _wizID) external {
+    function completeTask(string memory _IPFSHash, bytes32 _hash, uint40 _wizId) external {
         // IPFS, hash, wizardID
 
         // find the task type -- can't be too many
@@ -377,15 +402,16 @@ contract Governance is ReentrancyGuard, Ownable {
                 // verify it is viable
                 require(taskTypes[i].begTimestamp <= block.timestamp && block.timestamp <= taskTypes[i].endTimestamp, "Outside time period");
                 // create new task
-                Task memory myTask = Task(_IPFSHash,_wizID, _hash, 0, taskTypes[i].numFieldsToHash, taskTypes[i].timeBonus, 0, 0, 0, 0);
-                DoubleEndedQueue.pushBack(tasksSubmitted, bytes32(tasksAttempted));
-                tasks[tasksAttempted] = myTask;
-                tasksAttempted+=1;
+                Task memory myTask = Task(_IPFSHash,_wizId, _hash, 0, taskTypes[i].numFieldsToHash, taskTypes[i].timeBonus, 0, 0, 0, 0);
+                DoubleEndedQueue.pushBack(tasksWaitingConfirmation, bytes32(totalTasksAttempted));
+                tasks[totalTasksAttempted] = myTask;
+                totalTasksAttempted+=1;
 
                 // update TaskTypes
-                taskTypes[i].nextActiveTimeThreshold[_wizID] = block.timestamp + 1 days;
+                taskTypes[i].nextActiveTimeThreshold[_wizId] = block.timestamp + 1 days;
+                taskTypes[i].availableSlots = taskTypes[i].availableSlots - 1;
 
-                emit TaskCompleted(_wizID,tasksAttempted -1, _IPFSHash, block.timestamp);
+                emit TaskCompleted(_wizId,totalTasksAttempted -1, _IPFSHash, block.timestamp);
                 break;
             }
             unchecked{++i;}

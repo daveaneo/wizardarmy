@@ -87,7 +87,7 @@ function sleep(ms) {
     }
 
     async function CompleteTask() {
-        console.log("What is 5 + 9?");
+        console.log("Todo complete task?");
         // todo -- backend work. Load a task and submit the hashed details to the blockchain
         // todo -- confirm smart contracts comply -- may need a verifier contract
     }
