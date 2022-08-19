@@ -191,6 +191,7 @@ contract Governance is ReentrancyGuard, Ownable {
         // if no tasks, return empty array
         if (count==0) {
             Task[] memory myReturn= new Task[](1);
+            myReturn[0].NFTID=999;
 //            myReturn[0] = "";
             return myReturn;
         }

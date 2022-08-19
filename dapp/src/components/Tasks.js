@@ -171,6 +171,7 @@ function Tasks(props) {
 */
 
     async function updatePendingTasksToConfirm() {
+       console.log("wizID: ", wizardId);
        let tasks = await wizardGovernanceContract.getTasksAssignedToWiz(wizardId);
        console.log("TASKS: ", tasks);
        if(tasks[0].IPFSHash==""){
@@ -184,7 +185,12 @@ function Tasks(props) {
            for(let i=0;i<tasks.length;i++){
                console.log("task: ", tasks[i]);
            }
-           setTaskToConfirm({...tasks[0]});
+           console.log('tasks[0]: ', tasks[0])
+           console.log('tasks[0]: ', tasks[0]["IPFSHash"])
+           let myObj ={"IPFSHash": tasks[0]["IPFSHash"], "fields": tasks[0]["numFieldsToHash"]}
+           let myTask = await LoadTextFieldOntoConfirmingTask(myObj);
+           console.log("myTask: ", myTask)
+           setTaskToConfirm({...myTask});
        }
    }
 
@@ -210,8 +216,9 @@ function Tasks(props) {
           // update tasks
             console.log("events: ", res.events[0])
             console.log("Task complete. Loading new tasks.")
-            let remTasks = taskTypes.filter(function(id) {
-                return id !== _id
+            console.log("id: ", _id)
+            let remTasks = taskTypes.filter(function(tt) {
+                return tt.id !== _id
             });
             console.log("remTasks: ", remTasks)
             setTaskTypes(remTasks);
@@ -389,6 +396,22 @@ function sleep(ms) {
 // confirmTask
 
 
+  async function LoadTextFieldOntoConfirmingTask(confirmationObject) {
+//       let confirmationObject = taskToConfirm;
+       let myJSON= await loadJSONFromIPFS(confirmationObject.IPFSHash);
+       console.log("myJSON: ", myJSON)
+       if(myJSON.description!=""){
+         confirmationObject.description = myJSON.description;
+         console.log("confirmationObject: ", confirmationObject)
+//         setTaskToConfirm(confirmationObject);
+         return confirmationObject;
+       }
+       else{
+         console.log("Call to IPFS failed to retrieve proper description.")
+       }
+
+  }
+
     // a lot of await
   async function ClaimRandomTask() {
     let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
@@ -400,13 +423,19 @@ function sleep(ms) {
         let taskId = res.events[0].args[1]
         // note, we are passing task information in event
         let taskFromEvent = res.events[0].args[2];
+        // todo -- this may needs to be formatted better
+
         let task = await wizardGovernanceContract.getTaskById(taskId);
-        console.log("task: ", task, taskFromEvent);
+        // let myObj ={"IPFSHash": task[0]["IPFSHash"], "fields": task[0]["numFieldsToHash"]}
+
+        console.log("task --confirm this is not array and is pure object: ", task); // equivalent
 
         // set stateVariable about tasks to confirm
+        task = await LoadTextFieldOntoConfirmingTask(task);
+        console.log("my new task: ", task)
         setTaskToConfirm(task);
 
-        console.log("taskId, task: ", taskId, task);
+//        console.log("taskId, task: ", taskId, task);
 
         // create function tasks assigned to me
     }
@@ -477,6 +506,15 @@ function sleep(ms) {
     useEffect(() => {
         LoadMyTasks();
     }, [connected, address]);
+
+    useEffect(() => {
+        console.log("taskToConfirm changed: ", taskToConfirm)
+        if(areTasksAvailableToConfirm){
+           console.log("loading text file...")
+           //LoadTextFieldOntoConfirmingTask();
+        }
+    }, [areTasksAvailableToConfirm]);
+
 
     useEffect(() => {
       LoadContracts();
@@ -607,7 +645,7 @@ function sleep(ms) {
             </div>
         )}
 
-        {areTasksAvailableToConfirm && taskToConfirm.IPFSHash==""
+        {areTasksAvailableToConfirm && (taskToConfirm.IPFSHash== undefined || taskToConfirm.IPFSHash=="" )
          ?
             <div>
                <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
@@ -621,7 +659,9 @@ function sleep(ms) {
         {taskToConfirm.IPFSHash!=undefined && taskToConfirm.IPFSHash!=""  &&
 
             <div>
-               {taskToConfirm.IPFSHash}
+               {taskToConfirm.description}
+                <br/>
+               todo: mapping of tasksToConfirm.fields to input types
                <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
             </div>
         }
