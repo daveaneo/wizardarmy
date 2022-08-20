@@ -52,7 +52,7 @@ function Tasks(props) {
 
 
     async function fetchWithTimeout(resource, options = {}) {
-      const { timeout = 5000 } = options;
+      const { timeout = 6000 } = options;
 
       const controller = new AbortController();
       const id = setTimeout(() => controller.abort(), timeout);
@@ -171,25 +171,23 @@ function Tasks(props) {
 */
 
     async function updatePendingTasksToConfirm() {
-       console.log("wizID: ", wizardId);
-       let tasks = await wizardGovernanceContract.getTasksAssignedToWiz(wizardId);
-       console.log("TASKS: ", tasks);
-       if(tasks[0].IPFSHash==""){
+//       console.log("wizID: ", wizardId);
+       let myReturn = await wizardGovernanceContract.getTasksAssignedToWiz(wizardId);
+       console.log("myReturn: ", myReturn)
+       let tasks = myReturn[0];
+       let myTaskIds = myReturn[1];
+
+//       console.log("TASKS: ", tasks, myTaskIds);
+       if(tasks[0].IPFSHash=="" || tasks[0].IPFSHash==undefined){
          console.log("no tasks assigned.")
          if(taskToConfirm.IpfsHash!=undefined){
            setTaskToConfirm({});
          }
        }
        else{
-       console.log("my tasks already assigned: ", tasks);
-           for(let i=0;i<tasks.length;i++){
-               console.log("task: ", tasks[i]);
-           }
-           console.log('tasks[0]: ', tasks[0])
-           console.log('tasks[0]: ', tasks[0]["IPFSHash"])
-           let myObj ={"IPFSHash": tasks[0]["IPFSHash"], "fields": tasks[0]["numFieldsToHash"]}
+           console.log("getting task stuff.")
+           let myObj ={"taskId": parseInt(myTaskIds[0]), "IPFSHash": tasks[0]["IPFSHash"], "numFields": tasks[0]["numFieldsToHash"], "refuted": parseInt(tasks[0].refuterID)!=0}
            let myTask = await LoadTextFieldOntoConfirmingTask(myObj);
-           console.log("myTask: ", myTask)
            setTaskToConfirm({...myTask});
        }
    }
@@ -395,13 +393,35 @@ function sleep(ms) {
 // Request task to confirm
 // confirmTask
 
+  async function updateTaskToConfirmGivenInput(_input, _fieldId) {
+    let myObj = Object.assign({}, taskToConfirm);
+    myObj.fields[_fieldId].input = _input;
+    setTaskToConfirm(myObj);
+  }
+
 
   async function LoadTextFieldOntoConfirmingTask(confirmationObject) {
 //       let confirmationObject = taskToConfirm;
+       console.log("-------------IN LoadTextFieldOntoConfirmingTask ---------")
+       console.log("confirmationObject: ", confirmationObject);
+
+    if(confirmationObject.IPFSHash===undefined){
+      return {}
+    }
+
        let myJSON= await loadJSONFromIPFS(confirmationObject.IPFSHash);
-       console.log("myJSON: ", myJSON)
-       if(myJSON.description!=""){
+       console.log("myJSON: ", myJSON);
+       if(myJSON!= null && myJSON.description!=""){
          confirmationObject.description = myJSON.description;
+         // create fields from numFields
+         confirmationObject.fields = [];
+         confirmationObject.inputs = [];
+         for (let i =0; i<confirmationObject.numFields; i++){
+            let obj = {"id": i, "type": "string", "input": ""}
+            confirmationObject.fields.push(obj);
+         }
+//         new Array(confirmationObject.numFields).fill('string');
+
          console.log("confirmationObject: ", confirmationObject)
 //         setTaskToConfirm(confirmationObject);
          return confirmationObject;
@@ -430,6 +450,8 @@ function sleep(ms) {
 
         console.log("task --confirm this is not array and is pure object: ", task); // equivalent
 
+//        task = {"IPFSHash": task[0].IPFSHash, "numFields": task[0].numFieldsToHash}
+        task = {"taskId": taskId, "IPFSHash": task[0]["IPFSHash"], "numFields": task[0]["numFieldsToHash"], "refuted": parseInt(task[0].refuterID)!=0}
         // set stateVariable about tasks to confirm
         task = await LoadTextFieldOntoConfirmingTask(task);
         console.log("my new task: ", task)
@@ -447,16 +469,45 @@ function sleep(ms) {
 
   async function ConfirmCompletedTask() {
     console.log("to do");
-    // transact with blockchain, claiming one task (15 minute limit)
-    // populate information in order to confirm
-    // submit
+//    let myObj = Object.assign({}, taskToConfirm);
+//    myObj.fields[_fieldId].input = _input;
+//    setTaskToConfirm(myObj);
 
-//    let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
-//    let res = await tx.wait(1);
-//    console.log("res: ", res);
-//    console.log("res.events[0].args: ", res.events[0].args);
-//
-//    let taskId = res.events[0].args[1]
+    let leaves = [];
+    for(let i =0; i< taskToConfirm.fields.length; i++){
+      leaves.push(taskToConfirm.fields[i].input);
+    }
+
+    let unhashedLeaves = []
+//    let hashedLeaves = []
+    let onceHashedLeaves = []
+    let twiceHashedLeaves = []
+//    let hashTypes = []
+    // hash all leafs
+    for(let i =0; i < leaves.length; i++){
+        let temp = utils.keccak256(utils.toUtf8Bytes(leaves[i]))
+        onceHashedLeaves.push(utils.keccak256(utils.toUtf8Bytes(leaves[i])));
+        temp = utils.keccak256(temp);
+        twiceHashedLeaves.push(temp);
+//        hashTypes.push("bytes");
+    }
+
+    let finalHash;
+    let tx = undefined;
+    console.log("to send: ", wizardId, taskToConfirm.taskId, twiceHashedLeaves, onceHashedLeaves)
+    if(taskToConfirm.refuted){
+//        finalHash = ethers.utils.solidityKeccak256(hashTypes, twiceHashedLeaves)
+        tx = await wizardGovernanceContract.submitVerification(wizardId, taskToConfirm.taskId, twiceHashedLeaves) ;
+    }
+    else{
+//        finalHash = ethers.utils.solidityKeccak256(hashTypes, onceHashedLeaves)
+        tx = await wizardGovernanceContract.submitVerification(wizardId, taskToConfirm.taskId, onceHashedLeaves) ;
+    }
+
+
+    let res = await tx.wait(1);
+    console.log("res: ", res);
+    console.log("res.events[0].args: ", res.events[0].args);
 
   }
 
@@ -506,6 +557,11 @@ function sleep(ms) {
     useEffect(() => {
         LoadMyTasks();
     }, [connected, address]);
+
+    useEffect(() => {
+        console.log("task to confirm has changed: ", taskToConfirm)
+    }, [taskToConfirm]);
+
 
     useEffect(() => {
         console.log("taskToConfirm changed: ", taskToConfirm)
@@ -604,7 +660,6 @@ function sleep(ms) {
 */}
       </div>
       <p className="DoubleBordered">Available tasks</p>
-        {taskTypes.length}
         {taskTypes && taskTypes.map(taskType =>
             <div key={taskType.id} className="Double">
                 <br/>
@@ -645,7 +700,7 @@ function sleep(ms) {
             </div>
         )}
 
-        {areTasksAvailableToConfirm && (taskToConfirm.IPFSHash== undefined || taskToConfirm.IPFSHash=="" )
+        {areTasksAvailableToConfirm && taskToConfirm && (taskToConfirm.IPFSHash== undefined || taskToConfirm.IPFSHash=="" )
          ?
             <div>
                <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
@@ -656,13 +711,30 @@ function sleep(ms) {
             </div>
          }
 
-        {taskToConfirm.IPFSHash!=undefined && taskToConfirm.IPFSHash!=""  &&
+        {taskToConfirm && taskToConfirm.IPFSHash!=undefined && taskToConfirm.IPFSHash!=""  &&
+
 
             <div>
                {taskToConfirm.description}
                 <br/>
-               todo: mapping of tasksToConfirm.fields to input types
-               <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task </button>
+
+               {/* Input Fields  */}
+                {taskToConfirm.fields.map(field =>
+                    <div key={field.id} className="Double">
+                        <label> {field.id}: </label>
+                        <input
+                            type={"string"}
+                            id={field.id}
+                            value={[field.input]}
+                            onChange={e => {updateTaskToConfirmGivenInput(e.target.value, field.id)}}
+                        />
+                    </div>
+                )}
+
+                <div>
+                   <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task  </button>
+                </div>
+
             </div>
         }
 

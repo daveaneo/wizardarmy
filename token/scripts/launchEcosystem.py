@@ -113,6 +113,7 @@ def main():
 
 
     # Task-claim testing
+    '''
     hex_string = "FirstOne"
     tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25, {'from': accounts[0]})
     tx.wait(1)
@@ -130,6 +131,7 @@ def main():
 
     tasks = governance.getTasksAssignedToWiz(1, {'from': accounts[1]})
     print(f'tasks for wiz1: {tasks}')
+    '''
 
     '''
     hex_string = "SecondOne"

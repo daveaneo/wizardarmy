@@ -173,7 +173,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-    function getTasksAssignedToWiz(uint40 _wizId) external view returns (Task[] memory) {
+    function getTasksAssignedToWiz(uint40 _wizId) external view returns (Task[] memory, uint256[] memory) {
         uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
         Task memory myTask;
         uint256 taskId;
@@ -191,24 +191,27 @@ contract Governance is ReentrancyGuard, Ownable {
         // if no tasks, return empty array
         if (count==0) {
             Task[] memory myReturn= new Task[](1);
-            myReturn[0].NFTID=999;
+            uint256[] memory myReturnUint= new uint256[](1);
+//            myReturn[0].NFTID=0;
 //            myReturn[0] = "";
-            return myReturn;
+            return (myReturn, myReturnUint);
         }
 
         uint256 counter = 0;
         Task[] memory myTasks = new Task[](count);
+        uint256[] memory myTaskIds = new uint256[](count);
         for(uint256 i =0; i < totalTasksSubmitted; ){
             taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
             myTask = tasks[taskId];
             if( myTask.verificationReservedTimestamp > block.timestamp && myTask.verifierID== _wizId){
                 myTasks[counter] = myTask;
+                myTaskIds[counter] = taskId;
                 unchecked{++counter;}
                 if(counter>count){break;}
             }
             unchecked{++i;}
         }
-        return myTasks;
+        return (myTasks, myTaskIds);
     }
 
 
