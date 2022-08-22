@@ -6,6 +6,11 @@
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "@walletconnect/safe-json": "^1.0.0",
+    "@walletconnect/socket-transport": "^1.8.0",
+    "@walletconnect/utils": "^1.8.0",
+    "@walletconnect/window-getters": "^1.0.0",
+    "@walletconnect/window-metadata": "^1.0.0",
     "@web3-onboard/core": "^2.6.0",
     "@web3-onboard/injected-wallets": "^2.0.15",
     "@web3-onboard/walletconnect": "^2.0.8",
@@ -16,10 +21,10 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.3.0",
-    "react-scripts": "^5.0.1",
+    "react-scripts": "^4.0.3",
     "stream": "^0.0.2",
     "web-vitals": "^2.1.4",
-    "webpack": "^5.74.0"
+    "webpack": "4.44.2"
   },
   "scripts": {
     "start": "react-scripts start",

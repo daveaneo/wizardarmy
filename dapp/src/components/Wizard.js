@@ -223,7 +223,7 @@ function sleep(ms) {
     <div className="">
       <p>{totalTowerTokens} TOKENS TOTAL </p>
       <p className="DoubleBordered">Wizard {wizardId} {isOnTheTower ? "is on floor " + myFloor : "not in the tower."}</p>
-        {myWizard && wizardId < totalWizards &&
+        {myWizard && wizardId <= totalWizards &&
             <div className="Double">
                 <div className="DoubleBordered">
                     <div>element: {myWizard.element}</div>
@@ -244,7 +244,7 @@ function sleep(ms) {
             </div>
         }
 
-        {wizardId >= totalWizards && 'Wizard does not exist.'}
+        {wizardId > totalWizards && 'Wizard does not exist.'}
         {!myWizard && 'loading...'}
         {!myWizard &&
           <div>

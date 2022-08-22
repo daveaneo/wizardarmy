@@ -458,17 +458,9 @@ contract Governance is ReentrancyGuard, Ownable {
         require(wizardsNFT.ownerOf(_wizId) == msg.sender && tasks[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
         require(_fields.length > 0);
 
-        Task storage myTask = tasks[_taskID];
+        Task memory myTask = tasks[_taskID];
         uint256 count = 0;
-
-        // hash leaf if refuter exists
-        // todo -- redo our hashes as we are hashing not same throughout
-
-//        bytes32 myHash = myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[0])) : _fields[0] ; // note -- not hashed
-//        for(uint256 i = 0; i < _fields.length;){
-//            myHash = keccak256(abi.encodePacked(myHash, myTask.refuterID > 0 ? keccak256(abi.encodePacked(_fields[i])) : _fields[i]));
-//            unchecked{++i;}
-//        }
+        bool deleteTaskFlag = true;
 
         // hash leaves if there is a refuter
         if(myTask.refuterID > 0) {
@@ -489,11 +481,10 @@ contract Governance is ReentrancyGuard, Ownable {
             address payable taskSubmitter = payable(wizardsNFT.ownerOf(myTask.verifierID));
 //            address payable verifier = msg.sender;
 
-
             wizardsNFT.verifyDuty(myTask.NFTID, myTask.timeBonus);
             wizardsNFT.verifyDuty(myTask.verifierID, taskVerificationTimeBonus);
 
-            myTask.payment=0; // thwart reentrancy attacks
+            // myTask.payment=0; // thwart reentrancy attacks
             delete tasks[_taskID];
 
             // send to task submitter
@@ -508,6 +499,14 @@ contract Governance is ReentrancyGuard, Ownable {
         else { // if incorrect Hash
             // case 2 -- if no match, send to DAO
 
+
+            if(myTask.refuterID==0){
+                myTask.refuterID=uint16(_wizId);
+                myTask.refuterHash=myHash;
+                tasks[_taskID] = myTask;
+                deleteTaskFlag = false;
+            }
+
             // case 1 -- if matches hash of refuter, split
             if(myTask.refuterHash==myHash){
                 uint256 split = myTask.payment/2;
@@ -516,7 +515,7 @@ contract Governance is ReentrancyGuard, Ownable {
                 wizardsNFT.verifyDuty(myTask.refuterID, taskVerificationTimeBonus);
                 wizardsNFT.verifyDuty(_wizId, taskVerificationTimeBonus);
 
-                myTask.payment=0; // thwart reentrancy attacks
+                // myTask.payment=0; // thwart reentrancy attacks
                 delete tasks[_taskID];
 
                 // send to task submitter
@@ -540,6 +539,24 @@ contract Governance is ReentrancyGuard, Ownable {
                 // emit event
             }
         }
+
+            // delete task from double ended queue
+        if(deleteTaskFlag){
+            uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
+//            Task memory myTask;
+
+            // delete task from doubleEndedQueue
+            for(uint256 i =0; i < totalTasksSubmitted; ){
+                if( uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i))==_taskID){
+                    bytes32 prevFront = DoubleEndedQueue.popFront(tasksWaitingConfirmation);
+                    if(i!=0){ // add back on if we weren't meant to remove front
+                        tasksWaitingConfirmation._data[int128(tasksWaitingConfirmation._begin + int(i))] = prevFront;
+                    }
+                }
+                unchecked{++i;}
+            }
+        }
+
     }
 
     //////////////////////

@@ -451,7 +451,9 @@ function sleep(ms) {
         console.log("task --confirm this is not array and is pure object: ", task); // equivalent
 
 //        task = {"IPFSHash": task[0].IPFSHash, "numFields": task[0].numFieldsToHash}
-        task = {"taskId": taskId, "IPFSHash": task[0]["IPFSHash"], "numFields": task[0]["numFieldsToHash"], "refuted": parseInt(task[0].refuterID)!=0}
+        // todo -- this is causing undefined
+        task = {"taskId": taskId, "IPFSHash": task[0].IPFSHash, "numFields": task[0].numFieldsToHash, "refuted": parseInt(task[0].refuterID)!=0}
+        console.log("task after making it an object: ", task)
         // set stateVariable about tasks to confirm
         task = await LoadTextFieldOntoConfirmingTask(task);
         console.log("my new task: ", task)
@@ -508,6 +510,10 @@ function sleep(ms) {
     let res = await tx.wait(1);
     console.log("res: ", res);
     console.log("res.events[0].args: ", res.events[0].args);
+
+    if(res){
+        setTaskToConfirm({});
+    }
 
   }
 
@@ -703,7 +709,8 @@ function sleep(ms) {
         {areTasksAvailableToConfirm && taskToConfirm && (taskToConfirm.IPFSHash== undefined || taskToConfirm.IPFSHash=="" )
          ?
             <div>
-               <button onClick={() => ClaimRandomTask()}> Claim Random Task </button>
+               {taskToConfirm.IPFSHash}
+               <button onClick={() => ClaimRandomTask()}> Claim Random Task to Confirm </button>
             </div>
          :
             <div>
