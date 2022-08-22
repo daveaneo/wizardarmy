@@ -46,11 +46,13 @@ function Battle(props) {
         return processedFloor;
     }
 
+   console.log("hello sir")
+
     async function AttackTower(_floor) {
         // todo implement and add in specific floor
-//        console.log("I am attacking..")
-//        console.log("wizardId: ", wizardId);
-//        console.log("_floor: ", _floor);
+        console.log("I am attacking..")
+        console.log("wizardId: ", wizardId);
+        console.log("_floor: ", _floor);
 
         // approve token
         // todo -- approval is tricky as balance is changing constantly
