@@ -46,7 +46,6 @@ function Battle(props) {
         return processedFloor;
     }
 
-   console.log("hello sir")
 
     async function AttackTower(_floor) {
         // todo implement and add in specific floor
@@ -61,7 +60,7 @@ function Battle(props) {
 
 //        var res = await tx.wait();
         console.log("flor balance: ", floorBalance);
-        const tx = await wizardBattleContract.attack(wizardId, _floor, {value: '10000000000'});//{value: parseInt(floorBalance*1.1)}); // send a little extra
+        const tx = await wizardBattleContract.attack(wizardId, _floor, {value: parseInt(floorBalance*1.1)});//{value: parseInt(floorBalance*1.1)}); // send a little extra
 //        console.log("tx: ", tx)
         const res = await tx.wait(1);
 //        console.log("res: ", res)

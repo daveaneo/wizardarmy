@@ -19,6 +19,7 @@ contract WizardBattle is Ownable, ReentrancyGuard {
     uint256 DAOShare = 300; // out of 10,000 (100%) => 1% // percent of fee
     uint256 attackFee = 1000; // out of 10,000 => 10%
     uint256 dustThreshold =10000;
+    uint256 ELEMENTSYNERGYMULTIPLIER = 100; // out of 100 (110 means 10% bonus)
 
     constructor(address _ecosystemToken, address _wizardNFT, address _wizardTower) {
         ecosystemToken = IERC20(_ecosystemToken);
@@ -32,6 +33,7 @@ contract WizardBattle is Ownable, ReentrancyGuard {
     event Attack(uint256 attackerId, uint256 defenderId, uint256 floorAttacked,
                  uint256 netTokensGainedOrLost, Wizards.OUTCOME outcome, uint256 timestamp);
     event Capture(uint256 captured, uint256 capturer, uint256 timestamp);
+    event AttackRound(uint256 round, uint256 damageDealt, uint256 defenderHP);
 
     ////////////////////
     ////    Get       //
@@ -117,6 +119,7 @@ contract WizardBattle is Ownable, ReentrancyGuard {
         uint256 ethValueOfTokensOnFloor = 10000; // todo -- use dex to calculate this
 //        uint256 tokensWaged = msg.value;
         uint256 attackingFromFloor = wizardTower.wizardIdToFloor(_attackerId);
+        require(_floor != attackingFromFloor, "Can not attack yourself.");
 
         // 10% fee for attacking
         require(ethValueOfTokensOnFloor*attackFee/10000 <= msg.value, "insuffcient tokens to attack"); // only if other user is valid
@@ -142,7 +145,7 @@ contract WizardBattle is Ownable, ReentrancyGuard {
             outcome = battle(_attackerId, occupyingWizard);
         }
 
-        if(outcome!=Wizards.OUTCOME.LOSS) {
+        if(outcome==Wizards.OUTCOME.WIN || outcome==Wizards.OUTCOME.CAPTURE) {
             // withdraw tokens before leaving floor
             if(wizardTower.floorBalance(attackingFromFloor) > dustThreshold) {
                 wizardTower.withdraw(attackingFromFloor);
@@ -155,7 +158,7 @@ contract WizardBattle is Ownable, ReentrancyGuard {
             }
            // update NFT stats for wins/loses/tokens
         }
-        else {
+        else { // if loss or tie
             // nothing else to do
         }
 
@@ -174,18 +177,19 @@ contract WizardBattle is Ownable, ReentrancyGuard {
 
     // todo -- return a number between 0 and 200 for all combinations
     function getElementMultiplier(Wizards.ELEMENT attackingElement, Wizards.ELEMENT defendingElement) internal pure returns(uint256){
+        // ELEMENTSYNERGYMULTIPLIER
         return 100;
     }
 
     // @dev find the outcome of _attackerId attacking
-    function battle(uint256 _attackerId, uint256 _defenderId) public view returns(Wizards.OUTCOME){
+    function battle(uint256 _attackerId, uint256 _defenderId) public returns(Wizards.OUTCOME){ // todo -- expose this to public for use in other dApps?
         WizardTower.FloorInfo memory floor = wizardTower.getFloorInfoGivenWizard(_defenderId); // does not contain floor #!
         Wizards.ELEMENT floorElement = floor.element;
         Wizards.Stats[2] memory characters = [wizardNFT.getStatsGivenId(_attackerId), wizardNFT.getStatsGivenId(_defenderId)];
 
         // todo -- convert this to arrays
-        Wizards.Stats memory attacker = wizardNFT.getStatsGivenId(_attackerId);
-        Wizards.Stats memory defender = wizardNFT.getStatsGivenId(_defenderId);
+//        Wizards.Stats memory attacker = wizardNFT.getStatsGivenId(_attackerId);
+//        Wizards.Stats memory defender = wizardNFT.getStatsGivenId(_defenderId);
 
         uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(msg.sender, block.timestamp,
             _attackerId, floor.lastWithdrawalTimestamp)));
@@ -193,29 +197,36 @@ contract WizardBattle is Ownable, ReentrancyGuard {
 
         // determine who fights first
         uint256 firstToAttack; // 0 means attacker (aggressor)
-        uint256 firstAttackSelector = pseudoRandNum % (attacker.speed + defender.speed);
+        uint256 firstAttackSelector = pseudoRandNum % (characters[0].speed + characters[1].speed);
         pseudoRandNum >>= 8; // shift 8 bits
-        if(firstAttackSelector > attacker.speed) {
+        if(firstAttackSelector > characters[0].speed) {
             firstToAttack = 1; // defender
         }
 
         // determine buffs ( out of 10**4 )
         uint256[2] memory attackMultipliers =
-              [uint256((characters[0].element==floorElement ? 125 : 100) * getElementMultiplier(characters[0].element, characters[1].element)),
-               uint256((characters[1].element==floorElement ? 125 : 100) * getElementMultiplier(characters[1].element, characters[0].element))];
+              [uint256((characters[0].element==floorElement ? ELEMENTSYNERGYMULTIPLIER : 100) * getElementMultiplier(characters[0].element, characters[1].element)),
+               uint256((characters[1].element==floorElement ? ELEMENTSYNERGYMULTIPLIER : 100) * getElementMultiplier(characters[1].element, characters[0].element))];
 
         uint256 attackAmount;
         uint256 attackLuck;
         uint256 defenderIndex; // todo -- battle is only creating losses
+        defenderIndex = (firstToAttack==0 ? 1 : 0);
         for(uint256 i=0; i < 20; ){
             attackLuck = uint256(uint8(pseudoRandNum));
             attackLuck = attackLuck > 12 ? attackLuck : 0; // 12/256 likelihood of being 0
-            defenderIndex = (firstToAttack==0 ? 1 : 0);
-            attackAmount = attackLuck == 0 ? 0 : (characters[firstToAttack].magicalPower*attackMultipliers[firstToAttack] / 10**4) * (384 + attackLuck/4 ) / 512;
-            attackAmount = attackAmount > characters[defenderIndex].magicalDefense ? attackAmount - characters[defenderIndex].magicalDefense : 0;
+//            defenderIndex = (firstToAttack==0 ? 1 : 0);
+            // get attack value semi randomly
+            attackAmount = attackLuck == 0 ? 0 : characters[firstToAttack].magicalPower*attackMultipliers[firstToAttack] * (192 + attackLuck/4 ) / 256 / 10**4; // 3/4 max hit + 1/4 is random
+            // reduce attack amount by defense amount
+            attackAmount = attackAmount > characters[defenderIndex].magicalDefense/2 ? attackAmount - characters[defenderIndex].magicalDefense/2 : 0;
             characters[defenderIndex].hp = attackAmount > characters[defenderIndex].hp ? 0 : characters[defenderIndex].hp - attackAmount;
+
+
+            emit AttackRound(i, attackAmount, characters[defenderIndex].hp);
+
             if(characters[defenderIndex].hp == 0) {break;}
-//            firstToAttack = defenderIndex;
+
             unchecked{
                 (firstToAttack, defenderIndex) = (defenderIndex, firstToAttack);
                 i++;

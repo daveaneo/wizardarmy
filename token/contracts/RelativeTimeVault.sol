@@ -203,7 +203,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 //    }
 
     function switchFloors(uint256 _floorA, uint256 _floorB) external onlyBattler {
-        require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "must own wizardsNFT");
+        require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "invalid floors");
         FloorInfo memory floorInfo;
         uint256 previousFloorAWizard = floorIdToInfo[_floorA].occupyingWizardId;
         floorIdToInfo[_floorA].occupyingWizardId = floorIdToInfo[_floorB].occupyingWizardId;

@@ -49,12 +49,12 @@ def main():
     # create wizards
     for i in range(1, 3):
         tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(1)
+        tx.wait(2)
         tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(1)
+        tx.wait(2)
         print(f'wizard {i} initiated, resulting in event: {tx.events}')
         tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(1)
+        tx.wait(2)
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')
@@ -78,6 +78,7 @@ def main():
     #     chain.sleep(60)
     #     chain.mine(1)
 
+    '''
     try:
         uri = wizards.tokenURI(1)
         print(f'uri: {uri}')
@@ -86,6 +87,7 @@ def main():
         print(f'uri: {uri}')
     except Exception as e:
         print(f'failed get get uri. error: {e}')
+    '''
 
     # Governance
     #     function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
@@ -176,6 +178,37 @@ def main():
     tx = governance.testHashing(hex_string, bytes_array, True)
     tx.wait(1)
     print(f'events: {tx.events}')
+    '''
+
+    # Wizard Battle
+    # won; // 0 = > loss, 1 = > win, 2 = > tie?, 3 = > capture
+
+    '''
+    wiz_1 = wizards.getStatsGivenId(1)
+    wiz_2 = wizards.getStatsGivenId(2)
+
+    print(f'wiz_1: {wiz_1}')
+    print(f'wiz_2: {wiz_2}')
+
+    outcomes = dict()
+    for i in range(10):
+        wiz_on_floor_1 = wizard_tower.getWizardOnFloor(1)
+        wiz_on_floor_2 = wizard_tower.getWizardOnFloor(2)
+        wiz_1_floor = wizard_tower.wizardIdToFloor(1)
+        wiz_2_floor = wizard_tower.wizardIdToFloor(2)
+        print(f'wiz_on_floor_1: {wiz_on_floor_1}')
+        print(f'floor for wiz 1: {wiz_1_floor}')
+        print(f'wiz_on_floor_2: {wiz_on_floor_2}')
+        print(f'floor for wiz 2: {wiz_2_floor}')
+        floor_to_attack = wiz_2_floor
+
+        tx = wizard_battle.attack(1, floor_to_attack, {'from': accounts[0], 'value': 1000*100})
+        tx.wait(1)
+        print(f'events: {tx.events}')
+        # print(f'outcome: {tx.events["Attack"]["outcome"]}')
+        outcome = tx.events["Attack"]["outcome"]
+        outcomes[outcome] = outcomes.get(outcome, 0) + 1
+    print(f'outcomes: {outcomes}')
     '''
 
     if DUMP_ABI:

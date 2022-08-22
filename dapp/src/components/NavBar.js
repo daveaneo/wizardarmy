@@ -47,6 +47,12 @@ function NavBar(props) {
               rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
             },
 */
+            {
+              id: '0x13881',
+              token: 'MATIC',
+              label: 'Mumbai Testnet',
+              rpcUrl: 'https://rpc-mumbai.maticvigil.com/'
+            },
           ]
         })
 
