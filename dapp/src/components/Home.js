@@ -73,6 +73,7 @@ function sleep(ms) {
   async function updateNumWizards() {
     if(NFTContractNoSigner!==undefined){
         let num = parseInt((await NFTContractNoSigner.totalSupply()));
+        console.log('num: ', num)
         setNumWizards(num);
     }
   }

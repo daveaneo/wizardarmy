@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
-import Onboard from '@web3-onboard/core'
-import injectedModule from '@web3-onboard/injected-wallets'
-import walletConnectModule from '@web3-onboard/walletconnect'
+//import Onboard from '@web3-onboard/core'
+//import injectedModule from '@web3-onboard/injected-wallets'
+//import walletConnectModule from '@web3-onboard/walletconnect'
 //import axios;
 
 
@@ -23,11 +23,22 @@ function NavBar(props) {
   const signer = window.signer;
   const myInfuraRPC = process.env.REACT_APP_RINKEBY_RPC;
   const MAINNET_RPC_URL = process.env.REACT_APP_MAINNET_RPC;
-  const injected = injectedModule()
-  const walletConnect = walletConnectModule()
+//  const injected = injectedModule()
+//  const walletConnect = walletConnectModule()
 //  const [onboard, setOnboard] = useState(undefined);
 //  var myonboard = undefined;
+  const SpheronOverride = true;
 
+  async function simpleSetup() {
+    const provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+    // Prompt user for account connections
+    await provider.send("eth_requestAccounts", []);
+    const signer = provider.getSigner();
+    console.log("Account:", await signer.getAddress());
+}
+  simpleSetup();
+
+/*
   async function setupOnboard() {
        let myonboard = await Onboard({
           wallets: [injected, walletConnect],
@@ -39,14 +50,12 @@ function NavBar(props) {
               rpcUrl: myInfuraRPC
             },
 
-// todo -- add Polygon
-/*            {
+            {
               id: '0x89',
               token: 'MATIC',
               label: 'Polygon',
               rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
             },
-*/
             {
               id: '0x13881',
               token: 'MATIC',
@@ -59,9 +68,16 @@ function NavBar(props) {
        setOnboard(myonboard)
        return myonboard;
 }
+*/
 
   async function connectWallet() {
-    // todo connection errors: connect/disconnect/connect
+    if(SpheronOverride==true){
+        simpleSetup();
+        setConnected(true);
+        return;
+    }
+
+    /*
     var myonboard;
     if (onboard==undefined){
       myonboard = await setupOnboard();
@@ -81,18 +97,9 @@ function NavBar(props) {
       )
 
       const signer = ethersProvider.getSigner()
-/*
-      // send a transaction with the ethers provider
-      const txn = await signer.sendTransaction({
-        to: wallets[0],
-        value: 100000000000000
-      })
-
-      const receipt = await txn.wait()
-      console.log(receipt)
-*/
       setConnected(true);
     }
+    */
 }
 
   async function loadAddress() {
@@ -161,7 +168,6 @@ function NavBar(props) {
 
   return (
     <div className="NavBar">
-    <div> USE ONLY RINKEBY (ETHEREUM)</div>
       <div>
 
         <Link to="/"> Home </Link>
