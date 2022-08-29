@@ -273,6 +273,7 @@ function sleep(ms) {
                     </Link>
                   </div>
                 }
+                { true && <div>Rebirth</div>}
             </div>
           }
         </div>

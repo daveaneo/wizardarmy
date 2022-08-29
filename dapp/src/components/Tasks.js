@@ -437,7 +437,6 @@ function sleep(ms) {
     let _onBoard = await wizardGovernanceContract.isMyWizardOnBoard(wizardId);
     console.log("onBoard: ", _onBoard);
     setOnBoard(_onBoard)
-
   }
 
     // a lot of await
