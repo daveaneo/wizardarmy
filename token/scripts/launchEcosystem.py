@@ -14,6 +14,9 @@ print(f'network: {network.show_active()}')
 chain = network.state.Chain()
 for i in range(2):
     print(f'accounts[{i}]: {accounts[i]}')
+required_confirmations = 1 if network.show_active()=="development" else 2
+
+print(f'required_confirmations: {required_confirmations}')
 
 
 # variables
@@ -24,7 +27,7 @@ def main():
     wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
-    governance = Governance.deploy(wizards.address, {'from': accounts[0]})
+    governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
 
     # save addresses
     directory = os.getcwd()
@@ -44,24 +47,24 @@ def main():
     # set modifier addresses
     tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
     tx = wizard_tower.updateBattler(wizard_battle.address, {'from': accounts[0]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
 
     # create wizards
     for i in range(1, 3):
         tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(2)
+        tx.wait(required_confirmations)
         tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(2)
+        tx.wait(required_confirmations)
         print(f'wizard {i} initiated, resulting in event: {tx.events}')
         tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(2)
+        tx.wait(required_confirmations)
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')
 
     # fuel tower
     tx = token.transfer(wizard_tower.address, 10**10, {'from': accounts[0]} )
-    tx.wait(1)
+    tx.wait(required_confirmations)
 
     # chain.sleep(60*9)
     # chain.mine(1)
@@ -96,7 +99,7 @@ def main():
     '''
     hex_string = "FirstOne"
     tx = governance.createTaskType(hex_string, 1, 24*60*60, 0, 999999999999, 25)
-    tx.wait(1)
+    tx.wait(required_confirmations)
     tasks = governance.getMyAvailableTaskTypes()
     print(f'my tasks: {tasks}')
     print(f'events: {tx.events}')
@@ -105,7 +108,7 @@ def main():
 
     hex_string = "SecondOne"
     tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25)
-    tx.wait(1)
+    tx.wait(required_confirmations)
     tasks = governance.getMyAvailableTaskTypes()
     print(f'my tasks: {tasks}')
     print(f'events: {tx.events}')
@@ -118,15 +121,15 @@ def main():
     '''
     hex_string = "FirstOne"
     tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25, {'from': accounts[0]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
     print(f'tasktype created.')
 
     tx = governance.completeTask(hex_string, "0x0", 1, {'from': accounts[0]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
     print(f'task completed.')
 
     tx = governance.claimRandomTaskForVerification(2, {'from': accounts[1]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
 
     tasks = governance.getTasksAssignedToWiz(2, {'from': accounts[1]})
     print(f'tasks for wiz2: {tasks}')
@@ -138,11 +141,11 @@ def main():
     '''
     hex_string = "SecondOne"
     tx = governance.createTaskType(hex_string, 5, 24*60*60, 0, 999999999999, 25, {'from': accounts[0]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
     print(f'tasktype created.')
 
     tx = governance.completeTask(hex_string, "0x0", 1, {'from': accounts[0]})
-    tx.wait(1)
+    tx.wait(required_confirmations)
     print(f'task completed.')
 
 
@@ -151,12 +154,12 @@ def main():
 
     tx = governance.claimRandomTaskForVerification(2)
     if tx:
-        tx.wait(1)
+        tx.wait(required_confirmations)
     print(f'tx.events: {tx.events}')
 
     tx = governance.claimRandomTaskForVerification(2)
     if tx:
-        tx.wait(1)
+        tx.wait(required_confirmations)
     print(f'tx.events: {tx.events}')
     // end Task-Claim testing
     '''
@@ -176,12 +179,14 @@ def main():
     # bytes_array = [ "0x00000000000000000000000000000000000000000000000000000068656c6c6f", "0x0000000000000000000000000000000000000000000000000000006d6f74746f" ]
 
     tx = governance.testHashing(hex_string, bytes_array, True)
-    tx.wait(1)
+    tx.wait(required_confirmations)
     print(f'events: {tx.events}')
     '''
 
     # Wizard Battle
     # won; // 0 = > loss, 1 = > win, 2 = > tie?, 3 = > capture
+
+
 
     '''
     wiz_1 = wizards.getStatsGivenId(1)
@@ -190,6 +195,13 @@ def main():
     print(f'wiz_1: {wiz_1}')
     print(f'wiz_2: {wiz_2}')
 
+    uri = wizards.tokenURI(1)
+    print(f'uri: \n\n{uri}')
+    '''
+
+
+
+    '''
     outcomes = dict()
     for i in range(10):
         wiz_on_floor_1 = wizard_tower.getWizardOnFloor(1)
@@ -203,13 +215,20 @@ def main():
         floor_to_attack = wiz_2_floor
 
         tx = wizard_battle.attack(1, floor_to_attack, {'from': accounts[0], 'value': 1000*100})
-        tx.wait(1)
+        tx.wait(required_confirmations)
         print(f'events: {tx.events}')
         # print(f'outcome: {tx.events["Attack"]["outcome"]}')
         outcome = tx.events["Attack"]["outcome"]
         outcomes[outcome] = outcomes.get(outcome, 0) + 1
     print(f'outcomes: {outcomes}')
     '''
+
+    # test isCallerOnBoard
+    on_board = governance.isCallerOnBoard({'from': accounts[0]})
+    print(f'on_board: {on_board}')
+    on_board = governance.isCallerOnBoard({'from': accounts[1]})
+    print(f'on_board: {on_board}')
+
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

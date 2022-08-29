@@ -44,6 +44,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 protectionTimeExtension;
         address ecosystemTokenAddress;
         uint256 phaseDuration;
+        uint256 totalPhases;
+        uint256 rebirthFee;
         string imageBaseURI;
     }
 
@@ -55,6 +57,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     event NewVerifier(address battler);
     event NewBattler(address verifier);
     event Initiated(address initiater, uint256 indexed wizardId, uint256 timestamp);
+    event Rebirth(address initiater, uint256 indexed wizardId, uint256 newLevel, uint256 timestamp);
 
 
     ////////////////////
@@ -64,8 +67,36 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
+
+
+//    struct Stats {
+//        uint256 level;
+//        uint256 hp;
+//        uint256 magicalPower;
+//        uint256 magicalDefense;
+//        uint256 speed;
+//        uint256 wins;
+//        uint256 losses;
+//        uint256 battles;
+//        uint256 tokensClaimed;
+//        uint256 goodness;
+//        uint256 badness;
+//        uint256 initiationTimestamp; // 0 if uninitiated
+//        uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
+//        ELEMENT element;
+//    }
+
+
     function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
-        return tokenIdToStats[_wizardId];
+        uint256 myPhase = getPhaseOf(_wizardId) + 1; // base 1
+        // totalPhases
+        Stats memory myStats = tokenIdToStats[_wizardId];
+        myStats.hp = myStats.hp * myPhase / contractSettings.totalPhases;
+        myStats.magicalPower = myStats.magicalPower * myPhase / contractSettings.totalPhases;
+        myStats.magicalDefense = myStats.magicalDefense * myPhase / contractSettings.totalPhases;
+        myStats.speed = myStats.speed * myPhase / contractSettings.totalPhases;
+        // initial phase will give zero stats
+        return myStats;
     }
 
 
@@ -80,6 +111,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         contractSettings.ecosystemTokenAddress = _address; // todo -- do in less steps
         contractSettings.phaseDuration = 60*60;// todo --
         contractSettings.imageBaseURI = _imageBaseURI;// todo --
+        contractSettings.totalPhases = 8;
+        contractSettings.rebirthFee = 5;
     }
 
     function mint() external {
@@ -119,6 +152,34 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit Initiated(msg.sender, _tokenId, block.timestamp);
     }
 
+    function rebirth(uint256 _tokenId) external payable {
+        /* todo -- add in requires
+        require(ownerOf(_tokenId) == msg.sender, "must be owner");
+        require(tokenIdToStats[_tokenId].initiationTimestamp == 0, "already initiated");
+        require(isActive(_tokenId), "must be active");
+        require(getPhaseOf(_tokenId)==contractSettings.totalPhases-1, "must be at max phase");
+        require(msg.value == contractSettings.rebirthFee, "insufficient fee.")
+        */
+
+        // todo -- receive fee
+
+        Stats storage myStats = tokenIdToStats[_tokenId];
+        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp, myStats.level)));
+
+        myStats.initiationTimestamp = block.timestamp;
+        myStats.protectedUntilTimestamp += contractSettings.protectionTimeExtension;
+        myStats.level += 1;
+
+        myStats.hp += pseudoRandNum % 16 + 10;
+        myStats.magicalPower += pseudoRandNum/10**2 % 16 + 10;
+        myStats.magicalDefense += pseudoRandNum/10**4 % 16 + 10;
+        myStats.speed += pseudoRandNum/10**6 % 10;
+
+
+        emit Rebirth(msg.sender, _tokenId, myStats.level, block.timestamp); // todo -- could emit stats bonus
+    }
+
+
     function reportBattle(uint256 _attackerId, uint256 _defenderId, OUTCOME outcome, uint256 _tokensWon,
         uint256 _tokensWaged) external onlyBattler {
         if(outcome == OUTCOME.WIN){
@@ -143,11 +204,16 @@ contract Wizards is ERC721Enumerable, Ownable {
 //        }
     }
 
+
     /**
      * @dev Gets phase of NFT
      */
-    function getPhaseOf(uint256 _tokenId) public returns(uint256) {
-
+    function getPhaseOf(uint256 _tokenId) public view returns(uint256) {
+        uint256 phase =
+          (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
+          > 7 ? 7 : (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
+          ;
+        return phase;
     }
 
     /**
@@ -185,7 +251,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         if(tokenIdToStats[_tokenId].initiationTimestamp==0){ // uninitiated
             linkExtension = "0"; // todo -- shameful uninitiated picture
         }
-        else{
+        else{ // todo -- this didn't use getPhaseOf
             linkExtension =
                       Strings.toString(
                       (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
@@ -225,7 +291,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         json_str = string(abi.encodePacked(json_str,
             ', {"display_type": "number", "trait_type": "speed", "value": ',
             Strings.toString(myStats.speed),   ' }',
-            ', {"display_type": "number", "trait_type": "mp", "value": ',
+            ', {"display_type": "number", "trait_type": "wins", "value": ',
             Strings.toString(myStats.wins),   ' }'
         ));
 
@@ -293,11 +359,14 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     function modifyContractSettings(string memory _imageBaseURI, uint256 _phaseDuration, uint256 _protectionTimeExtension, uint256 _mintCost,
                     uint256 _initiationCost) external onlyOwner {
-        contractSettings.imageBaseURI;
-        contractSettings.phaseDuration;
-        contractSettings.protectionTimeExtension;
-        contractSettings.mintCost;
-        contractSettings.initiationCost;
+        contractSettings.imageBaseURI = _imageBaseURI;
+        contractSettings.phaseDuration = _phaseDuration;
+        contractSettings.protectionTimeExtension = _protectionTimeExtension;
+        contractSettings.mintCost = _mintCost;
+        contractSettings.initiationCost = _initiationCost
+
+
+        ;
     }
 
     ///////////////////////////

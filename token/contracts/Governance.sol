@@ -16,6 +16,7 @@ import './helpers/ReentrancyGuard.sol';
 import './helpers/ERC2981Collection.sol';
 import './libraries/Strings.sol';
 import './libraries/Address.sol';
+import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
 //contract BMMultipass is ERC721Enumerable, ReentrancyGuard, Ownable {
@@ -23,6 +24,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
 //    IERC20  ecosystemTokens;
     Wizards wizardsNFT;
+    WizardTower wizardTower;
 
     // the value stored here is shifted over by one because 0 means no vote, 1 means voting for slot 0
     mapping (uint256 => mapping (uint256 => uint256)) public proposalToNFTVotes;
@@ -83,6 +85,7 @@ contract Governance is ReentrancyGuard, Ownable {
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
     uint256 taskVerificationTimeBonus = 1 days; // 1 day
+    uint256 boardSeats = 3;
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId, Task myTask);
     event VerificationFailed(uint256 VerifierIdFirst, uint256 VerifierIdSecond, uint256 taskId);
@@ -111,6 +114,16 @@ contract Governance is ReentrancyGuard, Ownable {
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
+
+    function isCallerOnBoard() public view returns (bool) {
+        for(uint256 i =1; i <= boardSeats;){
+            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
+                return true;
+            }
+            unchecked{++i;}
+        }
+        return false;
+    }
 
 /*
 // todo -- delete this helper function
@@ -309,9 +322,10 @@ contract Governance is ReentrancyGuard, Ownable {
     /** @dev Constructor for HOADAO
         @param _nft -- contract address for NFTs
       */
-    constructor(address _nft){
+    constructor(address _nft, address _wizardTower){
 //        ecosystemTokens = IERC20(_erc20);
         wizardsNFT = Wizards(_nft);
+        wizardTower = WizardTower(_wizardTower);
 
 //        contractSettings = ContractSettings({
 //        });
@@ -585,7 +599,9 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // top x in tower?
     modifier onlyBoard() {
-        require(true,'Must be on the board'); // todo -- onlyBoard
+        // check caller against top 3 wizards on tower
+        require(isCallerOnBoard(), "Must be on the board");
+//        require(true,'Must be on the board'); // todo -- onlyBoard
         _;
     }
 

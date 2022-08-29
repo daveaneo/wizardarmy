@@ -27,7 +27,7 @@ contract WizardTower is RelativeTimeVault {
     ////    Battle    //
     ////////////////////
 
-    function attack(uint256 floor) external { }
+//    function attack(uint256 floor) external { }
 
 
     ////////////////////

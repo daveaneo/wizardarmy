@@ -32,6 +32,7 @@ function Tasks(props) {
   const [taskToConfirm, setTaskToConfirm] = useState({});
   const [areTasksAvailableToConfirm, setAreTasksAvailableToConfirm] = useState(false);
   const [IPFSCidToDelete, setIPFSCidToDelete] = useState(undefined);
+  const [onBoard, setOnBoard] = useState(undefined);
 
   // contracts
   const { ethereum } = window;
@@ -432,6 +433,13 @@ function sleep(ms) {
 
   }
 
+  async function updateOnBoard() {
+    let _onBoard = await wizardGovernanceContract.isCallerOnBoard();
+    console.log("onBoard: ", onBoard);
+    setOnBoard(_onBoard)
+
+  }
+
     // a lot of await
   async function ClaimRandomTask() {
     let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
@@ -588,72 +596,76 @@ function sleep(ms) {
          LoadMyTasks();
          updateAreTasksAvailableToConfirm();
          updatePendingTasksToConfirm();
+         updateOnBoard();
       }
     }, [contractsLoaded]);
 
   return (
     <div className="">
       <div>
-          <p> Board Functions </p>
 
-          {/* Create Task */}
-        <div>
-            <textarea value={newTaskDescription} onChange={(e) => { setNewTaskDescription(e.target.value);}} />
-              <label for="numFields"> Num Fields</label>
-              <input
-                id="numFields"
-                type="number"
-                value={numFieldsForTask}
-                onChange={e => {
-                  setNumFieldsForTask(Number(e.target.value));
-                }}
-              />
+          {/* Board Functions*/}
+          {onBoard && <div>
+              <p> Board Functions </p>
 
-              <label for="maxSlots"> Max Slots</label>
-              <input
-                type="number"
-                id="maxSlots"
-                value={maxSlotsForTask}
-                onChange={e => {
-                  setMaxSlotsForTask(Number(e.target.value));
-                }}
-              />
-            <button onClick={() => CreateTask(newTaskDescription, numFieldsForTask, maxSlotsForTask)}> Create Task Type </button> {/* description, beg timestamp, end timestamp*/}
-        </div>
+              {/* Create Task */}
+            <div>
+                <textarea value={newTaskDescription} onChange={(e) => { setNewTaskDescription(e.target.value);}} />
+                  <label for="numFields"> Num Fields</label>
+                  <input
+                    id="numFields"
+                    type="number"
+                    value={numFieldsForTask}
+                    onChange={e => {
+                      setNumFieldsForTask(Number(e.target.value));
+                    }}
+                  />
 
-          {/* Create Propsoal */}
-            <br />
-        <div>
-            <textarea value={newProposalDescription} onChange={(e) => { setNewProposalDescription(e.target.value);}} />
-              <label for="numFields"> Num Fields</label>
-              <input
-                type="number"
-                id="numFields"
-                value={numFieldsForProposal}
-                onChange={e => {
-                  //bug
-                  setNumFieldsForProposal(Number(e.target.value));
-                }}
-              />
-            <button onClick={() => CreateProposal(newProposalDescription, numFieldsForProposal)}> Create Proposal </button> {/* description, num choices, beg timestamp, end timestamp*/}
-        </div>
+                  <label for="maxSlots"> Max Slots</label>
+                  <input
+                    type="number"
+                    id="maxSlots"
+                    value={maxSlotsForTask}
+                    onChange={e => {
+                      setMaxSlotsForTask(Number(e.target.value));
+                    }}
+                  />
+                <button onClick={() => CreateTask(newTaskDescription, numFieldsForTask, maxSlotsForTask)}> Create Task Type </button> {/* description, beg timestamp, end timestamp*/}
+            </div>
 
-        {/* IPFSCidToDelete */}
-            <br />
-        <div>
-              <label for="numFields">IPFS Cid</label>
-              <input
-                type="text"
-                id="IPFSCIDField"
-                value={IPFSCidToDelete}
-                onChange={e => {
-                  //bug
-                  setIPFSCidToDelete(e.target.value);
-                }}
-              />
-          <button onClick={() => DeleteTaskType(IPFSCidToDelete)}> Delete TaskType </button>
-        </div>
-        {/* End Admin Options */}
+              {/* Create Propsoal */}
+                <br />
+            <div>
+                <textarea value={newProposalDescription} onChange={(e) => { setNewProposalDescription(e.target.value);}} />
+                  <label for="numFields"> Num Fields</label>
+                  <input
+                    type="number"
+                    id="numFields"
+                    value={numFieldsForProposal}
+                    onChange={e => {
+                      //bug
+                      setNumFieldsForProposal(Number(e.target.value));
+                    }}
+                  />
+                <button onClick={() => CreateProposal(newProposalDescription, numFieldsForProposal)}> Create Proposal </button> {/* description, num choices, beg timestamp, end timestamp*/}
+            </div>
+
+            {/* IPFSCidToDelete */}
+                <br />
+            <div>
+                  <label for="numFields">IPFS Cid</label>
+                  <input
+                    type="text"
+                    id="IPFSCIDField"
+                    value={IPFSCidToDelete}
+                    onChange={e => {
+                      //bug
+                      setIPFSCidToDelete(e.target.value);
+                    }}
+                  />
+              <button onClick={() => DeleteTaskType(IPFSCidToDelete)}> Delete TaskType </button>
+            </div>
+        </div> } {/* End Admin Options */}
 
         {/* Authenticated User  Options */}
 {/*
