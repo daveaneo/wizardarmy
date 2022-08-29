@@ -9,7 +9,9 @@ const WizardTowerabi = require('../abi/wizardtower.json').abi;
 const WizardBattleabi = require('../abi/wizardbattle.json').abi;
 const WizardGovernanceabi = require('../abi/wizardgovernance.json').abi;
 const ERC20abi = require('../abi/ERC20.json').abi;
-const myInfuraRPC = process.env.REACT_APP_MUMBAI_RPC;
+const myInfuraMumbaiRPC = process.env.REACT_APP_MUMBAI_RPC;
+const myInfuraRinkebyRPC = process.env.REACT_APP_RINKEBY_RPC;
+const networkIdUsed=4;
 
 let ecosystemTokenAddress = '0x600dafEF3d5E493F9bee74Cc4aBd73a86AD08Cc2';
 let wizardNFTAddress = '0x2032c752b40D9ce5Fa734a5b752B13B8eBEA798E';
@@ -19,9 +21,28 @@ let wizardGovernanceAddress = '0xF1ddC2469E07Ef2dA2b005e32d84000bD60a58d9';
 
 
  // load some data without metamask or signer
-const getNFTContractNoSigner = () => {
-  const provider = new ethers.providers.JsonRpcProvider(myInfuraRPC);
-  const icoContract = new ethers.Contract(wizardNFTAddress, WizardsNFTabi, provider);
+async function getNFTContractNoSigner() {
+  console.log("DAVID")
+//  const provider = await( new ethers.providers.JsonRpcProvider());
+
+
+//  const { chainId } = await provider.getNetwork();
+  const chainId = networkIdUsed;
+  let myRPC;
+  console.log("chainId: ", chainId)
+  if(chainId==4){
+    myRPC= myInfuraRinkebyRPC;
+  }
+  else if(chainId==80001 ){
+    myRPC= myInfuraMumbaiRPC;
+  }
+  else{
+    return undefined; // errors???
+  }
+
+  const provider = new ethers.providers.JsonRpcProvider(myRPC);
+  var icoContract = await( new ethers.Contract(wizardNFTAddress, WizardsNFTabi, provider));
+  console.log("isoContract: ", icoContract)
   return icoContract;
 }
 
@@ -36,8 +57,9 @@ function ContractSettings(props) {
 
   // create contracts that don't need signatures
   if(window.NFTContractNoSigner===undefined){
-      const noSigninNFTContract = getNFTContractNoSigner();
-      window.NFTContractNoSigner = noSigninNFTContract;
+      const noSigninNFTContract = getNFTContractNoSigner().then( (contract) => {
+        window.NFTContractNoSigner = contract;
+      });
    }
 
 
