@@ -434,8 +434,8 @@ function sleep(ms) {
   }
 
   async function updateOnBoard() {
-    let _onBoard = await wizardGovernanceContract.isCallerOnBoard();
-    console.log("onBoard: ", onBoard);
+    let _onBoard = await wizardGovernanceContract.isMyWizardOnBoard(wizardId);
+    console.log("onBoard: ", _onBoard);
     setOnBoard(_onBoard)
 
   }

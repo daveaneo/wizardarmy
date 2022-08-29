@@ -91,7 +91,15 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
     }
 
     function getFloorInfoGivenWizard(uint256 _wizardId) external view returns(FloorInfo memory) {
+        require(_wizardId>0 && _wizardId < activeFloors + 1, "invalid number");
         return floorIdToInfo[wizardIdToFloor[_wizardId]];
+    }
+
+    function getFloorGivenWizard(uint256 _wizardId) external view returns(uint256
+
+    ) {
+        require(_wizardId>0 && _wizardId < activeFloors + 1, "invalid number");
+        return wizardIdToFloor[_wizardId];
     }
 
     //////////////
