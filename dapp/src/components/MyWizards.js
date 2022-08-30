@@ -129,6 +129,9 @@ function MyWizards(props) {
       LoadMyWizards();
     }, []);
 
+    useEffect(() => {
+      LoadMyWizards();
+    }, [numWizards]); // this is total amount of wizards, not my amount of my wizards
 
   return (
     <div className="">

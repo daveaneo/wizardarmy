@@ -33,7 +33,7 @@ function App() {
            onboard={onboard}
         />
 
-          <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected}
+          <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected} numWizards={numWizards} setNumWizards={setNumWizards}
             onboard={onboard} setOnboard={setOnboard}
           />
         <Routes>
@@ -50,7 +50,7 @@ function App() {
                 element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}
             />
             <Route path="/"
-              element = {<Home address={address} connected={connected} numWizards={numWizards} onboard={onboard}/ >}
+              element = {<Home address={address} connected={connected} numWizards={numWizards} setNumWizards={setNumWizards} onboard={onboard}/ >}
               />
         </Routes>
         </div>

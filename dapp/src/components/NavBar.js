@@ -14,6 +14,8 @@ function NavBar(props) {
     const setConnected = props.setConnected;
     const onboard = props.onboard;
     const setOnboard = props.setOnboard;
+    const numWizards = props.numWizards;
+    const setNumWizards = props.setNumWizards;
 
   const { ethereum } = window;
   const ecosystemTokenContract = window.ecosystemToken;
@@ -163,10 +165,9 @@ function NavBar(props) {
      let tx = await wizardNFTContract.mint();
      let res = await tx.wait(1);
      if(res ){
-        //setNumWizards(numWizards + 1);
+        setNumWizards(numWizards + 1);
      }
      else {
-       console.log("Something went wrong with minting.")
      }
   }
 

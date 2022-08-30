@@ -12,10 +12,12 @@ function Home(props) {
   const address = props.address;
   const onboard = props.onboard;
 //  const numWizards = props.numWizards;
+  const numWizards = props.numWizards;
+  const setNumWizards = props.setNumWizards;
 
   const [text, setText] = useState("");
   const [savedText, setSavedText] = useState("");
-  const [numWizards, setNumWizards] = useState(0);
+//  const [numWizards, setNumWizards] = useState(0);
   const [counter, setCounter] = useState(1);
   const [contractsLoaded, setContractsLoaded] = useState(false);
 
