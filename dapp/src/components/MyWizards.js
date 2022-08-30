@@ -132,27 +132,18 @@ function MyWizards(props) {
 
   return (
     <div className="">
-      <p className="DoubleBordered">I own {wizards.length} wizards and have {isNaN(myTokens) ? "0" : myTokens} tokens.</p>
-        {wizards && wizards.map(wizard =>
-            <div key={wizard.id} className="Double">
-                <br/>
-
-                <Link to={"wizard/" + wizard.id}>Wizard {wizard.id}
-                <br/>
-                <img src={wizard.imageURL} alt={"wizard " + wizard.id} width={250} height={250}/>
-
-                <div className="DoubleBordered">
-                    <div>ID: {wizard.id}</div>
-                    <div>element: {wizard.element}</div>
-                    <div>HP: {wizard.hp}</div>
-                    <div>Magical Power: {wizard.magicalPower}</div>
-                    <div>Magical Defense: {wizard.magicalDefense}</div>
-                    <div>Speed: {wizard.speed}</div>
-                    <div>Tokens Claimed: {wizard.tokensClaimed}</div>
+      {/*
+      <p>I own {wizards.length} wizards and have {isNaN(myTokens) ? "0" : myTokens} tokens.</p>
+      */}
+        <div className="wizards-container">
+            {wizards && wizards.map(wizard =>
+                <div className="wizard-container" key={wizard.id}>
+                    <Link to={"wizard/" + wizard.id}>
+                        <img className="wizard-image" src={wizard.imageURL} alt={"wizard " + wizard.id}/>
+                    </Link>
                 </div>
-                </Link>
-            </div>
-        )}
+            )}
+        </div>
         {wizards.length != myNumWizards && 'loading...'}
         {myNumWizards == 0 && "you have no wizards."}
     </div>

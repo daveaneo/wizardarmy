@@ -22,14 +22,12 @@ let wizardGovernanceAddress = '0xF1ddC2469E07Ef2dA2b005e32d84000bD60a58d9';
 
  // load some data without metamask or signer
 async function getNFTContractNoSigner() {
-  console.log("DAVID")
 //  const provider = await( new ethers.providers.JsonRpcProvider());
 
 
 //  const { chainId } = await provider.getNetwork();
   const chainId = networkIdUsed;
   let myRPC;
-  console.log("chainId: ", chainId)
   if(chainId==4){
     myRPC= myInfuraRinkebyRPC;
   }
@@ -42,7 +40,6 @@ async function getNFTContractNoSigner() {
 
   const provider = new ethers.providers.JsonRpcProvider(myRPC);
   var icoContract = await( new ethers.Contract(wizardNFTAddress, WizardsNFTabi, provider));
-  console.log("isoContract: ", icoContract)
   return icoContract;
 }
 

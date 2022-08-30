@@ -20,6 +20,9 @@ function Wizard(props) {
   const [totalTowerTokens, setTotalTowerTokens] = useState(0);
   const [totalWizards, setTotalWizards] = useState(0);
   const [contractsLoaded, setContractsLoaded] = useState(false);
+  const [myPhase, setMyPhase] = useState(undefined);
+  const [pageRefreshes, setPageRefreshes] = useState(0)
+  const TOTALPHASES = 8;
 
   // contracts
   const { ethereum } = window;
@@ -29,6 +32,7 @@ function Wizard(props) {
   var wizardBattleContract =window.wizardBattleContract;
   var NFTContractNoSigner =window.NFTContractNoSigner;
   var loadingContracts = false;
+
 
 
 
@@ -92,8 +96,25 @@ function sleep(ms) {
         // todo -- confirm smart contracts comply -- may need a verifier contract
     }
 
-    async function LoadMyWizard() {
+    async function Rebirth() {
+        let tx = await wizardNFTContract.rebirth(wizardId);
+        let res = await tx.wait(1)
+        if(res){
+//            window.location.reload(false);
+            setPageRefreshes(pageRefreshes+1); // reload all
+        }
+        else{
+          console.error("rebirth failed.")
+        }
+    }
 
+
+    async function UpdateMyPhase() {
+        let _phase = await wizardNFTContract.getPhaseOf(wizardId);
+        setMyPhase(_phase)
+    }
+
+    async function LoadMyWizard() {
         if(wizardNFTContract===undefined) { return }
         let wiz = await wizardNFTContract.tokenIdToStats(wizardId);
         await processWizardStruct(wiz, wizardId).then( (processed) => {
@@ -196,8 +217,9 @@ function sleep(ms) {
             LoadMyFloor();
             SetIsOwner();
             LoadTowerTokens();
+            UpdateMyPhase();
         }
-    }, [contractsLoaded]);
+    }, [contractsLoaded, pageRefreshes]);
 
 
     useEffect(() => {
@@ -273,7 +295,11 @@ function sleep(ms) {
                     </Link>
                   </div>
                 }
-                { true && <div>Rebirth</div>}
+                { myPhase == (TOTALPHASES -1)
+                   && <div>
+                    <button onClick={Rebirth}>Rebirth</button> <br/>
+                   </div>
+                 }
             </div>
           }
         </div>

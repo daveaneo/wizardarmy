@@ -49,3 +49,98 @@
 body {
   background-color: lightblue;
 }
+
+
+
+
+/* Home */
+
+.wizardarmy-title {
+    font-family: Impact, Charcoal, sans-serif;
+    font-size: 12em;
+    letter-spacing: -0.4px;
+    word-spacing: 6px;
+    color: #FFF;
+    font-weight: 400;
+    text-decoration: none;
+    font-style: normal;
+    font-variant: normal;
+    text-transform: uppercase;
+    white-space: pre-wrap;
+    margin:0;
+    padding:0;
+}
+
+.wizardarmy-subtitle {
+    font-family: Impact, Charcoal, sans-serif;
+    font-size: 4em;
+    letter-spacing: -0.4px;
+    word-spacing: 6px;
+    color: #000;
+    font-weight: 100;
+    text-decoration: none;
+    font-style: normal;
+    font-variant: normal;
+    text-transform: uppercase;
+    white-space: pre-wrap;
+    margin:0;
+    padding:0;
+}
+
+
+/* MyWizards */
+
+.wizards-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  padding-top: 8em;
+}
+
+.wizard-image {
+    width: 8em;
+    height: 8em;
+    margin: .5em;
+}
+
+
+/* Navbar */
+
+.navbar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: no-wrap;
+  justify-content: space-evenly;
+  padding: 1em;
+  margin-right: 325px;
+}
+
+.navbar-item {
+    font-family: Impact, Charcoal, sans-serif;
+    font-size: 2.5em;
+    letter-spacing: -0.4px;
+    word-spacing: 6px;
+    color: #FFF;
+    font-weight: 100;
+    text-decoration: none;
+    font-style: normal;
+    font-variant: normal;
+    margin:0;
+    padding:.1em;
+}
+
+.navbar-item a:link {
+    text-decoration: none;
+    color: #000;
+}
+.navbar-item a:visited  {
+    text-decoration: none;
+    color: #000;
+}
+.navbar-item a:hover  {
+    text-decoration: none;
+    color: #FFF;
+}
+.navbar-item a:active { text-decoration: none; }
+

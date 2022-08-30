@@ -159,34 +159,68 @@ function NavBar(props) {
     }
   });
 
+  async function mintWizard() {
+     let tx = await wizardNFTContract.mint();
+     let res = await tx.wait(1);
+     if(res ){
+        //setNumWizards(numWizards + 1);
+     }
+     else {
+       console.log("Something went wrong with minting.")
+     }
+  }
+
+
+
   return (
-    <div className="NavBar">
-      <div>
-
-        <Link to="/"> Home </Link>
-
-        <Link to="/files/whitepaper.pdf" target="_blank" download>Whitepaper</Link>
-        <a href="https://github.com/daveaneo/wizardarmy/" target="_blank" rel="noreferrer">
-          Github
-        </a>
-        <a href="https://discord.gg/kRAaY6Rzbw" target="_blank" rel="noreferrer">
-          Discord
-        </a>
-        <button onClick={() => {
-        if (!connected) {
-            connectWallet();
-        }
-        else { // disconnecting
-            window.address = undefined;
-            setConnected(false);
-            setAddress(undefined);
-            // onboard
-            let [primaryWallet] = onboard.state.get().wallets
-            onboard.disconnectWallet({ label: primaryWallet.label })
-        }
-        }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
+    <div className="navbar">
+        <div className="navbar-item">
+          <Link to="/"> Home </Link>
         </div>
 
+        <div className="navbar-item">
+            <Link to="/files/whitepaper.pdf" target="_blank" download>Whitepaper</Link>
+        </div>
+
+        <div className="navbar-item">
+            <a href="https://github.com/daveaneo/wizardarmy/" target="_blank" rel="noreferrer">
+              Github
+            </a>
+        </div>
+
+        <div className="navbar-item">
+            <a href="https://discord.gg/kRAaY6Rzbw" target="_blank" rel="noreferrer">
+              Discord
+            </a>
+        </div>
+
+        <div className="navbar-item">
+            <button onClick={() => {
+            if (!connected) {
+                connectWallet();
+            }
+            else { // disconnecting
+                window.address = undefined;
+                setConnected(false);
+                setAddress(undefined);
+                // onboard
+                let [primaryWallet] = onboard.state.get().wallets
+                onboard.disconnectWallet({ label: primaryWallet.label })
+            }
+            }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
+        </div>
+
+        <div className="navbar-item">
+          {connected && <button onClick={() => {
+            if (connected) {
+                mintWizard().then(res => {
+                    })
+            }
+            else{
+            }
+          }}>{'mint' }</button>
+          }
+        </div>
 
     </div>
   );

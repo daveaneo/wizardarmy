@@ -72,13 +72,10 @@ function sleep(ms) {
 
   async function updateNumWizards() {
     if(NFTContractNoSigner!==undefined){
-        console.log("updating.... ", NFTContractNoSigner)
         let num = parseInt((await NFTContractNoSigner.totalSupply()));
-        console.log('num: ', num)
         setNumWizards(num);
     }
     else{
-        console.log("NOT updating.... ", NFTContractNoSigner)
     }
   }
 
@@ -96,6 +93,7 @@ function sleep(ms) {
 
   return (
         <div className="App">
+          {/*
           {connected && <button onClick={() => {
             if (connected) {
                 mintWizard().then(res => {
@@ -105,8 +103,12 @@ function sleep(ms) {
             }
           }}>{'mint' }</button>
           }
-          <p>Wizard Army, {numWizards} strong!</p>
-
+          */}
+          <p className="wizardarmy-title">
+            Wizard
+            {"\n"} Army
+           </p>
+          <p className="wizardarmy-subtitle"> {numWizards} strong! </p>
             {connected && <MyWizards
                   connected = {connected}
                   numWizards = {numWizards}
