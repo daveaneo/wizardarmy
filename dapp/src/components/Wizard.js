@@ -90,12 +90,6 @@ function sleep(ms) {
         return processedWizard;
     }
 
-    async function CompleteTask() {
-        console.log("Todo complete task?");
-        // todo -- backend work. Load a task and submit the hashed details to the blockchain
-        // todo -- confirm smart contracts comply -- may need a verifier contract
-    }
-
     async function Rebirth() {
         let tx = await wizardNFTContract.rebirth(wizardId);
         let res = await tx.wait(1)
@@ -283,7 +277,7 @@ function sleep(ms) {
           {myWizard.initiationTimestamp !== 0 &&
             <div>
                  <Link to={"/wizard/" + wizardId + "/tasks/"}>
-                   <button onClick={CompleteTask}>Complete Task</button>   <br/>
+                   <button >Complete Task</button>   <br/>
                 </Link>
 
                  { isOnTheTower===false && <button onClick={GetOnTheTower}>Get on the Tower</button> }  <br/>

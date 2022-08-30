@@ -126,7 +126,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
     function isMyWizardOnBoard(uint256 _wizId) public view returns (bool) {
-        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
+        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
             return true;
         }
         return false;

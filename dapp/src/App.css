@@ -47,9 +47,14 @@
 
 
 body {
-  background-color: lightblue;
+  background-color: #2d8a75;
 }
 
+h1 {
+  font-family: Impact, Charcoal, sans-serif;
+    font-weight: 50;
+  color: white;
+}
 
 
 
@@ -60,6 +65,7 @@ body {
     font-size: 12em;
     letter-spacing: -0.4px;
     word-spacing: 6px;
+    line-height: .8;
     color: #FFF;
     font-weight: 400;
     text-decoration: none;
@@ -67,8 +73,9 @@ body {
     font-variant: normal;
     text-transform: uppercase;
     white-space: pre-wrap;
-    margin:0;
-    padding:0;
+    margin-top:5%;
+    padding-top:0;
+
 }
 
 .wizardarmy-subtitle {
@@ -85,6 +92,7 @@ body {
     white-space: pre-wrap;
     margin:0;
     padding:0;
+    margin-top:0;
 }
 
 
@@ -132,15 +140,48 @@ body {
 
 .navbar-item a:link {
     text-decoration: none;
-    color: #000;
+    color: #FFF;
 }
 .navbar-item a:visited  {
     text-decoration: none;
-    color: #000;
+    color: #FFF;
 }
 .navbar-item a:hover  {
     text-decoration: none;
-    color: #FFF;
+    color: #373491;
 }
 .navbar-item a:active { text-decoration: none; }
 
+
+/* Tasks */
+
+/* Colors -- temp
+#0367a6 	(3,103,166)
+#373491 	(55,52,145)
+#877df0 	(135,125,240)
+#2d8a75 	(45,138,117)
+#4de8c4 	(77,232,196)
+*/
+
+.tasks-container {
+/*  background-color:#282c34; */
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  padding: 5em;
+}
+
+.task-container {
+/*  background-color: #877df0;
+  background-color: #373491;
+*/
+  padding: 2em;
+  color: white;
+  border:solid;
+}
+
+.task {
+/*  background-color: #FFF; */
+  padding: 2em;
+}

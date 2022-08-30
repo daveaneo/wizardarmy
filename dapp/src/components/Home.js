@@ -106,11 +106,11 @@ function sleep(ms) {
           }}>{'mint' }</button>
           }
           */}
-          <p className="wizardarmy-title">
+          <div className="wizardarmy-title">
             Wizard
             {"\n"} Army
-           </p>
-          <p className="wizardarmy-subtitle"> {numWizards} strong! </p>
+           </div>
+          <div className="wizardarmy-subtitle">{numWizards} strong! </div>
             {connected && <MyWizards
                   connected = {connected}
                   numWizards = {numWizards}

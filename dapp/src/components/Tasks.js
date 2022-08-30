@@ -174,13 +174,11 @@ function Tasks(props) {
     async function updatePendingTasksToConfirm() {
 //       console.log("wizID: ", wizardId);
        let myReturn = await wizardGovernanceContract.getTasksAssignedToWiz(wizardId);
-       console.log("myReturn: ", myReturn)
        let tasks = myReturn[0];
        let myTaskIds = myReturn[1];
 
 //       console.log("TASKS: ", tasks, myTaskIds);
        if(tasks[0].IPFSHash=="" || tasks[0].IPFSHash==undefined){
-         console.log("no tasks assigned.")
          if(taskToConfirm.IpfsHash!=undefined){
            setTaskToConfirm({});
          }
@@ -435,12 +433,12 @@ function sleep(ms) {
 
   async function updateOnBoard() {
     let _onBoard = await wizardGovernanceContract.isMyWizardOnBoard(wizardId);
-    console.log("onBoard: ", _onBoard);
     setOnBoard(_onBoard)
   }
 
     // a lot of await
   async function ClaimRandomTask() {
+    setAreTasksAvailableToConfirm(false);
     let tx = await wizardGovernanceContract.claimRandomTaskForVerification(wizardId);
     let res = await tx.wait(1);
     console.log("res: ", res);
@@ -452,14 +450,10 @@ function sleep(ms) {
         let taskFromEvent = res.events[0].args[2];
         // todo -- this may needs to be formatted better
 
-        let task = await wizardGovernanceContract.getTaskById(taskId);
-        // let myObj ={"IPFSHash": task[0]["IPFSHash"], "fields": task[0]["numFieldsToHash"]}
+//        let task = await wizardGovernanceContract.getTaskById(taskId);
 
-        console.log("task --confirm this is not array and is pure object: ", task); // equivalent
-
-//        task = {"IPFSHash": task[0].IPFSHash, "numFields": task[0].numFieldsToHash}
         // todo -- this is causing undefined
-        task = {"taskId": taskId, "IPFSHash": task[0].IPFSHash, "numFields": task[0].numFieldsToHash, "refuted": parseInt(task[0].refuterID)!=0}
+        let task = {"taskId": taskId, "IPFSHash": taskFromEvent.IPFSHash, "numFields": taskFromEvent.numFieldsToHash, "refuted": parseInt(taskFromEvent.refuterID)!=0}
         console.log("task after making it an object: ", task)
         // set stateVariable about tasks to confirm
         task = await LoadTextFieldOntoConfirmingTask(task);
@@ -472,6 +466,7 @@ function sleep(ms) {
     }
     else {
       console.log("error claiming task.")
+      setAreTasksAvailableToConfirm(true);
     }
 
 }
@@ -571,19 +566,22 @@ function sleep(ms) {
         LoadMyTasks();
     }, [connected, address]);
 
+/*
     useEffect(() => {
         console.log("task to confirm has changed: ", taskToConfirm)
     }, [taskToConfirm]);
+*/
 
 
+/*
     useEffect(() => {
         console.log("taskToConfirm changed: ", taskToConfirm)
         if(areTasksAvailableToConfirm){
            console.log("loading text file...")
-           //LoadTextFieldOntoConfirmingTask();
+//           LoadTextFieldOntoConfirmingTask();
         }
     }, [areTasksAvailableToConfirm]);
-
+*/
 
     useEffect(() => {
       LoadContracts();
@@ -676,24 +674,23 @@ function sleep(ms) {
           </form>
 */}
       </div>
-      <p className="DoubleBordered">Available tasks</p>
-        {taskTypes && taskTypes.map(taskType =>
-            <div key={taskType.id} className="Double">
+      <h1>Available Tasks</h1>
+        <div className="tasks-container">
+          {taskTypes && taskTypes.map(taskType =>
+            <div className="task-container" key={taskType.id}>
                 <br/>
-
-                Task {taskType.id}, {taskType.name}
 
                 {/* add line break if giving description, otherwise not */}
                 {activeTask==taskType.id ? <br/> : ""}
 
                 {activeTask==taskType.id ?
-                    <div className="DoubleBordered">
+                    <div>
                        {/* <div>IPFS Link: {taskType.IPFS}</div>  */}
                         <div>Assignment: {taskType.description}</div>
 
                        {/* Input Fields  */}
                         {taskType.fields && taskType.fields.map(field =>
-                            <div key={field.id} className="Double">
+                            <div key={field.id} className="task">
                                 <label> {field.id}: </label>
                                 <input
                                     type={field.type}
@@ -710,13 +707,15 @@ function sleep(ms) {
                     </div>
                 :
                     <>
+                       {/* Describe Task if not active, ability to activate */}
+                       Task {taskType.id}, {taskType.name} <br/>
                        <button onClick={() => setActivedTask(taskType.id)}> Activate </button>
                     </>
                 } {/*  End Individual Task Details  */}
 
             </div>
-        )}
-
+          )}
+        </div>
         {areTasksAvailableToConfirm && taskToConfirm && (taskToConfirm.IPFSHash== undefined || taskToConfirm.IPFSHash=="" )
          ?
             <div>
@@ -725,35 +724,37 @@ function sleep(ms) {
             </div>
          :
             <div>
-               No tasks available to confirm
+               {/*No tasks available to confirm*/}
             </div>
          }
 
         {taskToConfirm && taskToConfirm.IPFSHash!=undefined && taskToConfirm.IPFSHash!=""  &&
+            <>
+                <h1>Tasks to Confirm</h1>
+                <div className="tasks-container">
 
+                    <div className="task-container">
+                       {/* Input Fields  */}
+                        {taskToConfirm.fields.map(field =>
+                            <div key={field.id}>
+                               {taskToConfirm.description} <br/>
+                                <label> {field.id}: </label>
+                                <input
+                                    type={"string"}
+                                    id={field.id}
+                                    value={[field.input]}
+                                    onChange={e => {updateTaskToConfirmGivenInput(e.target.value, field.id)}}
+                                />
+                            </div>
+                        )}
 
-            <div>
-               {taskToConfirm.description}
-                <br/>
-
-               {/* Input Fields  */}
-                {taskToConfirm.fields.map(field =>
-                    <div key={field.id} className="Double">
-                        <label> {field.id}: </label>
-                        <input
-                            type={"string"}
-                            id={field.id}
-                            value={[field.input]}
-                            onChange={e => {updateTaskToConfirmGivenInput(e.target.value, field.id)}}
-                        />
+                        <div>
+                           <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task  </button>
+                        </div>
                     </div>
-                )}
 
-                <div>
-                   <button onClick={() => ConfirmCompletedTask()}> Confirm Completed Task  </button>
                 </div>
-
-            </div>
+            </>
         }
 
         {!connected && "Please Connect"}

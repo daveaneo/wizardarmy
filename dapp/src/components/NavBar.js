@@ -205,8 +205,10 @@ function NavBar(props) {
                 setConnected(false);
                 setAddress(undefined);
                 // onboard
-                let [primaryWallet] = onboard.state.get().wallets
-                onboard.disconnectWallet({ label: primaryWallet.label })
+                if(onboard!=undefined){
+                    let [primaryWallet] = onboard.state.get().wallets
+                    onboard.disconnectWallet({ label: primaryWallet.label })
+                }
             }
             }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
         </div>
