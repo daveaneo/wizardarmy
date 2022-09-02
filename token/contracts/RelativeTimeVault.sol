@@ -7,10 +7,14 @@ import '../contracts/helpers/ReentrancyGuard.sol';
 import '../contracts/interfaces/IERC20.sol';
 import '../contracts/interfaces/IERC721.sol';
 import '../contracts/wizards.sol';
+import "../contracts/libraries/PRBMathUD60x18.sol";
 
 contract RelativeTimeVault is ReentrancyGuard, Ownable {
+    using PRBMathUD60x18 for uint256;
+
     IERC20 public token; // Address of token contract and same used for rewards
     Wizards public wizardsNFT;
+
 
 //    uint256 totalTowerPower; // sum of power of all rooms
     uint256 public activeFloors = 0; //  10000;
@@ -73,6 +77,21 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         _;
     }
 
+
+    /////////////////////
+    ////    TEMP       //
+    /////////////////////
+
+  /// @notice Calculates x*y÷1e18 while handling possible intermediary overflow.
+  /// @dev Try this with x = type(uint256).max and y = 5e17.
+  function unsignedMul(uint256 x, uint256 y) external pure returns (uint256 result) {
+    result = x.mul(y);
+  }
+
+
+  function unsignedPow(uint256 x, uint256 y) external pure returns (uint256 result) {
+    result = x.pow(y);
+  }
 
     ////////////////////
     ////    Get       //
@@ -139,7 +158,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     // claim floor for wizard. Returns floor on.
     function claimFloor(uint256 _wizardId) external returns (uint256) {
-        require(true, "must own wizardsNFT"); // todo implement
+        require(wizardsNFT.ownerOf(_wizardId)==msg.sender, "must own wizardsNFT");
         require(wizardIdToFloor[_wizardId] == 0, "already claimed.");
         activeFloors += 1;
         FloorInfo memory floorInfo;

@@ -4,6 +4,8 @@ import { ethers } from "ethers";
 import Onboard from '@web3-onboard/core'
 import injectedModule from '@web3-onboard/injected-wallets'
 import walletConnectModule from '@web3-onboard/walletconnect'
+import { init, useConnectWallet } from '@web3-onboard/react'
+//import { useSetChain } from '@web3-onboard/react'
 //import axios;
 
 
@@ -13,7 +15,6 @@ function NavBar(props) {
     const connected = props.connected;
     const setConnected = props.setConnected;
     const onboard = props.onboard;
-    const setOnboard = props.setOnboard;
     const numWizards = props.numWizards;
     const setNumWizards = props.setNumWizards;
 
@@ -27,55 +28,44 @@ function NavBar(props) {
   const MAINNET_RPC_URL = process.env.REACT_APP_MAINNET_RPC;
   const injected = injectedModule()
   const walletConnect = walletConnectModule()
-//  const [onboard, setOnboard] = useState(undefined);
-//  var myonboard = undefined;
 
-  async function setupOnboard() {
-       let myonboard = await Onboard({
-          wallets: [injected, walletConnect],
-          chains: [
-            {
-              id: '0x4',
-              token: 'rETH',
-              label: 'Rinkeby',
-              rpcUrl: myInfuraRPC
-            },
-
-// todo -- add Polygon
-/*            {
-              id: '0x89',
-              token: 'MATIC',
-              label: 'Polygon',
-              rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
-            },
+/*
+  // SETUP UP OnBoard
+    const onboard = init({
+      wallets: [injected, walletConnect],
+      chains: [
+        {
+          id: '0x4',
+          token: 'rETH',
+          label: 'Rinkeby',
+          rpcUrl: myInfuraRPC
+        },
+        {
+          id: '0x89',
+          token: 'MATIC',
+          label: 'Polygon',
+          rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
+        },
+        {
+          id: '0x13881',
+          token: 'MATIC',
+          label: 'Mumbai Testnet',
+          rpcUrl: 'https://rpc-mumbai.maticvigil.com/'
+        },
+      ]
+    })
 */
-            {
-              id: '0x13881',
-              token: 'MATIC',
-              label: 'Mumbai Testnet',
-              rpcUrl: 'https://rpc-mumbai.maticvigil.com/'
-            },
-          ]
-        })
 
-       setOnboard(myonboard)
-       return myonboard;
-}
-
-  async function connectWallet() {
+  async function ConnectWallet() {
     // todo connection errors: connect/disconnect/connect
-    var myonboard;
     if (onboard==undefined){
-      myonboard = await setupOnboard();
-    }
-    else {
-      myonboard = onboard;
+        console.error("unboard is undefined.")
+        return;
     }
 
-    const wallets = await myonboard.connectWallet()
-//    const [primaryWallet] = myonboard.state.get().wallets
+    const wallets = await onboard.connectWallet()
+//    const [primaryWallet] = onboard.state.get().wallets
     if (wallets[0]) {
-
       // create an ethers provider with the last connected wallet provider
       const ethersProvider = new ethers.providers.Web3Provider(
         wallets[0].provider,
@@ -83,16 +73,6 @@ function NavBar(props) {
       )
 
       const signer = ethersProvider.getSigner()
-/*
-      // send a transaction with the ethers provider
-      const txn = await signer.sendTransaction({
-        to: wallets[0],
-        value: 100000000000000
-      })
-
-      const receipt = await txn.wait()
-      console.log(receipt)
-*/
       setConnected(true);
     }
 }
@@ -121,7 +101,7 @@ function NavBar(props) {
     setConnected(JSON.parse(window.sessionStorage.getItem("connected")));
     const temp = JSON.parse(window.sessionStorage.getItem("connected"));
     loadAddress();
-//    setupOnboard();
+//    SetupOnboard();
   }, []);
 
   useEffect(() => {
@@ -129,12 +109,6 @@ function NavBar(props) {
         window.sessionStorage.setItem("connected", connected);
     }
   }, [connected]);
-
-/*
-  useEffect(() => {
-    console.log("onboard has changed: ", onboard)
-  }, [onboard]);
-*/
 
   // Detect change in Metamask account
   useEffect(() => {
@@ -198,7 +172,7 @@ function NavBar(props) {
         <div className="navbar-item">
             <button onClick={() => {
             if (!connected) {
-                connectWallet();
+                ConnectWallet();
             }
             else { // disconnecting
                 window.address = undefined;

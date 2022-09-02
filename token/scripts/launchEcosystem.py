@@ -20,7 +20,8 @@ print(f'required_confirmations: {required_confirmations}')
 
 
 # variables
-image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/"
+# image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/" # simple images
+image_base_uri = "https://gateway.pinata.cloud/ipfs/QmVqAYo9SKUt2qTjtB7JBogBpXPpWnXbsn77P3FxYpGJpA/" # AI Generated
 
 def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
@@ -224,11 +225,19 @@ def main():
     '''
 
     # test isCallerOnBoard
+    '''
     on_board = governance.isCallerOnBoard({'from': accounts[0]})
     print(f'on_board: {on_board}')
     on_board = governance.isCallerOnBoard({'from': accounts[1]})
     print(f'on_board: {on_board}')
+    '''
 
+    # Mathy
+    a = 9999*10**14
+    b = 10000*10**18
+    result = wizard_tower.unsignedPow(a, b)
+    print(f'{a} ^ {b} = {result}')
+    print(f'standard format: {result/(10**18)}')
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

@@ -73,8 +73,8 @@ function MyWizards(props) {
 
     async function GetMyTokens() {
         if(ecosystemTokenContract!= undefined){
-            const tkns = parseInt(await ecosystemTokenContract.balanceOf(address));
-            setMyTokens(tkns);
+            const tokens = parseInt(await ecosystemTokenContract.balanceOf(address));
+            setMyTokens(tokens);
         }
     }
 

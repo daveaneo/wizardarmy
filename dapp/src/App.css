@@ -107,9 +107,13 @@ h1 {
 }
 
 .wizard-image {
-    width: 8em;
-    height: 8em;
+    width: 14em;
+    height: 14em;
     margin: .5em;
+    border:solid;
+    border-color: black;
+    borther-thickness: 3;
+
 }
 
 
@@ -185,3 +189,26 @@ h1 {
 /*  background-color: #FFF; */
   padding: 2em;
 }
+
+
+
+/* Wrong-Network */
+
+#wrong-network-overlay  {
+    color:white;
+    background:#373491;
+    padding:2em;
+    position:absolute;
+    left: 20%;
+    top: 30%;
+    margin: auto;
+    width: 50%;
+    border-radius: 1em;
+    /*    display:none; */
+    z-index:1000;
+    font-size: 4em;
+    opacity: 0.93;
+}
+
+
+

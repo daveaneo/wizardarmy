@@ -13,11 +13,11 @@ const myInfuraMumbaiRPC = process.env.REACT_APP_MUMBAI_RPC;
 const myInfuraRinkebyRPC = process.env.REACT_APP_RINKEBY_RPC;
 const networkIdUsed=4;
 
-let ecosystemTokenAddress = '0x600dafEF3d5E493F9bee74Cc4aBd73a86AD08Cc2';
-let wizardNFTAddress = '0x2032c752b40D9ce5Fa734a5b752B13B8eBEA798E';
-let wizardTowerAddress = '0xA3D74F6D5D3a6455ECd257a34599d865FD09aC56';
-let wizardBattleAddress = '0x652fDEA334B1d136ddf5AD37633754049f7f48CF';
-let wizardGovernanceAddress = '0xF1ddC2469E07Ef2dA2b005e32d84000bD60a58d9';
+let ecosystemTokenAddress = '0x6A185bbFD67640bB16A99F6dC47Ec9C2813807E8';
+let wizardNFTAddress = '0x81A4e43D0154B563946e48d21b6cE50b83d42dd3';
+let wizardTowerAddress = '0x91bCbE7dd0184767eAce2B39f47f2AF0c041bAf6';
+let wizardBattleAddress = '0x6EA16F0998CFF196979873FF0Ab929ec7927073D';
+let wizardGovernanceAddress = '0x00990C0394DEAef55a081364944f15aaAe4FaFC8';
 
 
  // load some data without metamask or signer

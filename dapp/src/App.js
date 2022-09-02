@@ -7,19 +7,20 @@ import Wizard from './components/Wizard';
 import Battle from './components/Battle';
 import Tasks from './components/Tasks';
 import Home from './components/Home';
+import WrongNetwork from './components/WrongNetwork';
 import NavBar from './components/NavBar';
 import ContractSettings from './components/ContractSettings';
+
+import {onboard} from './components/Onboard';
+
 import "./App.css";
-// temp for deploying
+
 
 function App() {
-  const [text, setText] = useState("");
-  const [savedText, setSavedText] = useState("");
   const [connected, setConnected] = useState(undefined);
   const [numWizards, setNumWizards] = useState(0);
   const [address, setAddress] = useState(undefined);
   const [counter, setCounter] = useState(1);
-  const [onboard, setOnboard] = useState(undefined);
 
   return (
 
@@ -34,8 +35,12 @@ function App() {
         />
 
           <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected} numWizards={numWizards} setNumWizards={setNumWizards}
-            onboard={onboard} setOnboard={setOnboard}
+            onboard={onboard}
           />
+
+        <WrongNetwork connected={connected} onboard={onboard} />
+
+
         <Routes>
             <Route path="/tower"
               element = {<WizardTower />}
