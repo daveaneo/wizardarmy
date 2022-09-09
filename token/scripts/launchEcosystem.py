@@ -241,7 +241,7 @@ def main():
 
     # PRBMATH
     a = 9999*10**14
-    b = 10000*10**18
+    b = 10*10**18
     # result = wizard_tower.unsignedPow(a, b)
     # print(f'{a} ^ {b} = {result}')
     # print(f'standard format: {result/(10**18)}')

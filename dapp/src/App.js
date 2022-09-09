@@ -9,7 +9,7 @@ import Tasks from './components/Tasks';
 import Home from './components/Home';
 import WrongNetwork from './components/WrongNetwork';
 import NavBar from './components/NavBar';
-import ContractSettings from './components/ContractSettings';
+//import ContractSettings from './components/ContractSettings';
 import {Connect} from './components/Connect';
 import { useDispatch, useSelector } from "react-redux";
 
@@ -38,6 +38,7 @@ function App() {
 
     <BrowserRouter>
         <div className="App">
+{/*
           <ContractSettings
            connected={connected}
            address={address}
@@ -45,7 +46,7 @@ function App() {
            setConnected={setConnected}
            onboard={onboard}
           />
-
+*/}
         <Connect
            connected={connected}
            address={address}

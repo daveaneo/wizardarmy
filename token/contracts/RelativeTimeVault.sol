@@ -7,12 +7,11 @@ import '../contracts/helpers/ReentrancyGuard.sol';
 import '../contracts/interfaces/IERC20.sol';
 import '../contracts/interfaces/IERC721.sol';
 import '../contracts/wizards.sol';
-import "../contracts/libraries/PRBMathUD60x18.sol";
+import "../contracts/libraries/PRBMathSD59x18Typed.sol";
 
 contract RelativeTimeVault is ReentrancyGuard, Ownable {
-    using PRBMathUD60x18 for uint256;
-//    using PRBMathUD60x18 for PRBMath.UD60x18;
-
+  using PRBMathSD59x18Typed for PRBMath.SD59x18;
+    //    using PRBMathUD60x18 for PRBMath.UD60x18;
     IERC20 public token; // Address of token contract and same used for rewards
     Wizards public wizardsNFT;
 
@@ -86,18 +85,25 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
   /// @notice Calculates x*y÷1e18 while handling possible intermediary overflow.
   /// @dev Try this with x = type(uint256).max and y = 5e17.
   function unsignedMul(uint256 x, uint256 y) external pure returns (uint256 result) {
-    result = x.mul(y);
+//    result = x.mul(y);
+    result = 9999;
   }
 
 
   function unsignedPow(uint256 x, uint256 y) external pure returns (uint256 result) {
-    result = x.pow(y);
+//    result = x.pow(y);
+    result = 8888;
   }
 
-  function doTheMath() external pure returns (uint256 result) {
+  function doTheMath() external pure returns (int256 result) {
     uint256 x = 9993*10**14;
-    uint256 y = 3*10**18;
-    result = (x).pow(y);
+    uint256 y = 1000*10**18;
+//    result = (x).pow(y);
+
+    PRBMath.SD59x18 memory xsd = PRBMath.SD59x18(int256(x));
+    PRBMath.SD59x18 memory ysd = PRBMath.SD59x18(int256(y));
+    result = xsd.pow(ysd).value;
+
   }
 
 
