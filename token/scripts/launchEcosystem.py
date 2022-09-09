@@ -8,6 +8,7 @@ from datetime import date
 import time
 
 DUMP_ABI = True
+MINT_WIZARDS = False
 dev = accounts.add(config["wallets"]["from_key"]) # accounts[0]
 secondary = accounts.add(config["wallets"]["secondary"]) # accounts[1]
 print(f'network: {network.show_active()}')
@@ -51,14 +52,15 @@ def main():
     tx.wait(required_confirmations)
 
     # create wizards
-    for i in range(1, 3):
-        tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(required_confirmations)
-        tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(required_confirmations)
-        print(f'wizard {i} initiated, resulting in event: {tx.events}')
-        tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
-        tx.wait(required_confirmations)
+    if MINT_WIZARDS:
+        for i in range(1, 3):
+            tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
+            tx.wait(required_confirmations)
+            tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
+            tx.wait(required_confirmations)
+            print(f'wizard {i} initiated, resulting in event: {tx.events}')
+            tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
+            tx.wait(required_confirmations)
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')
@@ -232,12 +234,19 @@ def main():
     print(f'on_board: {on_board}')
     '''
 
-    # Mathy
+
+
+
+
+
+    # PRBMATH
     a = 9999*10**14
     b = 10000*10**18
-    result = wizard_tower.unsignedPow(a, b)
-    print(f'{a} ^ {b} = {result}')
-    print(f'standard format: {result/(10**18)}')
+    # result = wizard_tower.unsignedPow(a, b)
+    # print(f'{a} ^ {b} = {result}')
+    # print(f'standard format: {result/(10**18)}')
+    result = wizard_tower.doTheMath()
+    print(f'result: {result} => {result/(10**18)}')
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

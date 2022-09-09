@@ -10,10 +10,15 @@ import Home from './components/Home';
 import WrongNetwork from './components/WrongNetwork';
 import NavBar from './components/NavBar';
 import ContractSettings from './components/ContractSettings';
+import {Connect} from './components/Connect';
+import { useDispatch, useSelector } from "react-redux";
 
 import {onboard} from './components/Onboard';
 
 import "./App.css";
+
+//const injected = injectedModule()
+//const walletConnect = walletConnectModule()
 
 
 function App() {
@@ -21,6 +26,13 @@ function App() {
   const [numWizards, setNumWizards] = useState(0);
   const [address, setAddress] = useState(undefined);
   const [counter, setCounter] = useState(1);
+
+//  const dispatch = useDispatch();
+//  const connect = Connect();
+//  const res = connect(dispatch);
+//  console.log("res: ", res)
+//  const res = dispatch(Connect());
+//  console.log("res: ", res)
 
   return (
 
@@ -32,7 +44,16 @@ function App() {
            setAddress={setAddress}
            setConnected={setConnected}
            onboard={onboard}
-        />
+          />
+
+        <Connect
+           connected={connected}
+           address={address}
+           setAddress={setAddress}
+           setConnected={setConnected}
+           onboard={onboard}
+          />
+
 
           <NavBar connected={connected} address={address} setAddress={setAddress} setConnected={setConnected} numWizards={numWizards} setNumWizards={setNumWizards}
             onboard={onboard}
@@ -55,7 +76,7 @@ function App() {
                 element = {<Wizard connected={connected} numWizards={numWizards} address={address} />}
             />
             <Route path="/"
-              element = {<Home address={address} connected={connected} numWizards={numWizards} setNumWizards={setNumWizards} onboard={onboard}/ >}
+              element = {<Home address={address} connected={connected} numWizards={numWizards} setNumWizards={setNumWizards}/ >}
               />
         </Routes>
         </div>

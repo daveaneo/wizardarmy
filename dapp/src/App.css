@@ -80,19 +80,20 @@ h1 {
 
 .wizardarmy-subtitle {
     font-family: Impact, Charcoal, sans-serif;
-    font-size: 4em;
+    font-size: 4.5em;
     letter-spacing: -0.4px;
     word-spacing: 6px;
-    color: #000;
+    color: #373491;
     font-weight: 100;
     text-decoration: none;
     font-style: normal;
     font-variant: normal;
     text-transform: uppercase;
     white-space: pre-wrap;
-    margin:0;
-    padding:0;
-    margin-top:0;
+    margin:0em;
+    padding:0px;
+    display: block;
+    vertical-align: top;
 }
 
 
@@ -160,11 +161,11 @@ h1 {
 /* Tasks */
 
 /* Colors -- temp
-#0367a6 	(3,103,166)
-#373491 	(55,52,145)
-#877df0 	(135,125,240)
-#2d8a75 	(45,138,117)
-#4de8c4 	(77,232,196)
+#0367a6 	(3,103,166) // bluish
+#373491 	(55,52,145) // darker purple
+#877df0 	(135,125,240) // lighter purple
+#2d8a75 	(45,138,117) /// greenish
+#4de8c4 	(77,232,196) // brighter green
 */
 
 .tasks-container {

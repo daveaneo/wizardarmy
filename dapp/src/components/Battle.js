@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import {Link, useParams} from "react-router-dom";
+import { useSelector } from "react-redux";
 // todo -- this page should be authenticated
 
 function Battle(props) {
-  const connected = props.connected;
-  const address = props.address;
+//  const connected = props.connected;
+//  const address = props.address;
   let params = useParams();
   const wizardId = params.id;
 
@@ -19,13 +20,17 @@ function Battle(props) {
   const [time, setTime] = useState(Date.now());
   const [contractsLoaded, setContractsLoaded] = useState(false);
 
-  // contracts
-  const { ethereum } = window;
-  const ecosystemTokenContract = window.ecosystemToken;
-  const wizardNFTContract = window.wizardNFTContract;
-  const wizardTowerContract =window.wizardTowerContract;
-  const wizardBattleContract =window.wizardBattleContract;
-  const signer = window.signer;
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
+
+  // Load signed, unsigned contracts from Redux
+//  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+//  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+  const wizardTowerContract =smartContracts.wizardTowerContract;
+  const wizardBattleContract =smartContracts.wizardBattleContract;
+
+
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   let isLoadingMyFloors = false;
   var loadingContracts = false;
@@ -149,7 +154,7 @@ function Battle(props) {
       let newFloorArray = [];
       let myPromises = [];
       let myPromise;
-      if(connected && (address !== undefined)) {
+      if(address && (address !== undefined)) {
           setMyNumNeighboringFloors(ids.length);
           // iterate through floors
           for(let i=0; i < ids.length; i++) {
@@ -220,7 +225,7 @@ function sleep(ms) {
 ////          LoadNeighborhood();
 //          LoadMyFloor();
 //      }
-    }, [connected, address]);
+    }, [smartContracts, address]);
 
     useEffect(() => {
       LoadContracts();
@@ -258,8 +263,8 @@ function sleep(ms) {
                 </div>
             </div>
         )}
-        {!connected && "Please Connect"}
-        {connected && (floors.length != myNumNeighboringFloors) && 'loading...'}
+        {!address && "Please Connect"}
+        {address && (floors.length != myNumNeighboringFloors) && 'loading...'}
         {myNumNeighboringFloors == 0 && "you are not on the tower."}
     </div>
   );

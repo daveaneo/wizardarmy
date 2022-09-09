@@ -11,6 +11,7 @@ import "../contracts/libraries/PRBMathUD60x18.sol";
 
 contract RelativeTimeVault is ReentrancyGuard, Ownable {
     using PRBMathUD60x18 for uint256;
+//    using PRBMathUD60x18 for PRBMath.UD60x18;
 
     IERC20 public token; // Address of token contract and same used for rewards
     Wizards public wizardsNFT;
@@ -92,6 +93,13 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
   function unsignedPow(uint256 x, uint256 y) external pure returns (uint256 result) {
     result = x.pow(y);
   }
+
+  function doTheMath() external pure returns (uint256 result) {
+    uint256 x = 9993*10**14;
+    uint256 y = 3*10**18;
+    result = (x).pow(y);
+  }
+
 
     ////////////////////
     ////    Get       //

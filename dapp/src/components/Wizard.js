@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useParams, Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 function Wizard(props) {
-  const connected = props.connected;
+//  const connected = props.connected;
   const numWizards = props.numWizards;
-  const address = props.address;
+//  const address = props.address;
 
   let params = useParams();
   const wizardId = params.id;
@@ -25,44 +26,22 @@ function Wizard(props) {
   const TOTALPHASES = 8;
 
   // contracts
-  const { ethereum } = window;
-  var ecosystemTokenContract = window.ecosystemToken;
-  var wizardNFTContract = window.wizardNFTContract;
-  var wizardTowerContract =window.wizardTowerContract;
-  var wizardBattleContract =window.wizardBattleContract;
-  var NFTContractNoSigner =window.NFTContractNoSigner;
-  var loadingContracts = false;
 
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
 
-
+  // Load signed, unsigned contracts from Redux
+  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+  const wizardTowerContract =smartContracts.wizardTowerContract;
+  const wizardBattleContract =smartContracts.wizardBattleContract;
 
   const signer = window.signer;
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   let isLoadingMyWizards = false;
 
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-  async function LoadContracts() {
-      if(loadingContracts) { return}
-      loadingContracts = true;
-
-      while(window.ecosystemToken == undefined &&
-         window.wizardNFTContract == undefined &&
-         window.wizardTowerContract == undefined &&
-         window.wizardBattleContract == undefined
-      ) {
-          await sleep(100);
-      }
-      var ecosystemTokenContract = window.ecosystemToken;
-      var wizardNFTContract = window.wizardNFTContract;
-      var wizardTowerContract =window.wizardTowerContract;
-      var wizardBattleContract =window.wizardBattleContract;
-      loadingContracts = false;
-      setContractsLoaded(true);
-  }
 
     // todo -- could combine this or import this function in MyWizards.js
     async function processWizardStruct(wiz, id) {
@@ -104,36 +83,36 @@ function sleep(ms) {
 
 
     async function UpdateMyPhase() {
-        let _phase = await wizardNFTContract.getPhaseOf(wizardId);
+        let _phase = await NFTContractNoSigner.getPhaseOf(wizardId);
         setMyPhase(_phase)
     }
 
     async function LoadMyWizard() {
-        if(wizardNFTContract===undefined) { return }
-        let wiz = await wizardNFTContract.tokenIdToStats(wizardId);
+        let wiz = await NFTContractNoSigner.tokenIdToStats(wizardId);
         await processWizardStruct(wiz, wizardId).then( (processed) => {
                 setMyWizard(processed);
         });
     }
 
     async function LoadTotalWizards() {
-        let total = parseInt(await wizardNFTContract.totalSupply());
+        let total = parseInt(await NFTContractNoSigner.totalSupply());
         setTotalWizards(total);
     }
 
 
     async function SetIsOwner() {
-        if(!connected || wizardId===undefined || wizardNFTContract ===undefined ){
+        if(address==null || wizardId===undefined || NFTContractNoSigner ===undefined ){
           setIsOwner(false);
         }
         else {
-            const ownerAddress = await wizardNFTContract.ownerOf(wizardId);
+            const ownerAddress = await NFTContractNoSigner.ownerOf(wizardId);
             setIsOwner(ownerAddress==address);
         }
     }
 
 
     async function LoadMyFloor() {
+        if(wizardTowerContract==undefined){ return;}
         const _floor = parseInt(await wizardTowerContract.wizardIdToFloor(wizardId));
         if (_floor!= 0){
             setIsOnTheTower(true);
@@ -199,21 +178,25 @@ function sleep(ms) {
        }
     }
 
-
     useEffect(() => {
-      LoadContracts();
-    }, []);
-
-    useEffect(() => {
-        if(contractsLoaded===true){
-            LoadTotalWizards();
-            LoadMyWizard();
-            LoadMyFloor();
-            SetIsOwner();
+        LoadTotalWizards();
+        SetIsOwner();
+        if(smartContracts.wizardTowerContract!=undefined){
             LoadTowerTokens();
-            UpdateMyPhase();
         }
-    }, [contractsLoaded, pageRefreshes]);
+
+    }, [smartContracts, pageRefreshes, address]);
+
+    useEffect(() => {
+        LoadTotalWizards();
+        LoadMyWizard();
+        SetIsOwner();
+        UpdateMyPhase();
+     if(smartContracts.wizardTowerContract!=undefined){
+        LoadTowerTokens();
+        LoadMyFloor();
+     }
+    }, []);
 
 
     useEffect(() => {
@@ -223,16 +206,8 @@ function sleep(ms) {
     }, [myFloor]);
 
     useEffect(() => {
-      LoadContracts();
-    }, [address]);
-
-
-    useEffect(() => {
       SetIsOwner();
-    }, [connected, address]);
-
-    useEffect(() => {
-    }, [isOwner]);
+    }, [address]);
 
 
   return (
@@ -259,7 +234,6 @@ function sleep(ms) {
                 </div>
             </div>
         }
-
         {wizardId > totalWizards && 'Wizard does not exist.'}
         {!myWizard && 'loading...'}
         {!myWizard &&

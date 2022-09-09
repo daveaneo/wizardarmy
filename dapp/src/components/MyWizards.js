@@ -1,28 +1,31 @@
 import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import {Link} from "react-router-dom";
+import { useSelector } from "react-redux";
 
 function MyWizards(props) {
-  const connected = props.connected;
+//  const connected = props.connected;
   const numWizards = props.numWizards;
-  const address = props.address;
-//  let [connected, setConnected] = useState(false);
+//  const address = props.address;
   const [wizardIDs, setWizardIDs] = useState([]);
   const [wizards, setWizards] = useState([]);
   const [myNumWizards, setMyNumWizards] = useState(0);
   const [myTokens, setMyTokens] = useState(undefined);
-
   const [time, setTime] = useState(Date.now());
 
-  // contracts
-  const { ethereum } = window;
-  const ecosystemTokenContract = window.ecosystemToken;
-  const wizardNFTContract = window.wizardNFTContract;
-  const wizardTowerContract =window.wizardTowerContract;
-  const wizardBattleContract =window.wizardBattleContract;
-  const signer = window.signer;
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
-  let isLoadingMyWizards = false;
+  var isLoadingMyWizards = false;
+
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
+
+  // Load signed, unsigned contracts from Redux
+//  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+  const wizardTowerContract =smartContracts.wizardTowerContract;
+  const wizardBattleContract =smartContracts.wizardBattleContract;
+
 
 
     async function processWizardStructByIndex(ind) {
@@ -91,7 +94,7 @@ function MyWizards(props) {
       let newWizArray = [];
       const myPromises = [];
       let myPromise;
-      if(address !== undefined) {
+      if(address != null) {
             let bal = await wizardNFTContract.balanceOf(address);
             setMyNumWizards(parseInt(bal));
             setWizardIDs([]);
@@ -123,7 +126,7 @@ function MyWizards(props) {
     useEffect(() => {
       LoadMyWizards();
       GetMyTokens();
-    }, [connected, address, numWizards]);
+    }, [smartContracts, address, numWizards]);
 
     useEffect(() => {
       LoadMyWizards();
@@ -133,11 +136,9 @@ function MyWizards(props) {
       LoadMyWizards();
     }, [numWizards]); // this is total amount of wizards, not my amount of my wizards
 
+
   return (
     <div className="">
-      {/*
-      <p>I own {wizards.length} wizards and have {isNaN(myTokens) ? "0" : myTokens} tokens.</p>
-      */}
         <div className="wizards-container">
             {wizards && wizards.map(wizard =>
                 <div className="wizard-container" key={wizard.id}>

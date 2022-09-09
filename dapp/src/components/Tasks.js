@@ -6,10 +6,11 @@ import axios from 'axios';
 //import * as IPFS from "ipfs-core";
 //import makeIpfsFetch from "js-ipfs-fetch";
 // todo -- this page should be authenticated
+import { useSelector } from "react-redux";
 
 function Tasks(props) {
-  const connected = props.connected;
-  const address = props.address;
+//  const connected = props.connected;
+//  const address = props.address;
   let params = useParams();
   const wizardId = params.id;
 
@@ -35,13 +36,19 @@ function Tasks(props) {
   const [onBoard, setOnBoard] = useState(undefined);
 
   // contracts
-  const { ethereum } = window;
-  const ecosystemTokenContract = window.ecosystemToken;
-  const wizardNFTContract = window.wizardNFTContract;
-  const wizardTowerContract = window.wizardTowerContract;
-  const wizardBattleContract = window.wizardBattleContract;
-  const wizardGovernanceContract = window.wizardGovernanceContract;
-  const signer = window.signer;
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
+
+  // Load signed, unsigned contracts from Redux
+//  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+  const wizardTowerContract =smartContracts.wizardTowerContract;
+  const wizardBattleContract =smartContracts.wizardBattleContract;
+  const wizardGovernanceContract =smartContracts.wizardGovernanceContract;
+
+
+
   const ELEMENTS = ["Fire", "Wind", "Water", "Earth"]
   var isInitiated = undefined;
   let isLoadingMyTasks = false;
@@ -246,7 +253,7 @@ function Tasks(props) {
 
       let newTaskTypes = [];
       let taskObjects = []
-      if(connected && (address !== undefined)) {
+      if(address!=null && (address !== undefined)) {
           newTaskTypes = await wizardGovernanceContract.getMyAvailableTaskTypes(wizardId); // will need task ID too
           if(newTaskTypes[0]==""){
             return;
@@ -564,7 +571,7 @@ function sleep(ms) {
 
     useEffect(() => {
         LoadMyTasks();
-    }, [connected, address]);
+    }, [address]);
 
 /*
     useEffect(() => {
@@ -757,8 +764,8 @@ function sleep(ms) {
             </>
         }
 
-        {!connected && "Please Connect"}
-        {connected && (taskTypes == undefined) && 'loading...'}
+        {address==null && "Please Connect"}
+        {address!=null && (taskTypes == undefined) && 'loading...'}
     </div>
   );
 }

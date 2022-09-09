@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ethers } from "ethers";
+//import { ethers } from "ethers";
 import { init, useConnectWallet } from '@web3-onboard/react'
 import "../App.css";
 

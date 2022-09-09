@@ -2,62 +2,24 @@ import { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import MyWizards from '../components/MyWizards';
 import "../App.css";
-//import "../Contracts.js";
+import { useSelector } from "react-redux";
 
-// todo -- get components to rerender with address change
-// todo -- have address change something else after, then use this to signal state change
 
 function Home(props) {
-  const connected = props.connected;
-  const address = props.address;
-  const onboard = props.onboard;
-//  const numWizards = props.numWizards;
+//  const connected = props.connected;
+//  const address = props.address;
   const numWizards = props.numWizards;
   const setNumWizards = props.setNumWizards;
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
 
-  const [text, setText] = useState("");
-  const [savedText, setSavedText] = useState("");
-//  const [numWizards, setNumWizards] = useState(0);
-  const [counter, setCounter] = useState(1);
-  const [contractsLoaded, setContractsLoaded] = useState(false);
+  // Load signed, unsigned contracts from Redux
+  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+//  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+//  const wizardTowerContract =smartContracts.wizardTowerContract;
+//  const wizardBattleContract =smartContracts.wizardBattleContract;
 
-  const { ethereum } = window;
-  var ecosystemTokenAddress = window.ecosystemToken;
-  var wizardNFTContract = window.wizardNFTContract;
-  var wizardTowerContract = window.wizardTowerContract;
-  var wizardBattleContract = window.wizardBattleContract;
-  var loadingContracts = false;
-
-//  const ecosystemTokenAddress = window.ecosystemToken;
-//  const wizardNFTContract = window.wizardNFTContract;
-//  const wizardTowerContract =window.wizardTowerContract;
-//  const wizardBattleContract =window.wizardBattleContract;
-
-  const NFTContractNoSigner = window.NFTContractNoSigner;
-
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-  async function LoadContracts() {
-      if(loadingContracts) { return}
-      loadingContracts = true;
-
-      while(window.ecosystemToken == undefined &&
-         window.wizardNFTContract == undefined &&
-         window.wizardTowerContract == undefined &&
-         window.wizardBattleContract == undefined
-      ) {
-          await sleep(100);
-      }
-      var ecosystemTokenContract = window.ecosystemToken;
-      var wizardNFTContract = window.wizardNFTContract;
-      var wizardTowerContract =window.wizardTowerContract;
-      var wizardBattleContract =window.wizardBattleContract;
-      loadingContracts = false;
-      setContractsLoaded(true);
-  }
 
   async function mintWizard() {
      wizardNFTContract.mint().then( tx => {
@@ -82,43 +44,26 @@ function sleep(ms) {
   }
 
   useEffect(() => {
-    LoadContracts();
   }, []);
 
   useEffect(() => {
     updateNumWizards();
-
-  }, [contractsLoaded, onboard]); //
-
-  // Detect change in Metamask account
+  }, [smartContracts]); //
 
 
   return (
         <div className="App">
-          {/*
-          {connected && <button onClick={() => {
-            if (connected) {
-                mintWizard().then(res => {
-                    })
-            }
-            else{
-            }
-          }}>{'mint' }</button>
-          }
-          */}
           <div className="wizardarmy-title">
             Wizard
             {"\n"} Army
            </div>
           <div className="wizardarmy-subtitle">{numWizards} strong! </div>
-            {connected && <MyWizards
-                  connected = {connected}
+            {address && <MyWizards
+//                  connected = {connected}
                   numWizards = {numWizards}
-                  address = {address}
+//                  address = {address}
                />
             }
-
-
         </div>
   );
 }

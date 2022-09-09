@@ -2,16 +2,17 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import Onboard from '@web3-onboard/core'
+import {Connect, updateAccount} from '../components/Connect';
 import injectedModule from '@web3-onboard/injected-wallets'
 import walletConnectModule from '@web3-onboard/walletconnect'
 import { init, useConnectWallet } from '@web3-onboard/react'
 //import { useSetChain } from '@web3-onboard/react'
 //import axios;
-
+import { useDispatch, useSelector } from "react-redux";
 
 function NavBar(props) {
     const setAddress = props.setAddress;
-    const address = props.address;
+//    const address = props.address;
     const connected = props.connected;
     const setConnected = props.setConnected;
     const onboard = props.onboard;
@@ -29,52 +30,15 @@ function NavBar(props) {
   const injected = injectedModule()
   const walletConnect = walletConnectModule()
 
-/*
-  // SETUP UP OnBoard
-    const onboard = init({
-      wallets: [injected, walletConnect],
-      chains: [
-        {
-          id: '0x4',
-          token: 'rETH',
-          label: 'Rinkeby',
-          rpcUrl: myInfuraRPC
-        },
-        {
-          id: '0x89',
-          token: 'MATIC',
-          label: 'Polygon',
-          rpcUrl: 'https://matic-mainnet.chainstacklabs.com'
-        },
-        {
-          id: '0x13881',
-          token: 'MATIC',
-          label: 'Mumbai Testnet',
-          rpcUrl: 'https://rpc-mumbai.maticvigil.com/'
-        },
-      ]
-    })
-*/
+
+  const dispatch = useDispatch();
+  const connect = Connect();
+//  const res = connect(dispatch);
+  const myReduxState = useSelector((state)=> state);
+  const address = useSelector(state => state.account)
 
   async function ConnectWallet() {
-    // todo connection errors: connect/disconnect/connect
-    if (onboard==undefined){
-        console.error("unboard is undefined.")
-        return;
-    }
-
-    const wallets = await onboard.connectWallet()
-//    const [primaryWallet] = onboard.state.get().wallets
-    if (wallets[0]) {
-      // create an ethers provider with the last connected wallet provider
-      const ethersProvider = new ethers.providers.Web3Provider(
-        wallets[0].provider,
-        'any'
-      )
-
-      const signer = ethersProvider.getSigner()
-      setConnected(true);
-    }
+      const res = connect(dispatch);
 }
 
   async function loadAddress() {
@@ -96,20 +60,44 @@ function NavBar(props) {
         });
     }
 
+// todo -- pass this information to redux
 // enable persist connection information between visits and refresh
   useEffect(() => {
-    setConnected(JSON.parse(window.sessionStorage.getItem("connected")));
-    const temp = JSON.parse(window.sessionStorage.getItem("connected"));
-    loadAddress();
+//    setConnected(JSON.parse(window.sessionStorage.getItem("connected")));
+//    const temp = JSON.parse(window.sessionStorage.getItem("connected"));
+//    console.log("connected: ", connected)
+//    loadAddress();
+
+
+    const connectedAccount = window.sessionStorage.getItem("connectedAccount");
+    if(connectedAccount!=""){
+      const update = updateAccount(connectedAccount);
+      const res = update(dispatch).then((res) =>{
+//          console.log("update: ", update)
+//          console.log("res: ", res);
+//          console.log("reinstating connection...")
+      });
+//      dispatch(test);
+    }
+
 //    SetupOnboard();
   }, []);
 
   useEffect(() => {
-    if (connected!==undefined){
-        window.sessionStorage.setItem("connected", connected);
-    }
-  }, [connected]);
+//    if (connected!==undefined){
+//        window.sessionStorage.setItem("connected", connected);
+//    }
 
+    if(address!=null){
+        window.sessionStorage.setItem("connectedAccount", address);
+    }
+    else{
+        window.sessionStorage.setItem("connectedAccount", "");
+    }
+  }, [address]);
+
+
+/*
   // Detect change in Metamask account
   useEffect(() => {
     if (window.ethereum) {
@@ -134,6 +122,8 @@ function NavBar(props) {
       });
     }
   });
+*/
+
 
   async function mintWizard() {
      let tx = await wizardNFTContract.mint();
@@ -144,8 +134,6 @@ function NavBar(props) {
      else {
      }
   }
-
-
 
   return (
     <div className="navbar">
@@ -171,25 +159,26 @@ function NavBar(props) {
 
         <div className="navbar-item">
             <button onClick={() => {
-            if (!connected) {
+            if (myReduxState.account==undefined) {
                 ConnectWallet();
             }
             else { // disconnecting
-                window.address = undefined;
-                setConnected(false);
-                setAddress(undefined);
+
+                let myRes = dispatch({
+                    type: "DISCONNECT",
+                  });
                 // onboard
                 if(onboard!=undefined){
                     let [primaryWallet] = onboard.state.get().wallets
                     onboard.disconnectWallet({ label: primaryWallet.label })
                 }
             }
-            }}>{!connected ? 'Connect wallet' : 'Disconnect' }</button>
+            }}>{myReduxState.account==undefined ? 'Connect wallet' : 'Disconnect' }</button>
         </div>
 
         <div className="navbar-item">
-          {connected && <button onClick={() => {
-            if (connected) {
+          {myReduxState.account!=undefined && <button onClick={() => {
+            if (myReduxState.account!=undefined) {
                 mintWizard().then(res => {
                     })
             }
@@ -204,5 +193,3 @@ function NavBar(props) {
 }
 
 export default NavBar;
-
-//        </* <button onClick={SendTokensToTowerContract}> Power Tower </button> */>
