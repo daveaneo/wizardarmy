@@ -240,13 +240,19 @@ def main():
 
 
     # PRBMATH
-    a = 9999*10**14
-    b = 10*10**18
+    # a = 9999*10**14
+    # b = 10*10**18
     # result = wizard_tower.unsignedPow(a, b)
     # print(f'{a} ^ {b} = {result}')
     # print(f'standard format: {result/(10**18)}')
-    result = wizard_tower.doTheMath()
-    print(f'result: {result} => {result/(10**18)}')
+    # result = wizard_tower.doTheMath()
+    # print(f'result: {result} => {result/(10**18)}')
+    # for i in range(1, 10):
+    #     result = wizard_tower.testGeometricSeriesSum(i)
+    #     print(f'result: {result} => {result}')
+
+
+
 
     if DUMP_ABI:
         print(f'dumping wizardTower...') # sdf sfd sdfsdf sdf

@@ -26,7 +26,8 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     // Geometric sequence
     uint256 aFirst = 10**10;
-    uint256 relativeIncrease = 9990; // out of 10000
+    // Geometric series aiming to have A(999) = A(0)/100
+    uint256 public relativeIncrease = 0.99540082876 * 10**18; // e ^ [(ln(1/100) % 999], from, A(999) = A(0)*r**999,
 
     address public tokenOperator; // Address to manage the Stake
     address public battler; // Address to manage the Stake
@@ -34,7 +35,7 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
     // todo -- combine mappings
     struct FloorInfo {
-        uint16 floorPower; // todo -- may not use it this way (function, instead)
+//        uint16 floorPower; // todo -- may not use it this way (function, instead)
         uint40 lastWithdrawalTimestamp;
         uint16 occupyingWizardId;
         Wizards.ELEMENT element;
@@ -106,6 +107,30 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
 
   }
 
+    // represent 1 as 1*10**18, 0.1 as 1 *10**17, ...
+  function fractionalPower(uint256 x, uint256 y) internal pure returns (int256 result) {
+    PRBMath.SD59x18 memory xsd = PRBMath.SD59x18(int256(x));
+    PRBMath.SD59x18 memory ysd = PRBMath.SD59x18(int256(y));
+    result = xsd.pow(ysd).value;
+  }
+
+
+
+  // total of geometric series = A(0)*(1-r^n)/(1 - r)
+  function geometricSeriesSum() internal view returns (int256 result) {
+    PRBMath.SD59x18 memory r = PRBMath.SD59x18(int256(relativeIncrease));
+    PRBMath.SD59x18 memory n = PRBMath.SD59x18(int256(activeFloors * 10**18));
+    PRBMath.SD59x18 memory one = PRBMath.SD59x18(int256(10**18));
+    result = ( one.sub(r.pow(n))).div(one.sub(r)).value; // todo -- check
+  }
+//
+//  function testGeometricSeriesSum(uint256 _floors) external view returns (int256 result) {
+//    PRBMath.SD59x18 memory r = PRBMath.SD59x18(int256(relativeIncrease));
+//    PRBMath.SD59x18 memory n = PRBMath.SD59x18(int256(_floors * 10**18));
+//    PRBMath.SD59x18 memory one = PRBMath.SD59x18(int256(10**18));
+//    result = ( one.sub(r.pow(n))).div(one.sub(r)).value; // todo -- check
+//    //result = xsd.pow(ysd).value;
+//  }
 
     ////////////////////
     ////    Get       //
@@ -266,23 +291,35 @@ contract RelativeTimeVault is ReentrancyGuard, Ownable {
         return floorPower(_floor) * token.balanceOf((address(this))) / _totalFloorPower();
     }
 
+    function testFloorPower(uint256 _floor) external view returns(uint256) {
+        uint256 myPower = uint256(fractionalPower(relativeIncrease, (_floor - 1) * 10**18));
+
+        FloorInfo memory floorInfo = floorIdToInfo[_floor];
+
+        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? startTimestamp : floorInfo.lastWithdrawalTimestamp;
+        return myPower * (block.timestamp - timestamp);// / 10**18;
+    }
+
     // todo -- implement geometric series powered by: https://github.com/paulrberg/prb-math
     // todo -- tutorial -- https://www.smartcontractresearch.org/t/deep-diving-into-prbmath-a-library-for-advanced-fixed-point-math/686
     function floorPower(uint256 _floor) public view returns(uint256) {
+        require(_floor > 0 && _floor <= activeFloors, "invalid floor");
         // Geometric series -- todo
-//        return aFirst * (relativeIncrease ** (_floor - 1)); // A(n) for geometric series
+        uint256 myPower = uint256(fractionalPower(relativeIncrease, (_floor - 1) * 10**18));
 
 //        Temporary simple series using one value (aFirst) for all floor powers base units (not including time)
         FloorInfo memory floorInfo = floorIdToInfo[_floor];
 
         // use startTimestamp if never withdrawn
         uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? startTimestamp : floorInfo.lastWithdrawalTimestamp;
-        return aFirst * (block.timestamp - timestamp);
+        return myPower * (block.timestamp - timestamp) / 10**18;
     }
 
     function _totalFloorPower() public view returns(uint256) {
         // Geometric series -- todo
-        return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * aFirst * activeFloors;
+          // total of geometric series = A(0)*(1-r^n)/(1 - r)
+          return totalPowerSnapshot +  (block.timestamp - totalPowerSnapshotTimestamp) * uint256(geometricSeriesSum()) / 10**18;
+//        return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * aFirst * activeFloors;
     }
 
     // called when adding/removing floors or withdrawing
