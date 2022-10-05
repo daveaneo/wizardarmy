@@ -9,7 +9,6 @@ import Tasks from './components/Tasks';
 import Home from './components/Home';
 import WrongNetwork from './components/WrongNetwork';
 import NavBar from './components/NavBar';
-//import ContractSettings from './components/ContractSettings';
 import {Connect} from './components/Connect';
 import { useDispatch, useSelector } from "react-redux";
 
@@ -17,22 +16,12 @@ import {onboard} from './components/Onboard';
 
 import "./App.css";
 
-//const injected = injectedModule()
-//const walletConnect = walletConnectModule()
-
 
 function App() {
   const [connected, setConnected] = useState(undefined);
   const [numWizards, setNumWizards] = useState(0);
   const [address, setAddress] = useState(undefined);
   const [counter, setCounter] = useState(1);
-
-//  const dispatch = useDispatch();
-//  const connect = Connect();
-//  const res = connect(dispatch);
-//  console.log("res: ", res)
-//  const res = dispatch(Connect());
-//  console.log("res: ", res)
 
   return (
 

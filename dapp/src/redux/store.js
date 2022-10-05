@@ -11,9 +11,9 @@ const initialState = {
 };
 
 const reduceFn = (state = { ...initialState }, action) => {
-    console.log("in reduceFn...");
-    console.log("state: ", state);
-    console.log("action: ", action);
+//    console.log("in reduceFn...");
+//    console.log("state: ", state);
+//    console.log("action: ", action);
     switch (action.type) {
         case "DISCONNECT":
           return {

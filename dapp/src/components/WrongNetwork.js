@@ -20,17 +20,22 @@ function WrongNetwork(props) {
 
     async function ValidateNetwork() {
         if(onboard==undefined || myWallet[0].wallet == null){
+            console.log("onboard is undefined")
+
             setNetworkIsValid(true);
         }
         else{
             const currentChainId = myWallet[0].wallet.chains[0].id;
             if(correctChainId===currentChainId && networkIsValid!=true){
                 setNetworkIsValid(true)
+                console.log("correct network")
             }
             else if(correctChainId!==currentChainId && networkIsValid!=false){
                 setNetworkIsValid(false)
+                console.log("NOT correct network")
+                console.log("correctChaindId: ", correctChainId)
+                console.log("ccurrentChainId: ", currentChainId)
             }
-
         }
     }
 
@@ -45,7 +50,7 @@ function WrongNetwork(props) {
   return (
       <>
         { !networkIsValid && <div id="wrong-network-overlay">
-          Please connect to Mumbai Testnet
+          Please connect to Mumbai ( Polygon Testnet )
         </div>
         }
       </>

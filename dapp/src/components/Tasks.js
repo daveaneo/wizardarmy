@@ -438,7 +438,8 @@ function sleep(ms) {
 
   }
 
-  async function updateOnBoard() {
+  // Updates if member is on the board (not blocknative onboard)
+  async function updateOnTheBoard() {
     let _onBoard = await wizardGovernanceContract.isMyWizardOnBoard(wizardId);
     setOnBoard(_onBoard)
   }
@@ -515,7 +516,6 @@ function sleep(ms) {
         tx = await wizardGovernanceContract.submitVerification(wizardId, taskToConfirm.taskId, onceHashedLeaves) ;
     }
 
-
     let res = await tx.wait(1);
     console.log("res: ", res);
     console.log("res.events[0].args: ", res.events[0].args);
@@ -525,33 +525,32 @@ function sleep(ms) {
     }
 
   }
-
-  async function LoadContracts() {
-      if(loadingContracts) { return}
-      loadingContracts = true;
-
-      while(window.ecosystemToken == undefined &&
-         window.wizardNFTContract == undefined &&
-         window.wizardTowerContract == undefined &&
-         window.wizardBattleContract == undefined &&
-         window.wizardGovernanceContract == undefined
-      ) {
-          await sleep(100);
-      }
-      var ecosystemTokenContract = window.ecosystemToken;
-      var wizardNFTContract = window.wizardNFTContract;
-      var wizardTowerContract = window.wizardTowerContract;
-      var wizardBattleContract = window.wizardBattleContract;
-      var wizardGovernanceContract = window.wizardGovernanceContract;
-      loadingContracts = false;
-      setContractsLoaded(true);
-  }
+//
+//  async function LoadContracts() {
+//      if(loadingContracts) { return}
+//      loadingContracts = true;
+//
+//      while(window.ecosystemToken == undefined &&
+//         window.wizardNFTContract == undefined &&
+//         window.wizardTowerContract == undefined &&
+//         window.wizardBattleContract == undefined &&
+//         window.wizardGovernanceContract == undefined
+//      ) {
+//          await sleep(100);
+//      }
+//      var ecosystemTokenContract = window.ecosystemToken;
+//      var wizardNFTContract = window.wizardNFTContract;
+//      var wizardTowerContract = window.wizardTowerContract;
+//      var wizardBattleContract = window.wizardBattleContract;
+//      var wizardGovernanceContract = window.wizardGovernanceContract;
+//      loadingContracts = false;
+//      setContractsLoaded(true);
+//  }
 
 
     useEffect(() => {
-      LoadContracts();
       const interval = setInterval(() => {
-        if(contractsLoaded===true){
+        if(smartContracts.wizardGovernanceContract!=undefined){
             LoadMyTasks();
         }
       }, 60000);
@@ -561,17 +560,21 @@ function sleep(ms) {
 
     useEffect(() => {
         if(activeTask!=undefined && taskTypes[activeTask]!=undefined){
-//         console.log("activated task has changed. New num of fields: ", taskTypes[activeTask].fields.length, taskTypes[activeTask], activeTask)
          // resize myInputs
          let tempMyInputs = Array(taskTypes[activeTask].fields.length).fill('');
-//         console.log("inputs have been created: ", tempMyInputs)
          setMyInputs(tempMyInputs);
         }
     }, [activeTask]);
 
     useEffect(() => {
-        LoadMyTasks();
-    }, [address]);
+        if(smartContracts.wizardGovernanceContract!=undefined){
+            LoadMyTasks();
+             updateAreTasksAvailableToConfirm();
+             updatePendingTasksToConfirm();
+             updateOnTheBoard();
+
+        }
+    }, [, smartContracts, address]);
 
 /*
     useEffect(() => {
@@ -590,19 +593,6 @@ function sleep(ms) {
     }, [areTasksAvailableToConfirm]);
 */
 
-    useEffect(() => {
-      LoadContracts();
-
-    }, []);
-
-    useEffect(() => {
-      if(contractsLoaded===true){
-         LoadMyTasks();
-         updateAreTasksAvailableToConfirm();
-         updatePendingTasksToConfirm();
-         updateOnBoard();
-      }
-    }, [contractsLoaded]);
 
   return (
     <div className="">
@@ -610,7 +600,7 @@ function sleep(ms) {
 
           {/* Board Functions*/}
           {onBoard && <div>
-              <p> Board Functions </p>
+              <h1> Board Functions </h1>
 
               {/* Create Task */}
             <div>

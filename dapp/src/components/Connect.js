@@ -14,21 +14,22 @@ const WizardGovernanceabi = require('../abi/wizardgovernance.json').abi;
 const ERC20abi = require('../abi/ERC20.json').abi;
 const myInfuraMumbaiRPC = process.env.REACT_APP_MUMBAI_RPC;
 const myInfuraRinkebyRPC = process.env.REACT_APP_RINKEBY_RPC;
-const networkIdUsed=4; // todo -- process.env.REACT_APP_CORRECT_CHAIN_ID
+const networkIdUsed = process.env.REACT_APP_CORRECT_CHAIN_ID;
 const injected = injectedModule()
 const walletConnect = walletConnectModule()
 
-let ecosystemTokenAddress = '0x6A185bbFD67640bB16A99F6dC47Ec9C2813807E8';
-let wizardNFTAddress = '0x81A4e43D0154B563946e48d21b6cE50b83d42dd3';
-let wizardTowerAddress = '0x91bCbE7dd0184767eAce2B39f47f2AF0c041bAf6';
-let wizardBattleAddress = '0x6EA16F0998CFF196979873FF0Ab929ec7927073D';
-let wizardGovernanceAddress = '0x00990C0394DEAef55a081364944f15aaAe4FaFC8';
+let ecosystemTokenAddress = '0x21921e727f71a5568e37C85F5bda0d5C1fa41102';
+let wizardNFTAddress = '0x444a9D9Bf54788322f3DbD3266910F8Eaf5868a7';
+let wizardTowerAddress = '0xcf28aeC9FA1fD50Ca73E52c517d31a8F1D86416E';
+let wizardBattleAddress = '0x4Fd82bb0736D2364b7B944c2aFd4Ed47F5B36123';
+let wizardGovernanceAddress = '0xed221878eFadD155EA1C54853145e5abe20ACF12';
 
 
  // load some data without metamask or signer
 function getNFTContractNoSigner() {
   const chainId = networkIdUsed;
   let myRPC;
+  console.log("chainid: ", chainId)
   if(chainId==4){
     myRPC= myInfuraRinkebyRPC;
   }
@@ -150,7 +151,6 @@ function getNFTContractNoSigner() {
     export const updateAccount = (account) => {
       return async (dispatch) => {
         const payload = getContractPayloadFromAccount(account);
-        console.log("in update account. account, dispatch, payload: ", account, dispatch, payload)
         dispatch(updateAccountRequest(payload));
      }
     }

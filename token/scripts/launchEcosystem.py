@@ -8,7 +8,7 @@ from datetime import date
 import time
 
 DUMP_ABI = True
-MINT_WIZARDS = False
+MINT_WIZARDS = True
 dev = accounts.add(config["wallets"]["from_key"]) # accounts[0]
 secondary = accounts.add(config["wallets"]["secondary"]) # accounts[1]
 print(f'network: {network.show_active()}')

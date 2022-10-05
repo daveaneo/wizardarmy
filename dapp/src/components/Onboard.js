@@ -18,12 +18,6 @@ import { init, useConnectWallet } from '@web3-onboard/react'
     export const onboard = init({
       wallets: [injected, walletConnect],
       chains: [
-        {
-          id: '0x4',
-          token: 'rETH',
-          label: 'Rinkeby',
-          rpcUrl: myInfuraRPC
-        },
 
     // todo -- add Polygon-
     /*            {

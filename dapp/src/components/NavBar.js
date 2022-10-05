@@ -3,72 +3,51 @@ import { Link } from "react-router-dom";
 import { ethers } from "ethers";
 import Onboard from '@web3-onboard/core'
 import {Connect, updateAccount} from '../components/Connect';
-import injectedModule from '@web3-onboard/injected-wallets'
-import walletConnectModule from '@web3-onboard/walletconnect'
 import { init, useConnectWallet } from '@web3-onboard/react'
-//import { useSetChain } from '@web3-onboard/react'
-//import axios;
 import { useDispatch, useSelector } from "react-redux";
 
 function NavBar(props) {
     const setAddress = props.setAddress;
-//    const address = props.address;
-    const connected = props.connected;
-    const setConnected = props.setConnected;
+//    const connected = props.connected;
+//    const setConnected = props.setConnected;
     const onboard = props.onboard;
     const numWizards = props.numWizards;
     const setNumWizards = props.setNumWizards;
 
-  const { ethereum } = window;
-  const ecosystemTokenContract = window.ecosystemToken;
-  const wizardNFTContract = window.wizardNFTContract;
-  const wizardTowerContract =window.wizardTowerContract;
-  const wizardBattleContract =window.wizardBattleContract;
+  const smartContracts = useSelector(state => state.smartContracts)
+  const address = useSelector(state => state.account)
+
+  // Load signed, unsigned contracts from Redux
+//  const NFTContractNoSigner = smartContracts.nftContractNoSigner;
+  const ecosystemTokenContract = smartContracts.ecosystemTokenContract;
+  const wizardNFTContract = smartContracts.wizardNFTContract;
+//  const wizardTowerContract =smartContracts.wizardTowerContract;
+//  const wizardBattleContract =smartContracts.wizardBattleContract;
+
   const signer = window.signer;
-  const myInfuraRPC = process.env.REACT_APP_RINKEBY_RPC;
-  const MAINNET_RPC_URL = process.env.REACT_APP_MAINNET_RPC;
-  const injected = injectedModule()
-  const walletConnect = walletConnectModule()
 
 
   const dispatch = useDispatch();
   const connect = Connect();
-//  const res = connect(dispatch);
   const myReduxState = useSelector((state)=> state);
-  const address = useSelector(state => state.account)
 
   async function ConnectWallet() {
       const res = connect(dispatch);
 }
 
-  async function loadAddress() {
-        let provider = new ethers.providers.Web3Provider(ethereum);
-        let signer = provider.getSigner();
-        let newAddr;
-        try{
-          newAddr = await signer.getAddress();
-        } catch(e) {
-       }
-        setAddress(newAddr);
-  }
+//  async function loadAddress() {
+//        let provider = new ethers.providers.Web3Provider(window.ethereum);
+//        let signer = provider.getSigner();
+//        let newAddr;
+//        try{
+//          newAddr = await signer.getAddress();
+//        } catch(e) {
+//       }
+//        setAddress(newAddr);
+//  }
 
-    async function SendTokensToTowerContract() {
-        ecosystemTokenContract.transfer(wizardTowerContract.address, 10**10).then( (tx) => {
-            tx.wait(1).then(() => {
-                console.log("Funds sent.")
-            });
-        });
-    }
-
-// todo -- pass this information to redux
 // enable persist connection information between visits and refresh
   useEffect(() => {
-//    setConnected(JSON.parse(window.sessionStorage.getItem("connected")));
-//    const temp = JSON.parse(window.sessionStorage.getItem("connected"));
-//    console.log("connected: ", connected)
-//    loadAddress();
-
-
     const connectedAccount = window.sessionStorage.getItem("connectedAccount");
     if(connectedAccount!=""){
       const update = updateAccount(connectedAccount);
@@ -79,15 +58,9 @@ function NavBar(props) {
       });
 //      dispatch(test);
     }
-
-//    SetupOnboard();
   }, []);
 
   useEffect(() => {
-//    if (connected!==undefined){
-//        window.sessionStorage.setItem("connected", connected);
-//    }
-
     if(address!=null){
         window.sessionStorage.setItem("connectedAccount", address);
     }
@@ -158,7 +131,7 @@ function NavBar(props) {
         </div>
 
         <div className="navbar-item">
-            <button onClick={() => {
+            <button className="nonStyledButton" onClick={() => {
             if (myReduxState.account==undefined) {
                 ConnectWallet();
             }
@@ -173,18 +146,18 @@ function NavBar(props) {
                     onboard.disconnectWallet({ label: primaryWallet.label })
                 }
             }
-            }}>{myReduxState.account==undefined ? 'Connect wallet' : 'Disconnect' }</button>
+            }}>{myReduxState.account==undefined ? 'Connect' : 'Disconnect' }</button>
         </div>
 
         <div className="navbar-item">
-          {myReduxState.account!=undefined && <button onClick={() => {
+          {myReduxState.account!=undefined && <button className="nonStyledButton" onClick={() => {
             if (myReduxState.account!=undefined) {
                 mintWizard().then(res => {
                     })
             }
             else{
             }
-          }}>{'mint' }</button>
+          }}>{'Mint' }</button>
           }
         </div>
 

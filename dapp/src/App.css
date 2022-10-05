@@ -62,7 +62,7 @@ h1 {
 
 .wizardarmy-title {
     font-family: Impact, Charcoal, sans-serif;
-    font-size: 12em;
+    font-size: 10em;
     letter-spacing: -0.4px;
     word-spacing: 6px;
     line-height: .8;
@@ -94,6 +94,7 @@ h1 {
     padding:0px;
     display: block;
     vertical-align: top;
+    margin-top: -.1em;
 }
 
 
@@ -104,17 +105,29 @@ h1 {
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: space-evenly;
-  padding-top: 8em;
 }
 
+
+
 .wizard-image {
-    width: 14em;
-    height: 14em;
-    margin: .5em;
+    width: 15em;
+    height: 15em;
+    margin: 1em;
     border:solid;
     border-color: black;
-    borther-thickness: 3;
+    border-thickness: 3;
+}
 
+.wizard-label {
+  color: white ;
+  font-size: 2em;
+  margin: 0;
+  padding: 0;
+  margin-bottom: -.4em;
+}
+
+
+.wizard-container {
 }
 
 
@@ -158,6 +171,17 @@ h1 {
 .navbar-item a:active { text-decoration: none; }
 
 
+button.nonStyledButton {
+  all: unset;
+  cursor: pointer;
+}
+
+
+button.nonStyledButton:hover {
+    color: #373491;
+}
+
+
 /* Tasks */
 
 /* Colors -- temp
@@ -176,6 +200,7 @@ h1 {
   justify-content: space-evenly;
   padding: 5em;
 }
+
 
 .task-container {
 /*  background-color: #877df0;

@@ -120,7 +120,6 @@ function Wizard(props) {
         else if(isOnTheTower==true){
             setIsOnTheTower(false);
         }
-
         setMyFloor(_floor);
     }
 
@@ -196,7 +195,7 @@ function Wizard(props) {
         LoadTowerTokens();
         LoadMyFloor();
      }
-    }, []);
+    }, [smartContracts]);
 
 
     useEffect(() => {

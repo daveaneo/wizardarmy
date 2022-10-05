@@ -142,6 +142,7 @@ function MyWizards(props) {
         <div className="wizards-container">
             {wizards && wizards.map(wizard =>
                 <div className="wizard-container" key={wizard.id}>
+                    <div className="wizard-label">{wizard.id}</div>
                     <Link to={"wizard/" + wizard.id}>
                         <img className="wizard-image" src={wizard.imageURL} alt={"wizard " + wizard.id}/>
                     </Link>
