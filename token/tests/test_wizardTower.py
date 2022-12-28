@@ -77,7 +77,7 @@ def deploy_Token():
 def deploy_NFT():
     print(f'Token: {Token}, len: {len(Token)}')
     token = Token[-1]
-    wizards = Wizards.deploy("Wizards", "WZD", token.address, {'from': accounts[0]})
+    wizards = Wizards.deploy("Wizards", "WZD", token.address, "http://my_BASE_URI.com", {'from': accounts[0]})
 
 
 def deploy_wizard_tower():
