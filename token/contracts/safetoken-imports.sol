@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: MIT
  */ 
 //pragma solidity ^0.8.2;
+//pragma solidity ^0.8.0;
 pragma solidity ^0.8.0;
 
 import "./helpers/Context.sol";
@@ -30,16 +31,16 @@ interface IERC20Metadata is IERC20 {
 //    function _msgData() internal view virtual returns (bytes calldata) {this; return msg.data;}
 //}
 
-//library SafeMath {
-//    function add(uint256 a, uint256 b) internal pure returns (uint256) {return a + b;}
-//    function sub(uint256 a, uint256 b) internal pure returns (uint256) {return a - b;}
-//    function mul(uint256 a, uint256 b) internal pure returns (uint256) {return a * b;}
-//    function div(uint256 a, uint256 b) internal pure returns (uint256) {return a / b;}
-//    function mod(uint256 a, uint256 b) internal pure returns (uint256) {return a % b;}
-//    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-//        unchecked { require(b <= a, errorMessage); return a - b; }
-//    }
-//}
+library SafeMath {
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {return a + b;}
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {return a - b;}
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {return a * b;}
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {return a / b;}
+    function mod(uint256 a, uint256 b) internal pure returns (uint256) {return a % b;}
+    function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
+        unchecked { require(b <= a, errorMessage); return a - b; }
+    }
+}
 
 //library Address {
 //    function isContract(address account) internal view returns (bool) { uint256 size; assembly { size := extcodesize(account) } return size > 0;}

@@ -5,7 +5,7 @@ pragma solidity ^0.8.15;
     @title Token Sale Contract
     @dev This contract calculates and processes referral rewards for token sale
  */
-import "./Ownable.sol";
+import "./helpers/Ownable.sol";
 // Declare interface to Wizard Token and its required functions that will be used in this contract
 interface IERC20WizardToken{
     function balanceOf(address owner) external view returns (uint256);
