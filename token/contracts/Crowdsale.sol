@@ -7,11 +7,17 @@ import './Whitelist.sol';
 //import '../interfaces/IERC20.sol';
 //import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-
+// Declare interface to Wizard NFT contract and its required functions that will be used in this contract
+interface IERC721Wizard{
+    function getReferrerId(uint256 _wizardId) external view returns(uint256);
+    function getAddressOfWizard(uint256 _wizardId) external view returns(address);
+}
 
 contract Crowdsale {
     struct Sale {
         uint248 tokenAmount;
+        uint128 rewards;
+        bool hasWithdrawnRewardsTokens;
         bool hasWithdrawnTokens;
     }
 
@@ -19,6 +25,7 @@ contract Crowdsale {
         bool individualCapsTurnedOn;
         bool onlyWhitelisted;
         bool buyersCanWithdrawAdminOverride;
+        bool buyersCanWithdrawRewardsAdminOverride;
         bool funded;
         /// more can be added
     }
@@ -27,11 +34,13 @@ contract Crowdsale {
     mapping(address => Sale) public sales;
     address public admin;
     IERC20 public token;
+    IERC721Wizard wizardContract;
     Whitelist whiteslistContract;
 
     // todo -- make these variables more memory efficient
     uint256 public end; // Claiming time? Should be different then begin + duration
     uint256 public claimTime; // time stamp in which purchasers can claim tokens
+    uint256 public rewardsClaimTime; // time stamp in which referrers can claim their rewards
     uint256 public timeUntilClaiming; // time from start to token claiming
     uint256 public duration; // duration of token sale
     uint256 public amountOfMaticForFullEVE;
@@ -39,6 +48,9 @@ contract Crowdsale {
     uint256 public totalTokensOfferedInSale;
     uint256 public minPurchase;
     uint256 public maxPurchase;
+    uint128 public totalRewardsToBeClaimed;
+    // uplineReferralPercent array stores what is the referral reward % for the upline referrers
+    uint16[5] uplineReferralPercent = [20,10,5,3,2];
 
 //    | ----Private Presale ----- || ----------------------- DEAD TIME--------------------- || --- Claiming Period -->
 //    | --------DEAD TIME-------- || ----Private Presale ----- || --------DEAD TIME-------- || --- Claiming Period -->
@@ -46,6 +58,7 @@ contract Crowdsale {
 
     constructor(
         address tokenAddress,
+        address _wizardContract,
         address _whitelistContractAddress,
         uint256 _duration, //in seconds
         uint256 _timeUntilClaiming, //in seconds, wait time after start
@@ -54,6 +67,7 @@ contract Crowdsale {
         uint256 _minPurchase,
         uint256 _maxPurchase) {
         token = IERC20(tokenAddress);
+        wizardContract = IERC721Wizard(_wizardContract);
         
         require(_duration > 0, 'duration should be > 0');
         require( _availableTokens > 0, '_availableTokens should be > 0');
@@ -73,6 +87,7 @@ contract Crowdsale {
         contractBoolSettings.individualCapsTurnedOn = true;
         contractBoolSettings.onlyWhitelisted = true;
         contractBoolSettings.buyersCanWithdrawAdminOverride = false;
+        contractBoolSettings.buyersCanWithdrawRewardsAdminOverride = false;
     }
 
 
@@ -82,6 +97,10 @@ contract Crowdsale {
 
     function timeUntilClaim() external view returns(uint256){
         return claimTime <= block.timestamp ? 0 : claimTime - block.timestamp;
+    }
+    
+    function timeUntilRewardsClaim() external view returns(uint256){
+        return rewardsClaimTime <= block.timestamp ? 0 : rewardsClaimTime - block.timestamp;
     }
 
     function maticToTokenAmount(uint256 _matic) public view returns(uint256){
@@ -106,13 +125,14 @@ contract Crowdsale {
         require(contractBoolSettings.funded==true, "Sale not yet funded.");
         end = block.timestamp + duration; // setting "end" to nonzero starts the token sale
         claimTime = block.timestamp + timeUntilClaiming;
+        rewardsClaimTime = block.timestamp + timeUntilRewardsClaim;
         // todo -- test efficiency of "delete"
         delete duration; // reclaim gas
         delete timeUntilClaiming;
     }
 
     // take into account if previous purchases have happened
-    function buy() public payable icoActive {
+    function buy(uint256 _wizardId) public payable icoActive {
         require(contractBoolSettings.onlyWhitelisted == false || whiteslistContract.isWhitelisted(msg.sender), "not whitelisted");
         Sale storage _mySale = sales[msg.sender];
         uint256 tokenAmount = maticToTokenAmount(msg.value);
@@ -121,10 +141,29 @@ contract Crowdsale {
             'have to buy between minPurchase and maxPurchase.'
         );
         require(tokenAmount <= availableTokens, 'Not enough tokens left for sale');
-
         _mySale.tokenAmount += uint248(tokenAmount);
         availableTokens -= tokenAmount;
+
+        if (_wizardId > 0){
+            _rewardsProcessing(_wizardId, uint128(tokenAmount)); 
+        }
     }
+
+    function _rewardsProcessing(uint256 _wizardId, uint128 _scaledBuyAmountCoin) private{
+        uint256 referrerWizardId = wizardContract.getReferrerId(_wizardId);
+        uint128 referralAmount;
+        address referrerAddress;
+        Sale storage _mySale;
+        
+        for (uint8 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
+            referralAmount = _scaledBuyAmountCoin * uint128(uplineReferralPercent[levelCounter]) / uint128(100);
+            referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);            
+            _mySale = sales[referrerAddress];
+            _mySale.rewards += referralAmount;            
+            totalRewardsToBeClaimed += referralAmount;
+            referrerWizardId = wizardContract.getReferrerId(referrerWizardId);
+        }        
+    }  
     
     function withdrawTokens()
         external
@@ -136,8 +175,21 @@ contract Crowdsale {
         require(token.transfer(msg.sender, sale.tokenAmount));
     }
 
-    receive() external payable {
-        buy();
+    // withdrawRewardsTokens function withdraws the rewards
+    function withdrawRewardsTokens()
+        external
+        isClaimingRewardsPeriod {
+        Sale storage sale = sales[msg.sender];
+        require(sale.rewards > 0, 'No rewards to claim');
+        require(sale.hasWithdrawnRewardsTokens == false, 'tokens were already withdrawn');
+        sale.hasWithdrawnRewardsTokens = true;
+        require(token.transfer(msg.sender, sale.rewards));
+        totalRewardsToBeClaimed -= sale.rewards;
+        sale.rewards = 0;
+    }
+
+    receive(_wizardId) external payable {
+        buy(_wizardId);
     }
     ////////////////////////////
     ////// Admin Functions /////
@@ -165,6 +217,11 @@ contract Crowdsale {
     function setBuyersCanWithdrawAdminOverride(bool _buyersCanWithdrawAdminOverride) external onlyAdmin{
         require(contractBoolSettings.buyersCanWithdrawAdminOverride != _buyersCanWithdrawAdminOverride);
         contractBoolSettings.buyersCanWithdrawAdminOverride = _buyersCanWithdrawAdminOverride;
+    }
+
+    function setBuyersCanWithdrawRewardsAdminOverride(bool _buyersCanWithdrawRewardsAdminOverride) external onlyAdmin{
+        require(contractBoolSettings.buyersCanWithdrawRewardsAdminOverride != _buyersCanWithdrawRewardsAdminOverride);
+        contractBoolSettings.buyersCanWithdrawRewardsAdminOverride = _buyersCanWithdrawRewardsAdminOverride;
     }
 
     // todo -- add nonrentrant
@@ -216,6 +273,15 @@ contract Crowdsale {
           end > 0 && (block.timestamp >= claimTime
           || contractBoolSettings.buyersCanWithdrawAdminOverride == true),
           'Not time to claim'
+        );
+        _;
+    }
+
+    modifier isClaimingRewardsPeriod() {
+        require(
+          end > 0 && (block.timestamp >= rewardsClaimTime
+          || contractBoolSettings.buyersCanWithdrawRewardsAdminOverride == true),
+          'Not time to claim rewards'
         );
         _;
     }
