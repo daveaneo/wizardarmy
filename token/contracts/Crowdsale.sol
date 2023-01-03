@@ -188,8 +188,8 @@ contract Crowdsale {
         sale.rewards = 0;
     }
 
-    receive(_wizardId) external payable {
-        buy(_wizardId);
+    receive() external payable {
+        buy(uint256(0));
     }
     ////////////////////////////
     ////// Admin Functions /////
