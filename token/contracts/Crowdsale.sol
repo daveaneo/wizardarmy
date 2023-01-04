@@ -1,3 +1,6 @@
+/**
+ * SPDX-License-Identifier: MIT
+ */ 
 pragma solidity ^0.8.4;
 
 //import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -42,6 +45,7 @@ contract Crowdsale {
     uint256 public claimTime; // time stamp in which purchasers can claim tokens
     uint256 public rewardsClaimTime; // time stamp in which referrers can claim their rewards
     uint256 public timeUntilClaiming; // time from start to token claiming
+    uint256 public timeUntilRewardsClaiming; // time from start to rewards claiming
     uint256 public duration; // duration of token sale
     uint256 public amountOfMaticForFullEVE;
     uint256 public availableTokens;
@@ -62,6 +66,7 @@ contract Crowdsale {
         address _whitelistContractAddress,
         uint256 _duration, //in seconds
         uint256 _timeUntilClaiming, //in seconds, wait time after start
+        uint256 _timeUntilRewardsClaiming,
         uint256 _amountOfMaticForFullEVE, // corresponding value of Matic that equals 1 full EVE ( qty_MATIC / qty_EVE )
         uint256 _availableTokens,
         uint256 _minPurchase,
@@ -83,6 +88,7 @@ contract Crowdsale {
         minPurchase = _minPurchase;
         maxPurchase = _maxPurchase;
         timeUntilClaiming = _timeUntilClaiming;
+        timeUntilRewardsClaiming = _timeUntilRewardsClaiming;
 
         contractBoolSettings.individualCapsTurnedOn = true;
         contractBoolSettings.onlyWhitelisted = true;
@@ -125,10 +131,11 @@ contract Crowdsale {
         require(contractBoolSettings.funded==true, "Sale not yet funded.");
         end = block.timestamp + duration; // setting "end" to nonzero starts the token sale
         claimTime = block.timestamp + timeUntilClaiming;
-        rewardsClaimTime = block.timestamp + timeUntilRewardsClaim;
+        rewardsClaimTime = block.timestamp + timeUntilRewardsClaiming;
         // todo -- test efficiency of "delete"
         delete duration; // reclaim gas
         delete timeUntilClaiming;
+        delete timeUntilRewardsClaiming;
     }
 
     // take into account if previous purchases have happened
