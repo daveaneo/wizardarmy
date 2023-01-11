@@ -18,10 +18,10 @@ interface IERC721Wizard{
 
 contract Crowdsale {
     struct Sale {
-        uint248 tokenAmount;
-        uint128 rewards;
-        bool hasWithdrawnRewardsTokens;
-        bool hasWithdrawnTokens;
+        uint128 tokenAmount; // purchasedTokens
+        uint128 rewards; // rewardedTokens
+        bool hasWithdrawnRewardsTokens; // remove
+        bool hasWithdrawnTokens; // remove
     }
 
     struct ContractBoolSettings {
@@ -48,8 +48,8 @@ contract Crowdsale {
     uint256 public timeUntilRewardsClaiming; // time from start to rewards claiming
     uint256 public duration; // duration of token sale
     uint256 public amountOfMaticForFullEVE;
-    uint256 public availableTokens;
-    uint256 public totalTokensOfferedInSale;
+    uint256 public availableTokens; // amount able to be sold
+    uint256 public totalTokensOfferedInSale; // starting amount for sale
     uint256 public minPurchase;
     uint256 public maxPurchase;
     uint128 public totalRewardsToBeClaimed;
