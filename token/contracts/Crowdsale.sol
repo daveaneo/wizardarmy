@@ -12,7 +12,7 @@ import './Whitelist.sol';
 
 // Declare interface to Wizard NFT contract and its required functions that will be used in this contract
 interface IERC721Wizard{
-    function getReferrerId(uint256 _wizardId) external view returns(uint256);
+    function getUplineId(uint256 _wizardId) external view returns(uint256);
     function getAddressOfWizard(uint256 _wizardId) external view returns(address);
 }
 
@@ -20,8 +20,6 @@ contract Crowdsale {
     struct Sale {
         uint128 tokenAmount; // purchasedTokens
         uint128 rewards; // rewardedTokens
-        bool hasWithdrawnRewardsTokens; // remove
-        bool hasWithdrawnTokens; // remove
     }
 
     struct ContractBoolSettings {
@@ -53,6 +51,7 @@ contract Crowdsale {
     uint256 public minPurchase;
     uint256 public maxPurchase;
     uint128 public totalRewardsToBeClaimed;
+    uint128 public totalPurchasedTokensToBeClaimed;
     // uplineReferralPercent array stores what is the referral reward % for the upline referrers
     uint16[5] uplineReferralPercent = [20,10,5,3,2];
 
@@ -151,25 +150,26 @@ contract Crowdsale {
         require(tokenAmount <= availableTokens, 'Not enough tokens left for sale');
         _mySale.tokenAmount += uint128(tokenAmount);
         availableTokens -= tokenAmount;
+        totalPurchasedTokensToBeClaimed += uint128(tokenAmount);
 
         if (_wizardId > 0){
-            _rewardsProcessing(_wizardId, uint128(tokenAmount)); 
+            _rewardsProcessing(_wizardId, tokenAmount); 
         }
     }
 
-    function _rewardsProcessing(uint256 _wizardId, uint128 _scaledBuyAmountCoin) private{
-        uint256 referrerWizardId = wizardContract.getReferrerId(_wizardId);
-        uint128 referralAmount;
+    function _rewardsProcessing(uint256 _wizardId, uint256 _buyAmount) private{
+        uint256 referrerWizardId = wizardContract.getUplineId(_wizardId);
+        uint256 referralAmount;
         address referrerAddress;
         Sale storage _mySale;
         
         for (uint256 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
-            referralAmount = _scaledBuyAmountCoin * uint128(uplineReferralPercent[levelCounter]) / uint128(100);
+            referralAmount = _buyAmount * uint256(uplineReferralPercent[levelCounter]) / uint256(100);
             referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);            
             _mySale = sales[referrerAddress];
-            _mySale.rewards += referralAmount;            
-            totalRewardsToBeClaimed += referralAmount;
-            referrerWizardId = wizardContract.getReferrerId(referrerWizardId);
+            _mySale.rewards += uint128(referralAmount);            
+            totalRewardsToBeClaimed += uint128(referralAmount);
+            referrerWizardId = wizardContract.getUplineId(referrerWizardId);
         }        
     }  
     
@@ -177,10 +177,12 @@ contract Crowdsale {
         external
         isClaimingPeriod {
         Sale storage sale = sales[msg.sender];
-        require(sale.tokenAmount > 0, 'only investors');
-        require(sale.hasWithdrawnTokens == false, 'tokens were already withdrawn');
-        sale.hasWithdrawnTokens = true;
-        require(token.transfer(msg.sender, sale.tokenAmount));
+        uint128 purchasedTokenAmount;
+        require(sale.tokenAmount > 0, 'No purchased tokens available to claim');
+        purchasedTokenAmount = sale.tokenAmount;
+        sale.tokenAmount = 0;
+        totalPurchasedTokensToBeClaimed -= purchasedTokenAmount;
+        require(token.transfer(msg.sender, purchasedTokenAmount));
     }
 
     // withdrawRewardsTokens function withdraws the rewards
@@ -188,14 +190,12 @@ contract Crowdsale {
         external
         isClaimingRewardsPeriod {
         Sale storage sale = sales[msg.sender];
-        uint256 _rewardsAmount;
-        require(sale.rewards > 0, 'No rewards to claim');
-        require(sale.hasWithdrawnRewardsTokens == false, 'tokens were already withdrawn');
-        sale.hasWithdrawnRewardsTokens = true;
-        _rewardsAmount = sale.rewards;
+        uint128 rewardsAmount;
+        require(sale.rewards > 0, 'No rewards to claim');        
+        rewardsAmount = sale.rewards;
         sale.rewards = 0;
-        totalRewardsToBeClaimed -= sale.rewards;
-        require(token.transfer(msg.sender, sale.rewards));
+        totalRewardsToBeClaimed -= rewardsAmount;
+        require(token.transfer(msg.sender, rewardsAmount));
     }
 
     receive() external payable {
@@ -238,7 +238,7 @@ contract Crowdsale {
     function withdrawToken() external onlyAdmin icoEnded {
         uint256 _withdrawal = availableTokens;
         availableTokens = 0;
-        require(_withdrawal > 0, "No EVE to withdraw that has not been sold.");
+        require(_withdrawal > 0, "No tokens to withdraw that has not been sold.");
         require(token.transfer(admin, _withdrawal), "Token transfer failed.");
     }
 
