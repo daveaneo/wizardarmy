@@ -18,7 +18,7 @@ interface IERC721Wizard{
 
 contract Crowdsale {
     struct Sale {
-        uint248 tokenAmount;
+        uint128 tokenAmount;
         uint128 rewards;
         bool hasWithdrawnRewardsTokens;
         bool hasWithdrawnTokens;
@@ -78,7 +78,8 @@ contract Crowdsale {
         require( _availableTokens > 0, '_availableTokens should be > 0');
         require(_minPurchase != 0, '_minPurchase should > 0');
         require(_maxPurchase != 0 && _minPurchase <= _maxPurchase && _maxPurchase <= _availableTokens, 'amount error');
-
+        require(_duration <= _timeUntilClaiming && _timeUntilClaiming <= _timeUntilRewardsClaiming, 
+        '_duration <= _timeUntilClaiming <= _timeUntilRewardsClaiming');
         whiteslistContract = Whitelist(_whitelistContractAddress);
         admin = msg.sender;
         duration = _duration;
@@ -148,7 +149,7 @@ contract Crowdsale {
             'have to buy between minPurchase and maxPurchase.'
         );
         require(tokenAmount <= availableTokens, 'Not enough tokens left for sale');
-        _mySale.tokenAmount += uint248(tokenAmount);
+        _mySale.tokenAmount += uint128(tokenAmount);
         availableTokens -= tokenAmount;
 
         if (_wizardId > 0){
@@ -162,7 +163,7 @@ contract Crowdsale {
         address referrerAddress;
         Sale storage _mySale;
         
-        for (uint8 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
+        for (uint256 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
             referralAmount = _scaledBuyAmountCoin * uint128(uplineReferralPercent[levelCounter]) / uint128(100);
             referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);            
             _mySale = sales[referrerAddress];
@@ -187,12 +188,14 @@ contract Crowdsale {
         external
         isClaimingRewardsPeriod {
         Sale storage sale = sales[msg.sender];
+        uint256 _rewardsAmount;
         require(sale.rewards > 0, 'No rewards to claim');
         require(sale.hasWithdrawnRewardsTokens == false, 'tokens were already withdrawn');
         sale.hasWithdrawnRewardsTokens = true;
-        require(token.transfer(msg.sender, sale.rewards));
-        totalRewardsToBeClaimed -= sale.rewards;
+        _rewardsAmount = sale.rewards;
         sale.rewards = 0;
+        totalRewardsToBeClaimed -= sale.rewards;
+        require(token.transfer(msg.sender, sale.rewards));
     }
 
     receive() external payable {
@@ -255,7 +258,8 @@ contract Crowdsale {
 
     modifier icoActive() {
         require(
-          end > 0 && block.timestamp < end && availableTokens > 0,
+          end > 0 && block.timestamp < end && availableTokens > 0 && contractBoolSettings.buyersCanWithdrawAdminOverride == false
+          && contractBoolSettings.buyersCanWithdrawRewardsAdminOverride == false,
           'ICO must be active'
         );
         _;
