@@ -6,6 +6,7 @@ pragma solidity ^0.8.4;
 //import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 //import '@openzeppelin/contracts/math/SafeMath.sol';
 import './Whitelist.sol';
+import './helpers/Ownable.sol';
 //import './Token.sol';
 //import '../interfaces/IERC20.sol';
 //import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -16,7 +17,7 @@ interface IERC721Wizard{
     function getAddressOfWizard(uint256 _wizardId) external view returns(address);
 }
 
-contract Crowdsale {
+contract Crowdsale is Ownable{
     struct Sale {
         uint128 tokenAmount; // purchasedTokens
         uint128 rewards; // rewardedTokens
@@ -33,7 +34,6 @@ contract Crowdsale {
 
     ContractBoolSettings contractBoolSettings;
     mapping(address => Sale) public sales;
-    address public admin;
     IERC20 public token;
     IERC721Wizard wizardContract;
     Whitelist whiteslistContract;
@@ -45,7 +45,7 @@ contract Crowdsale {
     uint256 public timeUntilClaiming; // time from start to token claiming
     uint256 public timeUntilRewardsClaiming; // time from start to rewards claiming
     uint256 public duration; // duration of token sale
-    uint256 public amountOfMaticForFullEVE;
+    uint256 public amountOfMaticForFullToken;
     uint256 public availableTokens; // amount able to be sold
     uint256 public totalTokensOfferedInSale; // starting amount for sale
     uint256 public minPurchase;
@@ -66,7 +66,7 @@ contract Crowdsale {
         uint256 _duration, //in seconds
         uint256 _timeUntilClaiming, //in seconds, wait time after start
         uint256 _timeUntilRewardsClaiming,
-        uint256 _amountOfMaticForFullEVE, // corresponding value of Matic that equals 1 full EVE ( qty_MATIC / qty_EVE )
+        uint256 _amountOfMaticForFullToken, // corresponding value of Matic that equals 1 full Token ( qty_MATIC / qty_Token )
         uint256 _availableTokens,
         uint256 _minPurchase,
         uint256 _maxPurchase) {
@@ -80,9 +80,8 @@ contract Crowdsale {
         require(_duration <= _timeUntilClaiming && _timeUntilClaiming <= _timeUntilRewardsClaiming, 
         '_duration <= _timeUntilClaiming <= _timeUntilRewardsClaiming');
         whiteslistContract = Whitelist(_whitelistContractAddress);
-        admin = msg.sender;
         duration = _duration;
-        amountOfMaticForFullEVE = _amountOfMaticForFullEVE;
+        amountOfMaticForFullToken = _amountOfMaticForFullToken;
         availableTokens = _availableTokens;
         totalTokensOfferedInSale = _availableTokens;
         minPurchase = _minPurchase;
@@ -110,11 +109,11 @@ contract Crowdsale {
     }
 
     function maticToTokenAmount(uint256 _matic) public view returns(uint256){
-        return _matic * 10**9 / amountOfMaticForFullEVE;
+        return _matic * 10**9 / amountOfMaticForFullToken;
     }
 
-    function tokenToMaticAmount(uint256 _EVE) public view returns(uint256){
-        return _EVE * amountOfMaticForFullEVE / 10**9;
+    function tokenToMaticAmount(uint256 _Token) public view returns(uint256){
+        return _Token * amountOfMaticForFullToken / 10**9;
     }
 
     function getMyAmountOfTokensBought() external view returns(uint256){
@@ -127,7 +126,7 @@ contract Crowdsale {
     ///////////////////////////
 
     // todo -- remove modifier parantheses
-    function start() external onlyAdmin icoNotStarted {
+    function start() external onlyOwner icoNotStarted {
         require(contractBoolSettings.funded==true, "Sale not yet funded.");
         end = block.timestamp + duration; // setting "end" to nonzero starts the token sale
         claimTime = block.timestamp + timeUntilClaiming;
@@ -214,39 +213,39 @@ contract Crowdsale {
         contractBoolSettings.funded = true;
     }
 
-    function setIndividualCapsTurnedOn(bool _individualCapsTurnedOn) external onlyAdmin{
+    function setIndividualCapsTurnedOn(bool _individualCapsTurnedOn) external onlyOwner{
         require(contractBoolSettings.individualCapsTurnedOn != _individualCapsTurnedOn);
         contractBoolSettings.individualCapsTurnedOn = _individualCapsTurnedOn;
     }
 
-    function setOnlyWhitelisted(bool _onlyWhitelisted) external onlyAdmin{
+    function setOnlyWhitelisted(bool _onlyWhitelisted) external onlyOwner{
         require(contractBoolSettings.onlyWhitelisted != _onlyWhitelisted);
         contractBoolSettings.onlyWhitelisted = _onlyWhitelisted;
     }
 
-    function setBuyersCanWithdrawAdminOverride(bool _buyersCanWithdrawAdminOverride) external onlyAdmin{
+    function setBuyersCanWithdrawAdminOverride(bool _buyersCanWithdrawAdminOverride) external onlyOwner{
         require(contractBoolSettings.buyersCanWithdrawAdminOverride != _buyersCanWithdrawAdminOverride);
         contractBoolSettings.buyersCanWithdrawAdminOverride = _buyersCanWithdrawAdminOverride;
     }
 
-    function setBuyersCanWithdrawRewardsAdminOverride(bool _buyersCanWithdrawRewardsAdminOverride) external onlyAdmin{
+    function setBuyersCanWithdrawRewardsAdminOverride(bool _buyersCanWithdrawRewardsAdminOverride) external onlyOwner{
         require(contractBoolSettings.buyersCanWithdrawRewardsAdminOverride != _buyersCanWithdrawRewardsAdminOverride);
         contractBoolSettings.buyersCanWithdrawRewardsAdminOverride = _buyersCanWithdrawRewardsAdminOverride;
     }
 
     // todo -- add nonrentrant
-    function withdrawToken() external onlyAdmin icoEnded {
+    function withdrawToken() external onlyOwner icoEnded {
         uint256 _withdrawal = availableTokens;
         availableTokens = 0;
         require(_withdrawal > 0, "No tokens to withdraw that has not been sold.");
-        require(token.transfer(admin, _withdrawal), "Token transfer failed.");
+        require(token.transfer(owner(), _withdrawal), "Token transfer failed.");
     }
 
     // todo -- add nonrentrant
-    function withdrawMatic() external onlyAdmin icoEnded {
+    function withdrawMatic() external onlyOwner icoEnded {
         uint256 _balance = address(this).balance;
         require(_balance > 0, "No Matic to withraw.");
-        (bool success, ) = admin.call{value : _balance}("Withdrawing Matic to owner");
+        (bool success, ) = owner().call{value : _balance}("Withdrawing Matic to owner");
         require(success, "Transfer failed.");
     }
 
@@ -294,11 +293,6 @@ contract Crowdsale {
           || contractBoolSettings.buyersCanWithdrawRewardsAdminOverride == true),
           'Not time to claim rewards'
         );
-        _;
-    }
-
-    modifier onlyAdmin() {
-        require(msg.sender == admin, 'only admin');
         _;
     }
 }
