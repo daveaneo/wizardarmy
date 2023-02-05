@@ -31,7 +31,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 battles;
         uint256 tokensClaimed;
         uint256 goodness;
-        uint256 badness;
+        uint256 uplineId;
         uint256 initiationTimestamp; // 0 if uninitiated
         uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
         ELEMENT element;
@@ -67,6 +67,9 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
+    function getUplineId(uint256 _wizardId) public view returns(uint256) {
+        return tokenIdToStats[_wizardId].uplineId;
+    }
 
 
 //    struct Stats {
@@ -115,8 +118,9 @@ contract Wizards is ERC721Enumerable, Ownable {
         contractSettings.rebirthFee = 5;
     }
 
-    function mint() external {
+    function mint(uint256 upline) external {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
+        require(upline <= totalSupply(), "invalid upline--must be less than total supply");
         // todo -- randomly create stats
         //
         // hp, base = 25
@@ -130,7 +134,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 speed = 10 + (pseudoRandNum/10*5) % 10;
         ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
 
-        Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, 0, 0, 0, element);
+        Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, upline, 0, 0, element);
         tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
     }

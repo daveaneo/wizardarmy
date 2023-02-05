@@ -54,13 +54,15 @@ def main():
     # create wizards
     if MINT_WIZARDS:
         for i in range(1, 3):
-            tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
+            tx = wizards.mint(i-1, {'from': (accounts[1] if i > 1 else accounts[0])})
             tx.wait(required_confirmations)
             tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
             tx.wait(required_confirmations)
             print(f'wizard {i} initiated, resulting in event: {tx.events}')
             tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
             tx.wait(required_confirmations)
+            upline = wizards.getUplineId(i)
+            print(f'upline of wizard: {upline}')
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')

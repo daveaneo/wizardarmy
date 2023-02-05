@@ -14,7 +14,8 @@ import './helpers/Ownable.sol';
 // Declare interface to Wizard NFT contract and its required functions that will be used in this contract
 interface IERC721Wizard{
     function getUplineId(uint256 _wizardId) external view returns(uint256);
-    function getAddressOfWizard(uint256 _wizardId) external view returns(address);
+    function ownerOf(uint256 _wizardId) external view returns(address);
+//    function getAddressOfWizard(uint256 _wizardId) external view returns(address); /// This is done through other functions, depending on the ERC721 implementation
 }
 
 contract Crowdsale is Ownable{
@@ -96,7 +97,7 @@ contract Crowdsale is Ownable{
     }
 
 
-    //////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////
     ////// "Public" Get, Non State-Changing Functions /////
     ///////////////////////////////////////////////////////
 
@@ -125,7 +126,6 @@ contract Crowdsale is Ownable{
     ////// Core Functions /////
     ///////////////////////////
 
-    // todo -- remove modifier parantheses
     function start() external onlyOwner icoNotStarted {
         require(contractBoolSettings.funded==true, "Sale not yet funded.");
         end = block.timestamp + duration; // setting "end" to nonzero starts the token sale
@@ -139,6 +139,12 @@ contract Crowdsale is Ownable{
 
     // take into account if previous purchases have happened
     function buy(uint256 _wizardId) public payable icoActive {
+        // default will be _wizardId = 0
+        // otherwise, we need to confirm that this address owns the wizard
+        if(_wizardId!=0){
+            require(wizardContract.ownerOf(_wizardId)== msg.sender);
+        }
+
         require(contractBoolSettings.onlyWhitelisted == false || whiteslistContract.isWhitelisted(msg.sender), "not whitelisted");
         Sale storage _mySale = sales[msg.sender];
         uint256 tokenAmount = maticToTokenAmount(msg.value);
@@ -164,7 +170,8 @@ contract Crowdsale is Ownable{
         
         for (uint256 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
             referralAmount = _buyAmount * uint256(uplineReferralPercent[levelCounter]) / uint256(100);
-            referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);            
+//            referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);
+            referrerAddress = wizardContract.ownerOf(referrerWizardId);
             _mySale = sales[referrerAddress];
             _mySale.rewards += uint128(referralAmount);            
             totalRewardsToBeClaimed += uint128(referralAmount);
@@ -172,7 +179,7 @@ contract Crowdsale is Ownable{
         }        
     }  
     
-    function withdrawTokens()
+    function withdrawPurchasedTokens()
         external
         isClaimingPeriod {
         Sale storage sale = sales[msg.sender];
