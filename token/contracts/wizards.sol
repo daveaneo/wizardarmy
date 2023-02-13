@@ -10,27 +10,24 @@ import "./libraries/Strings.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
 
 contract Wizards is ERC721Enumerable, Ownable {
-    // cull the herd and reduce to 1000?
-//    uint256 public totalSupply = 0;
     mapping (uint256 => Stats) public tokenIdToStats;
-    address public battler; /// contract address to update stats
     address public verifier; /// contract address to update stats
+    address public culler; /// contract address to exile any wizard
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
-    enum OUTCOME {LOSS, WIN, TIE, CAPTURE}
 
     // note -- stack gets too deep if add more
     struct Stats { // todo -- reduce uint amount
         uint256 level;
-        uint256 hp;
-        uint256 magicalPower;
-        uint256 magicalDefense;
-        uint256 speed;
-        uint256 wins;
-        uint256 losses;
-        uint256 battles;
+        uint256 _hp;
+        uint256 _magicalPower;
+        uint256 _magicalDefense;
+        uint256 _speed;
+        uint256 _wins;
+        uint256 _losses;
+        uint256 role; // limit wizards to 1 role, which is a number or a string
         uint256 tokensClaimed;
-        uint256 goodness;
+        uint256 contributionKarma;
         uint256 uplineId;
         uint256 initiationTimestamp; // 0 if uninitiated
         uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
@@ -40,235 +37,213 @@ contract Wizards is ERC721Enumerable, Ownable {
     struct ContractSettings { // todo refine
         uint256 mintCost;
         uint256 initiationCost;
+        // cull the herd and reduce to 1000... 400, and so forth? total or per role?
         uint256 maxSupply;
         uint256 protectionTimeExtension;
+        uint256 exileTimePenalty;
         address ecosystemTokenAddress;
         uint256 phaseDuration;
         uint256 totalPhases;
-        uint256 rebirthFee;
         string imageBaseURI;
     }
 
     ContractSettings public contractSettings;
-    // 8 images
+    // 8 images????
 
     // 8 phases, must initiate first
 
-    event NewVerifier(address battler);
-    event NewBattler(address verifier);
+    event NewVerifier(address verifier);
+    event NewCuller(address culler);
     event Initiated(address initiater, uint256 indexed wizardId, uint256 timestamp);
-    event Rebirth(address initiater, uint256 indexed wizardId, uint256 newLevel, uint256 timestamp);
-
+    event Exiled(address exilee, uint256 indexed wizardId, uint256 timestamp);
 
     ////////////////////
     ////    Get       //
     ////////////////////
+
+    /** @dev Check if wizard is active
+      * @param _wizardId id of wizard.
+      * @return true if active, false if inactive
+      */
     function isActive(uint256 _wizardId) public view returns(bool) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
+    /** @dev Check if wizard is active
+      * @param _wizardId id of wizard.
+      * @return wizardId of upline
+      */
     function getUplineId(uint256 _wizardId) public view returns(uint256) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
         return tokenIdToStats[_wizardId].uplineId;
     }
 
 
-//    struct Stats {
-//        uint256 level;
-//        uint256 hp;
-//        uint256 magicalPower;
-//        uint256 magicalDefense;
-//        uint256 speed;
-//        uint256 wins;
-//        uint256 losses;
-//        uint256 battles;
-//        uint256 tokensClaimed;
-//        uint256 goodness;
-//        uint256 badness;
-//        uint256 initiationTimestamp; // 0 if uninitiated
-//        uint256 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//        ELEMENT element;
-//    }
-
-
+    /** @dev returns stats of wizard, potentially amplified by level or phase
+      * @param _wizardId id of wizard.
+      * @return stats
+      */
     function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
         uint256 myPhase = getPhaseOf(_wizardId) + 1; // base 1
         // totalPhases
         Stats memory myStats = tokenIdToStats[_wizardId];
-        myStats.hp = myStats.hp * myPhase / contractSettings.totalPhases;
-        myStats.magicalPower = myStats.magicalPower * myPhase / contractSettings.totalPhases;
-        myStats.magicalDefense = myStats.magicalDefense * myPhase / contractSettings.totalPhases;
-        myStats.speed = myStats.speed * myPhase / contractSettings.totalPhases;
+//        myStats.hp = myStats.hp * myPhase / contractSettings.totalPhases;
+//        myStats.magicalPower = myStats.magicalPower * myPhase / contractSettings.totalPhases;
+//        myStats.magicalDefense = myStats.magicalDefense * myPhase / contractSettings.totalPhases;
+//        myStats.speed = myStats.speed * myPhase / contractSettings.totalPhases;
         // initial phase will give zero stats
         return myStats;
+    }
+
+
+    /** @dev Returns phase of wizard
+      * @param _wizardId id of wizard.
+      * @return number representing phase
+      */
+    function getPhaseOf(uint256 _wizardId) public view returns(uint256) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        uint256 phase =
+          (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
+          > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
+          ;
+        return phase;
+    }
+
+    /** @dev check if wizard has been exiled (temporarily banished)
+      * @param _wizardId id of wizard.
+      * @return true -> exiled; false -> not exiled
+      */
+    function isExiled(uint256 _wizardId) public returns(bool) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp != 0 && tokenIdToStats[_wizardId].initiationTimestamp ==0;
+    }
+
+    /** @dev check if wizard has deserted and thus can be exiled
+      * @param _wizardId id of wizard.
+      * @return true -> deserted; false -> has not deserted
+      */
+    function hasDeserted(uint256 _wizardId) public returns(bool) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
     }
 
 
     ///////////////////////////
     ////// Core Functions /////
     ///////////////////////////
-    constructor(string memory name_, string memory symbol_, address _address, string memory _imageBaseURI) ERC721(name_, symbol_) {
+    /** @dev initiate Wizards NFT
+      * @param _name name of NFT
+      * @param _symbol symbol for NFT
+      * @param _ERC20Address address for ecosystem token (currency)
+      * @param _imageBaseURI base URI used for images
+      */
+    constructor(string memory _name, string memory _symbol, address _ERC20Address, string memory _imageBaseURI) ERC721(_name, _symbol) {
         contractSettings.maxSupply = 10000;
         contractSettings.initiationCost = 1;
         contractSettings.mintCost = 5; // todo -- do in less steps
         contractSettings.protectionTimeExtension = 1 days; // todo -- do in less steps
-        contractSettings.ecosystemTokenAddress = _address; // todo -- do in less steps
+        contractSettings.ecosystemTokenAddress = _ERC20Address; // todo -- do in less steps
         contractSettings.phaseDuration = 60*60;// todo --
         contractSettings.imageBaseURI = _imageBaseURI;// todo --
         contractSettings.totalPhases = 8;
-        contractSettings.rebirthFee = 5;
     }
 
-    function mint(uint256 upline) external {
+
+    /** @dev check if wizard has deserted and thus can be exiled
+      * @param _referringWizardId id of referring wizard. use 0 if no referral
+      */
+    function mint(uint256 _referringWizardId) external {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
-        require(upline <= totalSupply(), "invalid upline--must be less than total supply");
-        // todo -- randomly create stats
-        //
-        // hp, base = 25
-        // mp base = 25
+        require(_referringWizardId <= totalSupply(), "invalid upline--must be less than total supply");
 
         uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp)));
 //        uint256 addOn = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp))) % 26;
-        uint256 hp = 25 + pseudoRandNum % 26;
-        uint256 magicalPower = 25 + (pseudoRandNum/100) % 26;
-        uint256 magicalDefense = 10 + (pseudoRandNum/10*4) % 10;
-        uint256 speed = 10 + (pseudoRandNum/10*5) % 10;
+//        uint256 hp = 25 + pseudoRandNum % 26;
+//        uint256 magicalPower = 25 + (pseudoRandNum/100) % 26;
+//        uint256 magicalDefense = 10 + (pseudoRandNum/10*4) % 10;
+//        uint256 speed = 10 + (pseudoRandNum/10*5) % 10;
         ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
 
-        Stats memory myStats =  Stats(1, hp, magicalPower, magicalDefense, speed, 0, 0, 0, 0, 0, upline, 0, 0, element);
+        Stats memory myStats =  Stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, _referringWizardId, 0, 0, element);
         tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
     }
 
 
-    /**
-     * @dev Moves NFT from inactive to active
-     */
-    function initiate(uint256 _tokenId) external {
-        require(ownerOf(_tokenId) == msg.sender, "must be owner");
-        require(tokenIdToStats[_tokenId].initiationTimestamp == 0, "already initiated");
-        // todo -- must be beyond time limitation
+    /** @dev Changes NFT from uninitated or exiled to initiated
+      * @param _wizardId id of wizard.
+      */
+    function initiate(uint256 _wizardId) external payable {
+        require(ownerOf(_wizardId) == msg.sender, "must be owner");
+        require(tokenIdToStats[_wizardId].initiationTimestamp == 0, "already initiated");
+        require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp, "Exiled wizard not yet allowed to return.");
         // todo -- receive fee
 
-        Stats storage myStats = tokenIdToStats[_tokenId];
+        require(msg.value == contractSettings.initiationCost, "incorrect initiaton fee");
+
+        Stats storage myStats = tokenIdToStats[_wizardId];
         myStats.initiationTimestamp = block.timestamp;
         myStats.protectedUntilTimestamp = block.timestamp + contractSettings.protectionTimeExtension;
 
-        emit Initiated(msg.sender, _tokenId, block.timestamp);
-    }
-
-    function rebirth(uint256 _tokenId) external payable {
-        /* todo -- add in requires
-        require(ownerOf(_tokenId) == msg.sender, "must be owner");
-        require(tokenIdToStats[_tokenId].initiationTimestamp == 0, "already initiated");
-        require(isActive(_tokenId), "must be active");
-        require(getPhaseOf(_tokenId)==contractSettings.totalPhases-1, "must be at max phase");
-        require(msg.value == contractSettings.rebirthFee, "insufficient fee.")
-        */
-
-        // todo -- receive fee
-
-        Stats storage myStats = tokenIdToStats[_tokenId];
-        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp, myStats.level)));
-
-        myStats.initiationTimestamp = block.timestamp;
-        myStats.protectedUntilTimestamp += contractSettings.protectionTimeExtension;
-        myStats.level += 1;
-
-        myStats.hp += pseudoRandNum % 16 + 10;
-        myStats.magicalPower += pseudoRandNum/10**2 % 16 + 10;
-        myStats.magicalDefense += pseudoRandNum/10**4 % 16 + 10;
-        myStats.speed += pseudoRandNum/10**6 % 10;
-
-
-        emit Rebirth(msg.sender, _tokenId, myStats.level, block.timestamp); // todo -- could emit stats bonus
+        emit Initiated(msg.sender, _wizardId, block.timestamp);
     }
 
 
-    function reportBattle(uint256 _attackerId, uint256 _defenderId, OUTCOME outcome, uint256 _tokensWon,
-        uint256 _tokensWaged) external onlyBattler {
-        if(outcome == OUTCOME.WIN){
-            tokenIdToStats[_attackerId].wins += 1;
-            tokenIdToStats[_defenderId].losses += 1;
-
-        }
-        else if(outcome == OUTCOME.LOSS){
-            tokenIdToStats[_attackerId].losses += 1;
-            tokenIdToStats[_defenderId].wins += 1;
-        }
-
-        tokenIdToStats[_attackerId].tokensClaimed += _tokensWon;
-
-        // todo -- tokens waged?
-//        tokenIdToStats[_defenderId].tokensClaimed += _tokensWon;
-        // todo -- add stat for last time attacked to limit attack frequency?
-
-        // we switched to ETH
-//        if(_won==OUTCOME.LOSS) {
-//            tokenIdToStats[_defenderId].tokensClaimed += _tokensWaged; // todo -- this ignores commission
-//        }
+    /** @dev exile an NFT that is negligent in duties. Use only for culling.
+      * @param _wizardId id of wizard.
+      */
+    function cull(uint256 _wizardId) external onlyCuller {
+        _exile(_wizardId);
     }
 
-
-    /**
-     * @dev Gets phase of NFT
-     */
-    function getPhaseOf(uint256 _tokenId) public view returns(uint256) {
-        uint256 phase =
-          (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
-          > 7 ? 7 : (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
-          ;
-        return phase;
+    /** @dev exile an NFT that is negligent in duties. Any address can call this, but wizard must have deserted
+      * @param _wizardId id of wizard.
+      */
+    function exile(uint256 _wizardId) external {
+        require(hasDeserted(_wizardId), "wizard can not be exiled.");
+        _exile(_wizardId);
     }
 
-    /**
-     * @dev check if NFT is deserted--negligent in duties.
-     */
-    function getIsDeserted(uint256 _tokenId) public returns(bool) {
-
+    /** @dev exile an NFT that is negligent in duties. Never called by address directly, only by cull or exile
+      * @param _wizardId id of wizard.
+      */
+    function _exile(uint256 _wizardId) internal {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id"); // todo -- potentially restrict this further
+        tokenIdToStats[_wizardId].protectedUntilTimestamp = block.timestamp; // this saves the time of exile started
+        tokenIdToStats[_wizardId].initiationTimestamp = 0;
     }
 
-    /**
-     * @dev Verify duties of NFT. Not duty specific
-     */
-    function verifyDuty(uint256 _tokenId, uint256 _timeReward) external onlyVerifier {
-        // add time entension to NFT
-        tokenIdToStats[_tokenId].protectedUntilTimestamp = _timeReward + (tokenIdToStats[_tokenId].protectedUntilTimestamp < block.timestamp
-                 ? block.timestamp : tokenIdToStats[_tokenId].protectedUntilTimestamp);
-
-        // increase stats of NFT
-//        tokenIdToStats[_tokenId].tasksCompleted +=1;
-    }
-
-
-
-    /**
-     * @dev uninitiate an NFT that is negligent in duties. Reward crusher
-     */
-    function crush(uint256 _tokenId) onlyHolder external {
-    }
-
-
-    function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
-        require(_exists(_tokenId), "ERC721Metadata: URI query for nonexistent token");
+    /** @dev get token URI
+      * @param _wizardId id of wizard.
+      * @return returns inline URI as string
+      */
+    function tokenURI(uint256 _wizardId) public view virtual override returns (string memory) {
+        require(_exists(_wizardId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
         string memory linkExtension;
-        if(tokenIdToStats[_tokenId].initiationTimestamp==0){ // uninitiated
+        if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
             linkExtension = "0"; // todo -- shameful uninitiated picture
         }
         else{ // todo -- this didn't use getPhaseOf
             linkExtension =
                       Strings.toString(
-                      (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
-                      > 7 ? 7 : (block.timestamp - tokenIdToStats[_tokenId].initiationTimestamp) / contractSettings.phaseDuration
+                      (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
+                      > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
                       );
         }
         string memory imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
-        return formatTokenURI(_tokenId, imageURI);
+        return formatTokenURI(_wizardId, imageURI);
     }
 
-    function formatTokenURI(uint256 _tokenId, string memory imageURI) public view returns (string memory) {
-//        Data memory _myData = unpackData(_tokenId);
-        Stats memory myStats = tokenIdToStats[_tokenId];
+    /** @dev format URI based on image and _wizardId
+      * @param _wizardId id of wizard.
+      * @param imageURI inline SVG string.
+      * @return returns inline URI as string
+      */
+    function formatTokenURI(uint256 _wizardId, string memory imageURI) public view returns (string memory) {
+        Stats memory myStats = tokenIdToStats[_wizardId];
 
         string memory json_str = string(abi.encodePacked(
             '{"description": "WizardArmy"',
@@ -284,28 +259,28 @@ contract Wizards is ERC721Enumerable, Ownable {
         // use this format to add extra properties
         json_str = string(abi.encodePacked(json_str,
             ', {"display_type": "number", "trait_type": "hp", "value": ',
-            Strings.toString(myStats.hp),   ' }',
+            Strings.toString(999),   ' }',
             ', {"display_type": "number", "trait_type": "magical power", "value": ',
-            Strings.toString(myStats.magicalPower),   ' }',
+            Strings.toString(999),   ' }',
                 ', {"display_type": "number", "trait_type": "magical defense", "value": ',
-            Strings.toString(myStats.magicalDefense),   ' }'
+            Strings.toString(9999),   ' }'
         ));
 
         // use this format to add extra properties
         json_str = string(abi.encodePacked(json_str,
             ', {"display_type": "number", "trait_type": "speed", "value": ',
-            Strings.toString(myStats.speed),   ' }',
+            Strings.toString(999),   ' }',
             ', {"display_type": "number", "trait_type": "wins", "value": ',
-            Strings.toString(myStats.wins),   ' }'
+            Strings.toString(999),   ' }'
         ));
 
 
         // use this format to add extra properties
         json_str = string(abi.encodePacked(json_str,
             ', {"display_type": "number", "trait_type": "losses", "value": ',
-            Strings.toString(myStats.losses),   ' }',
+            Strings.toString(999),   ' }',
             ', {"display_type": "number", "trait_type": "battles", "value": ',
-            Strings.toString(myStats.battles),   ' }',
+            Strings.toString(999),   ' }',
                 ', {"display_type": "number", "trait_type": "tokensClaimed", "value": ',
             Strings.toString(myStats.tokensClaimed),   ' }'
         ));
@@ -356,11 +331,32 @@ contract Wizards is ERC721Enumerable, Ownable {
 //    }
 
 
+    ///////////////////////////////////
+    ////// Verifier Functions     /////
+    ///////////////////////////////////
+
+    /** @dev increase protectionTimestamp, called by verifier. Used to keep wizard from being exiled.
+      * @param _wizardId id of wizard.
+      * @param _timeReward amout of time in seconds to add to current protectedUntilTimestamp
+      */
+    function increaseProtectedUntilTimestamp(uint256 _wizardId, uint256 _timeReward) external onlyVerifier {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id");
+        require(tokenIdToStats[_wizardId].initiationTimestamp!=0, "is not initiated");
+        tokenIdToStats[_wizardId].protectedUntilTimestamp += _timeReward;
+    }
+
+
     /////////////////////////////////
     ////// Admin Functions      /////
     /////////////////////////////////
 
 
+    /** @dev modify contract settings. Only available to owner
+      * @param _imageBaseURI baseURI for images
+      * @param _phaseDuration period in seconds for phases
+      * @param _protectionTimeExtension problby remove this // todo -- delete
+      * @param _initiationCost cost in ETH to initiate
+      */
     function modifyContractSettings(string memory _imageBaseURI, uint256 _phaseDuration, uint256 _protectionTimeExtension, uint256 _mintCost,
                     uint256 _initiationCost) external onlyOwner {
         contractSettings.imageBaseURI = _imageBaseURI;
@@ -368,8 +364,6 @@ contract Wizards is ERC721Enumerable, Ownable {
         contractSettings.protectionTimeExtension = _protectionTimeExtension;
         contractSettings.mintCost = _mintCost;
         contractSettings.initiationCost = _initiationCost
-
-
         ;
     }
 
@@ -387,10 +381,10 @@ contract Wizards is ERC721Enumerable, Ownable {
         _;
     }
 
-    modifier onlyBattler() {
+    modifier onlyCuller() {
         require(
-            msg.sender == battler,
-            "Only battler can call this function."
+            msg.sender == culler, // todo -- one or many addresses?
+            "Only culler can call this function."
         );
         _;
     }
@@ -399,16 +393,21 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Admin      /////
     ///////////////////////////
 
-    function updateBattler(address _battler) external onlyOwner {
-        require(_battler != address(0) && _battler != battler, "Invalid operator address");
-        battler = _battler;
-        emit NewBattler(_battler);
+    /** @dev increase protectionTimestamp, called by verifier. Used to keep wizard from being exiled.
+      * @param _culler new address for culler, the wallet/contract which can exile wizards without contraint
+      */
+    function updateCuller(address _culler) external onlyOwner {
+        require(_culler != address(0) && _culler != culler, "Invalid operator address");
+        culler = _culler;
+        emit NewCuller(_culler);
     }
 
+    /** @dev increase protectionTimestamp, called by verifier. Used to keep wizard from being exiled.
+      * @param _verifier the new address for verifier, the contract which can add protectedUntil time for wizards
+      */
     function updateVerifier(address _verifier) external onlyOwner {
         require(_verifier != address(0) && _verifier != verifier, "Invalid operator address");
         verifier = _verifier;
         emit NewVerifier(_verifier);
     }
-
 }

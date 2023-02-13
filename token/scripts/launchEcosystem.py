@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, WizardTower, WizardBattle, Governance, accounts, network, config
+from brownie import Wizards, Token, WizardTower, Governance, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -28,7 +28,7 @@ def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
     wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
-    wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
+    # wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
     governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
 
     # save addresses
@@ -44,19 +44,24 @@ def main():
         file.write(f'\ntoken: {token}')
         file.write(f'\nwizardsNFT: {wizards}')
         file.write(f'\nwizard_tower: {wizard_tower}')
-        file.write(f'\nwizard_battle: {wizard_battle}')
+        # file.write(f'\nwizard_battle: {wizard_battle}')
 
     # set modifier addresses
-    tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
-    tx = wizard_tower.updateBattler(wizard_battle.address, {'from': accounts[0]})
-    tx.wait(required_confirmations)
+    # tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
+    # tx = wizard_tower.updateBattler(wizard_battle.address, {'from': accounts[0]})
+    # tx.wait(required_confirmations)
+
+    contract_settings = wizards.contractSettings()
+    initation_cost = contract_settings[1]
+    print(f'contractSettings: {contract_settings}')
+    print(f'initation_cost: {initation_cost}')
 
     # create wizards
     if MINT_WIZARDS:
         for i in range(1, 3):
             tx = wizards.mint(i-1, {'from': (accounts[1] if i > 1 else accounts[0])})
             tx.wait(required_confirmations)
-            tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
+            tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0]), "value": initation_cost})
             tx.wait(required_confirmations)
             print(f'wizard {i} initiated, resulting in event: {tx.events}')
             tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
@@ -277,15 +282,15 @@ def main():
             # file.write(abi)
             json.dump(abi, file)
 
-        print(f'dumping wizardBattle...') # sdf sfd sdfsdf sdf
-        directory = os.getcwd()
-        path = os.path.join(directory, "abi_dump")
-        # print(f'path: {path}')
-        abi = str(wizard_battle.abi)
-        file_path = os.path.join(path, "wizardbattle.json")
-        with open(file_path, 'w') as file:
-            # file.write(abi)
-            json.dump(abi, file)
+        # print(f'dumping wizardBattle...') # sdf sfd sdfsdf sdf
+        # directory = os.getcwd()
+        # path = os.path.join(directory, "abi_dump")
+        # # print(f'path: {path}')
+        # abi = str(wizard_battle.abi)
+        # file_path = os.path.join(path, "wizardbattle.json")
+        # with open(file_path, 'w') as file:
+        #     # file.write(abi)
+        #     json.dump(abi, file)
 
 
         # todo -- save addresses

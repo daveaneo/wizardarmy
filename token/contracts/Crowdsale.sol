@@ -10,6 +10,7 @@ import './helpers/Ownable.sol';
 //import './Token.sol';
 //import '../interfaces/IERC20.sol';
 //import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import './helpers/ReentrancyGuard.sol';
 
 // Declare interface to Wizard NFT contract and its required functions that will be used in this contract
 interface IERC721Wizard{
@@ -18,7 +19,7 @@ interface IERC721Wizard{
 //    function getAddressOfWizard(uint256 _wizardId) external view returns(address); /// This is done through other functions, depending on the ERC721 implementation
 }
 
-contract Crowdsale is Ownable{
+contract Crowdsale is Ownable, ReentrancyGuard {
     struct Sale {
         uint128 tokenAmount; // purchasedTokens
         uint128 rewards; // rewardedTokens
@@ -137,7 +138,11 @@ contract Crowdsale is Ownable{
         delete timeUntilRewardsClaiming;
     }
 
-    // take into account if previous purchases have happened
+
+    /** @dev Buy ERC20 tokens by paying ETH
+      * @param _wizardId is the wizardId that will make purchase, using the upline to give bonuses. Setting this equal to zero allows anyone to buy tokens.
+      */
+    // todo -- should there be a fee or a tax or a price reduction for non-wizards?
     function buy(uint256 _wizardId) public payable icoActive {
         // default will be _wizardId = 0
         // otherwise, we need to confirm that this address owns the wizard
@@ -162,21 +167,21 @@ contract Crowdsale is Ownable{
         }
     }
 
-    function _rewardsProcessing(uint256 _wizardId, uint256 _buyAmount) private{
+    function _rewardsProcessing(uint256 _wizardId, uint256 _buyAmount) private {
         uint256 referrerWizardId = wizardContract.getUplineId(_wizardId);
         uint256 referralAmount;
         address referrerAddress;
         Sale storage _mySale;
         
-        for (uint256 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0 ; levelCounter++){
+        for (uint256 levelCounter=0 ; levelCounter < 5 && referrerWizardId != 0;){
             referralAmount = _buyAmount * uint256(uplineReferralPercent[levelCounter]) / uint256(100);
-//            referrerAddress = wizardContract.getAddressOfWizard(referrerWizardId);
             referrerAddress = wizardContract.ownerOf(referrerWizardId);
             _mySale = sales[referrerAddress];
             _mySale.rewards += uint128(referralAmount);            
             totalRewardsToBeClaimed += uint128(referralAmount);
             referrerWizardId = wizardContract.getUplineId(referrerWizardId);
-        }        
+            unchecked {++levelCounter;}
+        }
     }  
     
     function withdrawPurchasedTokens()
@@ -207,6 +212,7 @@ contract Crowdsale is Ownable{
     receive() external payable {
         buy(uint256(0));
     }
+
     ////////////////////////////
     ////// Admin Functions /////
     ////////////////////////////
@@ -214,7 +220,6 @@ contract Crowdsale is Ownable{
     // requires approval ???
     function fundTokenSale() external {
         require(contractBoolSettings.funded == false, "already funded.");
-//        require(token.transferFrom(admin, address(this), totalTokensOfferedInSale), "Token transfer failed.");
         // approve...
         require(token.transferFrom(msg.sender, address(this), totalTokensOfferedInSale), "Token transfer failed.");
         contractBoolSettings.funded = true;
@@ -240,22 +245,19 @@ contract Crowdsale is Ownable{
         contractBoolSettings.buyersCanWithdrawRewardsAdminOverride = _buyersCanWithdrawRewardsAdminOverride;
     }
 
-    // todo -- add nonrentrant
-    function withdrawToken() external onlyOwner icoEnded {
-        uint256 _withdrawal = availableTokens;
+    function withdrawToken() external onlyOwner icoEnded nonReentrant {
+        uint256 withdrawalAmount = availableTokens;
         availableTokens = 0;
-        require(_withdrawal > 0, "No tokens to withdraw that has not been sold.");
-        require(token.transfer(owner(), _withdrawal), "Token transfer failed.");
+        require(withdrawalAmount > 0, "No tokens to withdraw that has not been sold.");
+        require(token.transfer(owner(), withdrawalAmount), "Token transfer failed.");
     }
 
-    // todo -- add nonrentrant
-    function withdrawMatic() external onlyOwner icoEnded {
+    function withdrawMatic() external onlyOwner icoEnded nonReentrant {
         uint256 _balance = address(this).balance;
         require(_balance > 0, "No Matic to withraw.");
         (bool success, ) = owner().call{value : _balance}("Withdrawing Matic to owner");
         require(success, "Transfer failed.");
     }
-
 
 
     //////////////////////

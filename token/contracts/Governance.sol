@@ -503,8 +503,8 @@ contract Governance is ReentrancyGuard, Ownable {
             address payable taskSubmitter = payable(wizardsNFT.ownerOf(myTask.verifierID));
 //            address payable verifier = msg.sender;
 
-            wizardsNFT.verifyDuty(myTask.NFTID, myTask.timeBonus);
-            wizardsNFT.verifyDuty(myTask.verifierID, taskVerificationTimeBonus);
+            wizardsNFT.increaseProtectedUntilTimestamp(myTask.NFTID, myTask.timeBonus);
+            wizardsNFT.increaseProtectedUntilTimestamp(myTask.verifierID, taskVerificationTimeBonus);
 
             // myTask.payment=0; // thwart reentrancy attacks
             delete tasks[_taskID];
@@ -534,8 +534,8 @@ contract Governance is ReentrancyGuard, Ownable {
                 uint256 split = myTask.payment/2;
                 address payable taskRefuter = payable(wizardsNFT.ownerOf(myTask.refuterID));
 
-                wizardsNFT.verifyDuty(myTask.refuterID, taskVerificationTimeBonus);
-                wizardsNFT.verifyDuty(_wizId, taskVerificationTimeBonus);
+                wizardsNFT.increaseProtectedUntilTimestamp(myTask.refuterID, taskVerificationTimeBonus);
+                wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
 
                 // myTask.payment=0; // thwart reentrancy attacks
                 delete tasks[_taskID];
