@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, WizardTower, Governance, accounts, network, config
+from brownie import Wizards, Token, WizardTower, Governance, Appointer,  accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -30,6 +30,7 @@ def main():
     wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
     # wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
     governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
+    appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
 
     # save addresses
     directory = os.getcwd()
@@ -75,6 +76,17 @@ def main():
     # fuel tower
     tx = token.transfer(wizard_tower.address, 10**10, {'from': accounts[0]} )
     tx.wait(required_confirmations)
+
+    # create role contract
+    roles_controlled = [i for i in range(15)]
+    tx = appointer.createRole("boss", roles_controlled)
+    tx.wait(1)
+    role = appointer.getRole(1)
+    print(f'roll for boss: {role}')
+
+
+
+
 
     # chain.sleep(60*9)
     # chain.mine(1)

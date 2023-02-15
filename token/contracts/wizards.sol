@@ -13,6 +13,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     mapping (uint256 => Stats) public tokenIdToStats;
     address public verifier; /// contract address to update stats
     address public culler; /// contract address to exile any wizard
+    address public appointer; /// contract address to assign roles
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
@@ -25,7 +26,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 _speed;
         uint256 _wins;
         uint256 _losses;
-        uint256 role; // limit wizards to 1 role, which is a number or a string
+        uint256 role; // limit wizards to 1 role, which is a number
         uint256 tokensClaimed;
         uint256 contributionKarma;
         uint256 uplineId;
@@ -54,6 +55,7 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     event NewVerifier(address verifier);
     event NewCuller(address culler);
+    event NewAppointer(address appointer);
     event Initiated(address initiater, uint256 indexed wizardId, uint256 timestamp);
     event Exiled(address exilee, uint256 indexed wizardId, uint256 timestamp);
 
@@ -77,6 +79,11 @@ contract Wizards is ERC721Enumerable, Ownable {
     function getUplineId(uint256 _wizardId) public view returns(uint256) {
         require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
         return tokenIdToStats[_wizardId].uplineId;
+    }
+
+    function getRole(uint256 _wizardId) public view returns(uint256) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        return tokenIdToStats[_wizardId].role;
     }
 
 
@@ -346,6 +353,16 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
+    ////////////////////////////////////
+    ////// Appointer Functions     /////
+    ////////////////////////////////////
+
+    function appointRole(uint256 _wizardId, uint256 _role) external onlyAppointer {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        tokenIdToStats[_wizardId].role = _role;
+    }
+
+
     /////////////////////////////////
     ////// Admin Functions      /////
     /////////////////////////////////
@@ -372,12 +389,18 @@ contract Wizards is ERC721Enumerable, Ownable {
     ///////////////////////////
 
     modifier onlyVerifier() {
-        require(msg.sender != address(this), 'only verifier'); // todo -- decide who will verify--one or many addresses
+        require(msg.sender == verifier, 'only verifier'); // todo -- decide who will verify--one or many addresses
         _;
     }
 
+    modifier onlyAppointer() {
+        require(msg.sender == appointer, 'only appointer');
+        _;
+    }
+
+
     modifier onlyHolder() {
-        require(msg.sender != address(this), 'only verifier'); // todo -- decide who will verify--one or many addresses
+        require(msg.sender != address(this), 'only holder'); // todo -- decide who will verify--one or many addresses
         _;
     }
 
@@ -410,4 +433,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         verifier = _verifier;
         emit NewVerifier(_verifier);
     }
+
+    /** @dev increase protectionTimestamp, called by verifier. Used to keep wizard from being exiled.
+      * @param _appointer the new address for appointer, the contract which can appoint and create roles
+      */
+    function updateAppointer(address _appointer) external onlyOwner {
+        require(_appointer != address(0) && _appointer != appointer, "Invalid operator address");
+        appointer = _appointer;
+        emit NewAppointer(_appointer);
+    }
+
+
 }
