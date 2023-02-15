@@ -1,0 +1,35 @@
+
+
+TODO --
+
+Contracts:
+> Wizards
+  - Make it so each wizard can have up to one role
+  - Make it so external appointer can give wizard this role. This would likely be a smart contract in which certain roles had power to give other roles to users.
+  - Potentially have (updateable) values for
+    • Mana/Wizard Gold (how many tokens are in your account)
+    • Level
+    • Tasks complete / contributions
+    • Element (fire, wind, water, earth)
+    • role (designer, writer, influencer, et cetera)-- I'm thinking 1 role max per NFT. Role can be changed.
+    • Upline (either number or wizard image)
+    • Wizard Id
+
+> WizardTower
+  - Same value for all wizards
+> WizardGold
+  - Updateable threshold for when to add liquidity
+  - Update tokenomics
+  - No antiwhale (maybe refresh token from original source)
+
+> Crowdsale
+> Approver
+  - What is this? Tasking/governance?
+> Appointer (to do) contract that assigns roles to users (roles can be updated)
+> Governance (Change to Tasker)
+  - Remove voting and put in its own contract
+  - Each task group will have its own tasker contract
+  - Default tasker for everyone with easy tasks so there is always a way to participate
+
+
+
