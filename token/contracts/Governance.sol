@@ -115,20 +115,23 @@ contract Governance is ReentrancyGuard, Ownable {
     //////  Get Functions ///////
     /////////////////////////////
 
+    // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function isCallerOnBoard() public view returns (bool) {
-        for(uint256 i =1; i <= boardSeats;){
-            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
-                return true;
-            }
-            unchecked{++i;}
-        }
+//        for(uint256 i =1; i <= boardSeats;){
+//            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
+//                return true;
+//            }
+//            unchecked{++i;}
+//        }
+//        return false;
         return false;
     }
 
+    // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function isMyWizardOnBoard(uint256 _wizId) public view returns (bool) {
-        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
-            return true;
-        }
+//        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
+//            return true;
+//        }
         return false;
     }
 

@@ -9,105 +9,83 @@ import '../contracts/interfaces/IERC721.sol';
 import '../contracts/wizards.sol';
 //import "../contracts/libraries/PRBMathSD59x18Typed.sol";
 
+
+// todo -- we can drop the idea of floors and just have wizards in the tower, since all "floors" are now equal
+
 contract WizardTower is ReentrancyGuard, Ownable {
     IERC20 public token; // Address of token contract and same used for rewards
     Wizards public wizardsNFT;
 
-    // make contract Settings struct
-    uint256 public activeFloors;
-    uint256 startTimestamp;
-    uint256 public totalPowerSnapshot;
-    uint256 public totalPowerSnapshotTimestamp;
-//    uint256 DUST = 10**6; // min ecosystem tokens to do certain actions like auto withdraw
+    uint128 public totalPowerSnapshot;
+    uint40 public totalPowerSnapshotTimestamp;
+    address public evictionProceedsReceiver; // Address to manage the Stake
 
-    address public tokenOperator; // Address to manage the Stake
-    address public battler; // Address to manage the Stake
 //    enum Wizards.ELEMENT {FIRE, WIND, WATER, EARTH}
+
+
+    struct ContractSettings {
+        uint16 activeFloors;
+        uint40 startTimestamp;
+        uint16 floorCap;
+        uint64 dustThreshold; // min ecosystem tokens to do certain actions like auto withdraw
+        address evictionProceedsReceiver; // Address to manage the Stake
+    }
+    ContractSettings public contractSettings;
+
 
     // todo -- combine mappings
     struct FloorInfo {
         uint40 lastWithdrawalTimestamp;
-        uint16 occupyingWizardId;
+//        uint16 occupyingWizardId;
     }
 
-    mapping (uint256 => FloorInfo) public floorIdToInfo; // floor id to floor info
-    mapping (uint256 => uint256 ) public wizardIdToFloor; // floor 0 DNE
+    mapping (uint256 => FloorInfo ) public wizardIdToFloorInfo; // floor 0 DNE
 
 
     // Events
-    event NewOperator(address tokenOperator);
-    event NewBattler(address battler);
-    event DrainTower(address indexed tokenOperator, uint256 amount);
+    event DrainTower(address indexed owner, uint256 amount);
     event Withdraw(address indexed staker, uint256 totalAmount);
-    event FloorClaimed(address claimer, uint256 floorClaimed, uint256 indexed wizardId, uint256 timestamp);
-
-    // Modifiers
-    modifier onlyOperator() {
-        require(
-            msg.sender == tokenOperator,
-            "Only operator can call this function."
-        );
-        _;
-    }
+    event NewEvictionProceedsReceiver(address evictionProceedsReceiver);
+    event FloorClaimed(address claimer, uint256 indexed wizardId, uint256 timestamp);
+    event NewFloorCap(uint16 floorCap);
+    event NewDustThreshold(uint64 dustThreshold);
 
     ////////////////////
     ////    Get       //
     ////////////////////
 
-    function isOnTheTower(uint256 _wizardId) external view returns(bool) {
-        return wizardIdToFloor[_wizardId] != 0;
-    }
-
-    function getWizardOnFloor(uint256 _floor) external view returns(uint256) {
-        return uint256(floorIdToInfo[_floor].occupyingWizardId);
-    }
-
-    function getFloorInfoGivenFloor(uint256 _floor) external view returns(FloorInfo memory) {
-        return floorIdToInfo[_floor];
+    function isOnTheTower(uint256 _wizardId) public view returns(bool) {
+        require(_wizardId !=0 && _wizardId < wizardsNFT.totalSupply(), "invalid wizard");
+        return wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp != 0;
     }
 
     function getFloorInfoGivenWizard(uint256 _wizardId) external view returns(FloorInfo memory) {
-        require(_wizardId>0 && _wizardId < activeFloors + 1, "invalid number");
-        return floorIdToInfo[wizardIdToFloor[_wizardId]];
-    }
-
-    function getFloorGivenWizard(uint256 _wizardId) external view returns(uint256) {
-        require(_wizardId>0 && _wizardId < activeFloors + 1, "invalid number");
-        return wizardIdToFloor[_wizardId];
+        require(_wizardId>0 && _wizardId < contractSettings.activeFloors + 1, "invalid number");
+        return wizardIdToFloorInfo[_wizardId];
     }
 
     function floorBalance(uint256 _floor) public view returns(uint256) {
         return _floorBalance(_floor);
     }
 
-    /// todo review for accuracy
     function _floorBalance(uint256 _floor) internal view returns(uint256) {
-        require(activeFloors>0, "no active floors");
-        require(_floor <= activeFloors && _floor!= 0, "invalid floor");
-//        FloorInfo memory floorInfo = floorIdToInfo[_floor];
+        require(isOnTheTower(_floor), "invalid floor or no occupant");
         return floorPower(_floor) * token.balanceOf((address(this))) / totalFloorPower();
     }
-
 
     //////////////
     ////  Core  //
     //////////////
 
-
-
     constructor(address _token, address _wizardsNFTAddress)
     {
         token = IERC20(_token);
         wizardsNFT = Wizards(_wizardsNFTAddress);
-        tokenOperator = msg.sender;
-        startTimestamp = block.timestamp;
-        totalPowerSnapshotTimestamp = block.timestamp;
-    }
-
-    function updateOperator(address newOperator) external onlyOwner {
-        require(newOperator != address(0) && newOperator != tokenOperator, "Invalid operator address");
-        tokenOperator = newOperator;
-        emit NewOperator(newOperator);
+        totalPowerSnapshotTimestamp = uint40(block.timestamp);
+        contractSettings.evictionProceedsReceiver = msg.sender;
+        contractSettings.startTimestamp = totalPowerSnapshotTimestamp;
+        contractSettings.floorCap = 10000;
+        contractSettings.dustThreshold = uint64(10**16);
     }
 
     // For migration
@@ -118,96 +96,105 @@ contract WizardTower is ReentrancyGuard, Ownable {
     }
 
     // claim floor for wizard. Returns floor on.
-    function claimFloor(uint256 _wizardId) external returns (uint256) {
+    function claimFloor(uint256 _wizardId) external {
         require(wizardsNFT.isMature(_wizardId) && wizardsNFT.ownerOf(_wizardId)==msg.sender, "must own mature wizardsNFT");
-        require(wizardIdToFloor[_wizardId] == 0, "already claimed.");
-        activeFloors += 1;
-        FloorInfo memory floorInfo;
-        floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
-//        floorInfo.element = Wizards.ELEMENT(uint256(keccak256(abi.encodePacked(activeFloors, msg.sender, block.timestamp))) % 4);
-        floorInfo.occupyingWizardId = uint16(_wizardId);
-        wizardIdToFloor[_wizardId] = activeFloors;
-        floorIdToInfo[activeFloors] = floorInfo;
-        _updateTotalPowerSnapshot(0);
-        emit FloorClaimed(msg.sender, activeFloors, _wizardId, block.timestamp);
-        return activeFloors;
-    }
-
-    // todo -- update or remove. There should be a new function to withdraw wizard from the tower
-    function switchFloors(uint256 _floorA, uint256 _floorB) internal {
-        require((_floorA <= activeFloors) && (_floorB <= activeFloors) && (_floorB != _floorA), "invalid floors");
+        require(wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp == 0, "already claimed.");
+        require(contractSettings.activeFloors < contractSettings.floorCap, "tower at max capacity");
+        contractSettings.activeFloors += 1;
 //        FloorInfo memory floorInfo;
-        uint256 previousFloorAWizard = floorIdToInfo[_floorA].occupyingWizardId;
-        floorIdToInfo[_floorA].occupyingWizardId = floorIdToInfo[_floorB].occupyingWizardId;
-        floorIdToInfo[_floorB].occupyingWizardId = uint16(previousFloorAWizard);
-        wizardIdToFloor[floorIdToInfo[_floorA].occupyingWizardId] = _floorA;
-        wizardIdToFloor[previousFloorAWizard] = _floorB;
+//        floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
+//        wizardIdToFloorInfo[_wizardId] = floorInfo;
+        wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp = uint40(block.timestamp);
+        _updateTotalPowerSnapshot(0);
+        emit FloorClaimed(msg.sender, _wizardId, block.timestamp);
     }
 
-//    function testFloorPower(uint256 _floor) external view returns(uint256) {
-//        uint256 myPower = 10**18;
-//        FloorInfo memory floorInfo = floorIdToInfo[_floor];
-//        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? startTimestamp : floorInfo.lastWithdrawalTimestamp;
-//        return myPower * (block.timestamp - timestamp);// / 10**18;
-//    }
+    function evict(uint256 _wizardId) external onlyOwner returns(uint256) {
+        require(isOnTheTower(_wizardId));
+        contractSettings.activeFloors -= 1;
+        uint256 bal = _floorBalance(_wizardId);
+        // todo -- we could have some amount be sent to DAO, some absorbed by all other wizards on tower
+        if (bal > contractSettings.dustThreshold) {
+            _withdraw(_wizardId, contractSettings.evictionProceedsReceiver);
+        }
+        else {
+            // dust will be absorbed by all other users
+            _updateTotalPowerSnapshot(floorPower(_wizardId));
+        }
 
-    function drainAndDropFromFloor(uint256 _floor) external onlyOwner returns(uint256) {
-        // todo -- confirm accurate _floor
-        // drain funds from floor and send to DAO
-        // replace wizard in this floor with bottom floor
-        switchFloors(_floor, activeFloors);
-        // decrease total floors
-        activeFloors -= 1;
-
-        return 999999;
+        delete wizardIdToFloorInfo[_wizardId];
+        return bal;
     }
 
 
     function floorPower(uint256 _floor) public view returns(uint256) {
-        require(_floor > 0 && _floor <= activeFloors, "invalid floor");
-//        uint256 myPower = 1;
-        FloorInfo memory floorInfo = floorIdToInfo[_floor];
-        // use startTimestamp if never withdrawn
-        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? startTimestamp : floorInfo.lastWithdrawalTimestamp;
-//        return myPower * (block.timestamp - timestamp) / 10**18;
+        require(isOnTheTower(_floor)); // floor is same as wizardId
+        FloorInfo memory floorInfo = wizardIdToFloorInfo[_floor]; // wizard id is same as floor id
+        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? contractSettings.startTimestamp : floorInfo.lastWithdrawalTimestamp;
         return block.timestamp - timestamp;
     }
 
     function totalFloorPower() public view returns(uint256) {
-        return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * activeFloors;
+        return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * contractSettings.activeFloors;
     }
 
     // called when adding/removing floors or withdrawing
     function _updateTotalPowerSnapshot(uint256 _powerRemoved) internal  {
-        totalPowerSnapshot = totalFloorPower() - _powerRemoved;
-        totalPowerSnapshotTimestamp = block.timestamp;
+        totalPowerSnapshot = uint128(totalFloorPower() - _powerRemoved);
+        totalPowerSnapshotTimestamp = uint40(block.timestamp);
     }
 
-    function withdraw(uint256 _floor) external nonReentrant {
+    function withdraw(uint256 _wizardId) external nonReentrant {
         // require owner owns wizardsNFT on that floor
-        require(_floor!= 0 && _floor <= activeFloors, "invalid floor");
-        uint256 wizardId = floorIdToInfo[_floor].occupyingWizardId;
-        require(wizardsNFT.ownerOf(wizardId) == tx.origin, "You do not own the wizard there."); // todo -- confirm tx.origin is ok
-        _withdraw(_floor, tx.origin);
+        require(wizardsNFT.ownerOf(_wizardId) == tx.origin, "You do not own the wizard there."); // todo -- confirm tx.origin is ok
+        _withdraw(_wizardId, tx.origin);
     }
 
     function _withdraw(uint256 _floor, address recipient) internal {
+        require(isOnTheTower(_floor)); // floor is same as wizardId
         uint256 amountToWithdraw = _floorBalance(_floor);
+        require(amountToWithdraw!=0, "nothing to withdraw");
         uint256 myPower = floorPower(_floor);
-        // _withdrawFromVault
-        // _withdrawFromVault(amountToWithdraw); // we don't want to add our tokens to a vault atm
-
         // Check for balance in the contract
         require(token.balanceOf(address(this)) >= amountToWithdraw, "Not enough balance in the contract");
 
         // Update timestamp
-        floorIdToInfo[_floor].lastWithdrawalTimestamp = uint40(block.timestamp);
+        wizardIdToFloorInfo[_floor].lastWithdrawalTimestamp = uint40(block.timestamp);
 
         // Call the transfer function
         require(token.transfer(recipient, amountToWithdraw), "Unable to transfer token back to the account");
 
+        // reduce total power by the power removed
         _updateTotalPowerSnapshot(myPower);
 
         emit Withdraw(recipient, amountToWithdraw);
     }
+
+    /** @dev update address that receives funds from eviction
+      * @param _evictionProceedsReceiver new address for culler, the wallet/contract which can exile wizards without contraint
+      */
+    function updateEvictionProceedsReceiver(address _evictionProceedsReceiver) external onlyOwner {
+        require(_evictionProceedsReceiver != address(0) && _evictionProceedsReceiver != contractSettings.evictionProceedsReceiver, "Invalid operator address");
+        contractSettings.evictionProceedsReceiver = _evictionProceedsReceiver;
+        emit NewEvictionProceedsReceiver(_evictionProceedsReceiver);
+    }
+
+    /** @dev update max amount of occupants on tower
+      * @param _floorCap max amount of occupants
+      */
+    function updateFloorCap(uint16 _floorCap) external onlyOwner {
+        require(_floorCap != contractSettings.floorCap, "same cap");
+        contractSettings.floorCap = _floorCap;
+        emit NewFloorCap(_floorCap);
+    }
+
+    /** @dev update min token amount to transfer to EvictionProceedsReceiver
+      * @param _dustThreshold max amount of occupants
+      */
+    function updateDustThreshold(uint64 _dustThreshold) external onlyOwner {
+        require(_dustThreshold != contractSettings.dustThreshold, "same dust threshold");
+        contractSettings.dustThreshold = _dustThreshold;
+        emit NewDustThreshold(_dustThreshold);
+    }
+
 }

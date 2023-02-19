@@ -23,8 +23,9 @@ Contracts:
 
 
 > WizardTower
-  - Same value for all wizards
+    ✅ Same value for all wizards
 > WizardGold
+  - Possible refresh token from source
   - Updateable threshold for when to add liquidity
   - Update tokenomics
   - No antiwhale (maybe refresh token from original source)
