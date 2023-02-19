@@ -4,7 +4,6 @@ pragma solidity 0.8.15;
 // This will be where wizards receive ecosystem tokens
 import "./interfaces/IERC20.sol";
 //import "./interfaces/IERC721.sol";
-import "./RelativeTimeVault.sol";
 import "./WizardTower.sol";
 import "./helpers/ReentrancyGuard.sol";
 //import "./Wizards.sol";

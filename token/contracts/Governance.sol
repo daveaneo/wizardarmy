@@ -84,7 +84,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
-    uint256 taskVerificationTimeBonus = 1 days; // 1 day
+    uint40 taskVerificationTimeBonus = 1 days; // 1 day
     uint256 boardSeats = 3;
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId, Task myTask);
@@ -481,7 +481,7 @@ contract Governance is ReentrancyGuard, Ownable {
         require(_fields.length > 0);
 
         Task memory myTask = tasks[_taskID];
-        uint256 count = 0;
+//        uint256 count = 0;
         bool deleteTaskFlag = true;
 
         // hash leaves if there is a refuter
