@@ -69,7 +69,8 @@ contract WizardTower is ReentrancyGuard, Ownable {
     }
 
     function _floorBalance(uint256 _floor) internal view returns(uint256) {
-        require(isOnTheTower(_floor), "invalid floor or no occupant");
+//        require(isOnTheTower(_floor), "invalid floor or no occupant");
+        require(_floor !=0 && _floor <= wizardsNFT.totalSupply(), "invalid floor"); // wizardId and floor are interchangeable
         uint256 _totalFloorPower = totalFloorPower();
         return _totalFloorPower == 0 ? 0 : floorPower(_floor) * token.balanceOf((address(this))) / _totalFloorPower;
     }
@@ -112,7 +113,6 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
     function evict(uint256 _wizardId) external onlyOwner returns(uint256) {
         require(isOnTheTower(_wizardId));
-        contractSettings.activeFloors -= 1;
         uint256 bal = _floorBalance(_wizardId);
         // todo -- we could have some amount be sent to DAO, some absorbed by all other wizards on tower
         if (bal > contractSettings.dustThreshold) {
@@ -124,6 +124,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
         }
 
         delete wizardIdToFloorInfo[_wizardId];
+        contractSettings.activeFloors -= 1;
         return bal;
     }
 

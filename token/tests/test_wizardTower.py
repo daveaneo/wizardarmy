@@ -181,8 +181,17 @@ def test_evict(recurring_setup):
     # overflow happening. Lets check hte numbers
     total_floor_power = wizard_tower.totalFloorPower()
     floor_power = wizard_tower.floorPower(1)
-    print(f'total_floor_power: {total_floor_power}')
-    print(f'floor_power: {floor_power}')
+
+    floor_balance = wizard_tower.floorBalance(1)
+    contract_balance = token.balanceOf(wizard_tower.address)
+    print(f'\n\n\n############################################')
+    print(f'############################################')
+    print(f'total_floor_power: \n{total_floor_power}')
+    print(f'floor_power: \n{floor_power}')
+    print(f'floor_balance: \n{floor_balance}')
+    print(f'contract_balance: \n{contract_balance}')
+
+
 
     # Evict the wizard from the tower
     tx = wizard_tower.evict(1, {"from": accounts[0]})
@@ -209,7 +218,8 @@ def test_floor_balance(recurring_setup):
     tx.wait(1)
     total_floor_power = wizard_tower.totalFloorPower()
     print(f'total_floor_power: {total_floor_power}')
-    assert wizard_tower.floorBalance(1) == wizard_tower.floorPower(1) * token.balanceOf(wizard_tower) // wizard_tower.totalFloorPower()
+    assert wizard_tower.floorBalance(1) == (0 if not total_floor_power else
+                                            wizard_tower.floorPower(1) * token.balanceOf(wizard_tower) // wizard_tower.totalFloorPower())
 
     chain.sleep(3600*7) # sleep for a week
     total_floor_power = wizard_tower.totalFloorPower()
