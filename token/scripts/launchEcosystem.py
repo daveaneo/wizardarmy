@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-from brownie import Wizards, Token, WizardTower, Governance, Appointer,  accounts, network, config
+from brownie import Wizards, Token, WizardTower, Appointer, Governance, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -22,7 +22,7 @@ print(f'required_confirmations: {required_confirmations}')
 
 # variables
 # image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/" # simple images
-image_base_uri = "https://gateway.pinata.cloud/ipfs/QmVqAYo9SKUt2qTjtB7JBogBpXPpWnXbsn77P3FxYpGJpA/" # AI Generated
+image_base_uri = "https://gateway.pinata.cloud/ipfs/QmancBkpiTwZc5HWcnBpCcWMxXqrmwLMs57UvViKe5QC7D/" # AI Generated
 
 def main():
     token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
@@ -57,10 +57,10 @@ def main():
     print(f'contractSettings: {contract_settings}')
     print(f'initation_cost: {initation_cost}')
 
-    # create wizards
+    # create wizards (unitiated, active, exiled, regular)
     if MINT_WIZARDS:
         for i in range(1, 3):
-            tx = wizards.mint(i-1, {'from': (accounts[1] if i > 1 else accounts[0])})
+            tx = wizards.mint(i-1, {'from': (accounts[1] if i > 1 else accounts[0])}) # different uplines
             tx.wait(required_confirmations)
             tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0]), "value": initation_cost})
             tx.wait(required_confirmations)
@@ -69,6 +69,13 @@ def main():
             tx.wait(required_confirmations)
             upline = wizards.getUplineId(i)
             print(f'upline of wizard: {upline}')
+
+    # mint uninitiated
+    tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
+    tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
+
+    # cull (exile) wizard
+    tx = wizards.cull(4, {'from': accounts[0]}) # different uplines
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')

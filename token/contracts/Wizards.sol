@@ -70,6 +70,26 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
+
+    /** @dev check if wizard has been exiled (temporarily banished)
+      * @param _wizardId id of wizard.
+      * @return true -> exiled; false -> not exiled
+      */
+    function isExiled(uint256 _wizardId) public view returns(bool) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp != 0 && tokenIdToStats[_wizardId].initiationTimestamp ==0;
+    }
+
+    /** @dev check if wizard has deserted and thus can be exiled
+      * @param _wizardId id of wizard.
+      * @return true -> deserted; false -> has not deserted
+      */
+    function hasDeserted(uint256 _wizardId) public view returns(bool) {
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
+    }
+
+
     /** @dev Check if wizard is active
       * @param _wizardId id of wizard.
       * @return true if active, false if inactive
@@ -118,24 +138,6 @@ contract Wizards is ERC721Enumerable, Ownable {
         return phase;
     }
 
-    /** @dev check if wizard has been exiled (temporarily banished)
-      * @param _wizardId id of wizard.
-      * @return true -> exiled; false -> not exiled
-      */
-    function isExiled(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
-        return tokenIdToStats[_wizardId].protectedUntilTimestamp != 0 && tokenIdToStats[_wizardId].initiationTimestamp ==0;
-    }
-
-    /** @dev check if wizard has deserted and thus can be exiled
-      * @param _wizardId id of wizard.
-      * @return true -> deserted; false -> has not deserted
-      */
-    function hasDeserted(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
-        return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
-    }
-
 
     ///////////////////////////
     ////// Core Functions /////
@@ -155,6 +157,12 @@ contract Wizards is ERC721Enumerable, Ownable {
         contractSettings.phaseDuration = 60*60;// todo --
         contractSettings.imageBaseURI = _imageBaseURI;// todo --
         contractSettings.totalPhases = 8;
+        contractSettings.maturityThreshold = 0; // todo make it 5?
+
+        verifier = msg.sender;
+        culler = msg.sender;
+        appointer = msg.sender;
+
     }
 
 
@@ -217,6 +225,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         tokenIdToStats[_wizardId].initiationTimestamp = 0;
     }
 
+
+
+//    • Uninitiated
+//    • Exiled
+//      Inactive
+//    • "Egg"
+//    • Wizard -> Can join wizard tower
+
+    // todo -- consider adding elements to all images
     /** @dev get token URI
       * @param _wizardId id of wizard.
       * @return returns inline URI as string
@@ -226,14 +243,16 @@ contract Wizards is ERC721Enumerable, Ownable {
         // todo -- update image
         string memory linkExtension;
         if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
-            linkExtension = "0"; // todo -- shameful uninitiated picture
+            linkExtension = "uninitiated"; // todo -- shameful uninitiated picture
+        }
+        else if(isExiled(_wizardId)){ // exiled
+            linkExtension = "exiled"; // todo -- shameful banished/exiled picture
+        }
+        else if(!isActive(_wizardId)){ // not protected
+            linkExtension = "inactive"; // todo -- shameful, sleeping picture
         }
         else{ // todo -- this didn't use getPhaseOf
-            linkExtension =
-                      Strings.toString(
-                      (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
-                      > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
-                      );
+            linkExtension = Strings.toString(getPhaseOf(_wizardId));
         }
         string memory imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
         return formatTokenURI(_wizardId, imageURI);

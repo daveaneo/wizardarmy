@@ -46,9 +46,10 @@ contract WizardTower is ReentrancyGuard, Ownable {
     event DrainTower(address indexed owner, uint256 amount);
     event Withdraw(address indexed staker, uint256 totalAmount);
     event NewEvictionProceedsReceiver(address evictionProceedsReceiver);
-    event FloorClaimed(address claimer, uint256 indexed wizardId, uint256 timestamp);
+    event FloorClaimed(address claimer, uint256 indexed wizardId);
     event NewFloorCap(uint16 floorCap);
     event NewDustThreshold(uint64 dustThreshold);
+    event WizardEvicted(uint256 wizardId);
 
     ////////////////////
     ////    Get       //
@@ -100,7 +101,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
     // claim floor for wizard. Returns floor on.
     function claimFloor(uint256 _wizardId) external {
         require(wizardsNFT.isMature(_wizardId) && wizardsNFT.ownerOf(_wizardId)==msg.sender, "must own mature wizardsNFT");
-        require(wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp == 0, "already claimed.");
+        require(wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp == 0, "already claimed");
         require(contractSettings.activeFloors < contractSettings.floorCap, "tower at max capacity");
         contractSettings.activeFloors += 1;
 //        FloorInfo memory floorInfo;
@@ -108,11 +109,11 @@ contract WizardTower is ReentrancyGuard, Ownable {
 //        wizardIdToFloorInfo[_wizardId] = floorInfo;
         wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp = uint40(block.timestamp);
         _updateTotalPowerSnapshot(0);
-        emit FloorClaimed(msg.sender, _wizardId, block.timestamp);
+        emit FloorClaimed(msg.sender, _wizardId);
     }
 
     function evict(uint256 _wizardId) external onlyOwner returns(uint256) {
-        require(isOnTheTower(_wizardId));
+        require(isOnTheTower(_wizardId), "not on tower");
         uint256 bal = _floorBalance(_wizardId);
         // todo -- we could have some amount be sent to DAO, some absorbed by all other wizards on tower
         if (bal > contractSettings.dustThreshold) {
@@ -125,6 +126,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
         delete wizardIdToFloorInfo[_wizardId];
         contractSettings.activeFloors -= 1;
+        emit WizardEvicted(_wizardId);
         return bal;
     }
 

@@ -166,7 +166,7 @@ def test_evict(recurring_setup):
     assert wizard_tower.isOnTheTower(1)
 
 
-    chain.sleep(3600*7) # sleep for a week
+    chain.sleep(3600*7*1000) # sleep for a week
 
     tx = token.transfer(wizard_tower, 10**18, {'from': accounts[0]})
     tx.wait(1)
@@ -175,7 +175,7 @@ def test_evict(recurring_setup):
     dao_initial_balance = token.balanceOf(accounts[0].address)
     assert initial_balance > 0
 
-    # chain.sleep(3600*7) # sleep for a week
+    # chain.sleep(3600*7*1000) # sleep for a week
 
 
     # overflow happening. Lets check hte numbers
@@ -221,7 +221,7 @@ def test_floor_balance(recurring_setup):
     assert wizard_tower.floorBalance(1) == (0 if not total_floor_power else
                                             wizard_tower.floorPower(1) * token.balanceOf(wizard_tower) // wizard_tower.totalFloorPower())
 
-    chain.sleep(3600*7) # sleep for a week
+    chain.sleep(3600*7*1000) # sleep for a week
     total_floor_power = wizard_tower.totalFloorPower()
     print(f'total_floor_power: {total_floor_power}')
     assert wizard_tower.floorBalance(1) == (0 if not total_floor_power else
@@ -233,7 +233,8 @@ def test_total_floor_power(recurring_setup):
     # Test that the total floor power is calculated correctly
     tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
     tx.wait(1)
-    chain.sleep(3600*7) # sleep for a week
+    chain.sleep(3600*7*1000) # sleep for a week
+    # chain.mine()
     assert wizard_tower.totalFloorPower() == wizard_tower.floorPower(1)
 
 
@@ -242,4 +243,52 @@ def test_only_owner(recurring_setup):
     # Test that only the owner of the contract can call certain functions
     with reverts("Ownable: caller is not the owner"):
         wizard_tower.updateEvictionProceedsReceiver(accounts[1].address, {"from": accounts[1].address})
+
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+    tx.wait(1)
+    with reverts("Ownable: caller is not the owner"):
+        wizard_tower.evict(1,  {"from": accounts[2].address})
+
+def test_can_not_evict_wizard_not_on_tower(recurring_setup):
+    wizard_tower = WizardTower[-1]
+    # Test that only the owner of the contract can call certain functions
+    with reverts("not on tower"):
+        wizard_tower.evict(1, {"from": accounts[0].address})
+
+def test_can_not_claim_floor_twice(recurring_setup):
+    wizard_tower = WizardTower[-1]
+    # Test that only the owner of the contract can call certain functions
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+    tx.wait(1)
+
+    with reverts("already claimed"):
+        wizard_tower.claimFloor(1, {"from": accounts[1].address})
+
+
+def test_floor_evicted_event(recurring_setup):
+    wizard_tower = WizardTower[-1]
+
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+
+    # Evict the wizard from the first floor
+    tx = wizard_tower.evict(1, {"from": accounts[0]})
+    res = tx.wait(1)
+
+    print(f'events: {tx.events}')
+    print(f'tx: {tx}')
+
+    print(f'res: {res}')
+
+    # Check that the FloorEvicted event was emitted
+    assert "WizardEvicted" in tx.events
+    assert tx.events["WizardEvicted"]["wizardId"] == 1
+
+def test_floor_claimed_event(recurring_setup):
+    wizard_tower = WizardTower[-1]
+
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+
+    # Check that the FloorEvicted event was emitted
+    assert "FloorClaimed" in tx.events
+    assert tx.events["FloorClaimed"]["wizardId"] == 1
 
