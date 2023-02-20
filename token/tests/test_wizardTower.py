@@ -3,7 +3,7 @@
 # pytest -s <file location and name>
 # pytest -s tests/test_bondedStaking.py
 
-from brownie import Wizards, Token, WizardTower, network, config, accounts
+from brownie import Wizards, Token, WizardTower, network, config, accounts, reverts
 from brownie.network.state import Chain
 
 import random
@@ -89,7 +89,7 @@ def mint_NFT(x):
     wizards = Wizards[-1]
     tx = None
     for i in range(x):
-        tx = wizards.mint({'from': accounts[1]})
+        tx = wizards.mint(0, {'from': accounts[1]})
 
     tx and tx.wait(1)
 
@@ -99,6 +99,8 @@ def transfer_tokens_to_account_1():
     token = Token[-1]
     tx = token.transfer(accounts[1], 10**14, {'from': accounts[0]})
     tx.wait(1)
+
+
 
 
 def test_do_nothing(recurring_setup):
@@ -123,16 +125,111 @@ def test_fails(recurring_setup):
 
 def test_no_active_floors_at_start(recurring_setup):
     wizard_tower = WizardTower[-1]
-    active_floors = wizard_tower.activeFloors()
-    message_and_assert('No active floors', active_floors == 0)
+    contract_settings = wizard_tower.contractSettings()
+    print(f'contract_settings: {contract_settings}')
+    message_and_assert('No active floors', contract_settings[0] == 0)
 
 
 def test_can_claim_floor(recurring_setup):
     wizard_tower = WizardTower[-1]
-    tx = wizard_tower.claimFloor(0, {'from': accounts[1]})
-    active_floors = wizard_tower.activeFloors()
+    tx = wizard_tower.claimFloor(1, {'from': accounts[1]})
+    active_floors = wizard_tower.contractSettings()[0]
     message_and_assert('No active floors', active_floors == 1)
-    floor_info = wizard_tower.floorIdToInfo(1)
-    print(f'floor_info: {floor_info}')
-    message_and_assert('wizard 0 occupies floor 1', floor_info[2] == 0)
+
+
+
+# def test_chatGPT_tests(recurring_setup):
+#     wizard_tower = WizardTower[-1]
+#     wizard_owner = accounts[1].address
+#     chatGPT_test_claim_floor(wizard_tower, wizard_owner)
+#     chatGPT_test_evict(wizard_tower, wizard_owner)
+
+
+# Tests from ChatGPT, edited maybe
+def test_claim_floor(recurring_setup):
+    # Test that a wizard can claim a floor in the tower
+    wizard_tower = WizardTower[-1]
+    tx = wizard_tower.claimFloor(1, {'from': accounts[1]})
+    assert wizard_tower.isOnTheTower(1)
+
+
+def test_evict(recurring_setup):
+    # Test that the owner of the contract can evict a wizard from the tower
+    wizard_tower = WizardTower[-1]
+    token = Token[-1]
+    chain = network.state.Chain()
+    # current_block = chain.time()
+
+
+    tx = wizard_tower.claimFloor(1, {'from': accounts[1]})
+    tx.wait(1)
+    assert wizard_tower.isOnTheTower(1)
+
+
+    chain.sleep(3600*7) # sleep for a week
+
+    tx = token.transfer(wizard_tower, 10**18, {'from': accounts[0]})
+    tx.wait(1)
+
+    initial_balance = wizard_tower.floorBalance(1)
+    dao_initial_balance = token.balanceOf(accounts[0].address)
+    assert initial_balance > 0
+
+    # chain.sleep(3600*7) # sleep for a week
+
+
+    # overflow happening. Lets check hte numbers
+    total_floor_power = wizard_tower.totalFloorPower()
+    floor_power = wizard_tower.floorPower(1)
+    print(f'total_floor_power: {total_floor_power}')
+    print(f'floor_power: {floor_power}')
+
+    # Evict the wizard from the tower
+    tx = wizard_tower.evict(1, {"from": accounts[0]})
+    tx.wait(1)
+
+    dao_final_balance = token.balanceOf(accounts[0].address)
+
+    assert not wizard_tower.isOnTheTower(1)
+    assert wizard_tower.floorBalance(1) == 0
+
+    # Test that the DAO was properly compensated for eviction
+    # todo
+    assert dao_initial_balance + initial_balance == dao_final_balance
+
+
+def test_floor_balance(recurring_setup):
+    token = Token[-1]
+    wizard_tower = WizardTower[-1]
+    token = Token[-1]
+    chain = network.state.Chain()
+
+    # Test that the floor balance is calculated correctly
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+    tx.wait(1)
+    total_floor_power = wizard_tower.totalFloorPower()
+    print(f'total_floor_power: {total_floor_power}')
+    assert wizard_tower.floorBalance(1) == wizard_tower.floorPower(1) * token.balanceOf(wizard_tower) // wizard_tower.totalFloorPower()
+
+    chain.sleep(3600*7) # sleep for a week
+    total_floor_power = wizard_tower.totalFloorPower()
+    print(f'total_floor_power: {total_floor_power}')
+    assert wizard_tower.floorBalance(1) == (0 if not total_floor_power else
+                                            wizard_tower.floorPower(1) * token.balanceOf(wizard_tower) // wizard_tower.totalFloorPower())
+
+def test_total_floor_power(recurring_setup):
+    chain = network.state.Chain()
+    wizard_tower = WizardTower[-1]
+    # Test that the total floor power is calculated correctly
+    tx = wizard_tower.claimFloor(1, {"from": accounts[1].address})
+    tx.wait(1)
+    chain.sleep(3600*7) # sleep for a week
+    assert wizard_tower.totalFloorPower() == wizard_tower.floorPower(1)
+
+
+def test_only_owner(recurring_setup):
+    wizard_tower = WizardTower[-1]
+    # Test that only the owner of the contract can call certain functions
+    with reverts("Ownable: caller is not the owner"):
+        wizard_tower.updateEvictionProceedsReceiver(accounts[1].address, {"from": accounts[1].address})
 

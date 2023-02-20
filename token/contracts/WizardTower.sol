@@ -55,7 +55,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
     ////////////////////
 
     function isOnTheTower(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId !=0 && _wizardId < wizardsNFT.totalSupply(), "invalid wizard");
+        require(_wizardId !=0 && _wizardId <= wizardsNFT.totalSupply(), "invalid wizard");
         return wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp != 0;
     }
 
@@ -70,7 +70,8 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
     function _floorBalance(uint256 _floor) internal view returns(uint256) {
         require(isOnTheTower(_floor), "invalid floor or no occupant");
-        return floorPower(_floor) * token.balanceOf((address(this))) / totalFloorPower();
+        uint256 _totalFloorPower = totalFloorPower();
+        return _totalFloorPower == 0 ? 0 : floorPower(_floor) * token.balanceOf((address(this))) / _totalFloorPower;
     }
 
     //////////////
@@ -127,19 +128,19 @@ contract WizardTower is ReentrancyGuard, Ownable {
     }
 
 
-    function floorPower(uint256 _floor) public view returns(uint256) {
+    function floorPower(uint256 _floor) public view returns(uint128) {
         require(isOnTheTower(_floor)); // floor is same as wizardId
         FloorInfo memory floorInfo = wizardIdToFloorInfo[_floor]; // wizard id is same as floor id
         uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? contractSettings.startTimestamp : floorInfo.lastWithdrawalTimestamp;
-        return block.timestamp - timestamp;
+        return uint128(block.timestamp - timestamp);
     }
 
-    function totalFloorPower() public view returns(uint256) {
-        return totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * contractSettings.activeFloors;
+    function totalFloorPower() public view returns(uint128) {
+        return uint128(totalPowerSnapshot + (block.timestamp - totalPowerSnapshotTimestamp) * contractSettings.activeFloors);
     }
 
     // called when adding/removing floors or withdrawing
-    function _updateTotalPowerSnapshot(uint256 _powerRemoved) internal  {
+    function _updateTotalPowerSnapshot(uint128 _powerRemoved) internal  {
         totalPowerSnapshot = uint128(totalFloorPower() - _powerRemoved);
         totalPowerSnapshotTimestamp = uint40(block.timestamp);
     }
@@ -154,7 +155,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
         require(isOnTheTower(_floor)); // floor is same as wizardId
         uint256 amountToWithdraw = _floorBalance(_floor);
         require(amountToWithdraw!=0, "nothing to withdraw");
-        uint256 myPower = floorPower(_floor);
+        uint128 myPower = floorPower(_floor);
         // Check for balance in the contract
         require(token.balanceOf(address(this)) >= amountToWithdraw, "Not enough balance in the contract");
 
