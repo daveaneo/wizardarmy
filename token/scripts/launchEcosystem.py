@@ -73,6 +73,7 @@ def main():
     # mint uninitiated
     tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
     tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
+    tx.wait(required_confirmations)
 
     # cull (exile) wizard
     tx = wizards.cull(4, {'from': accounts[0]}) # different uplines

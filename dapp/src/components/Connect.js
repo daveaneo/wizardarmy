@@ -18,11 +18,12 @@ const networkIdUsed = process.env.REACT_APP_CORRECT_CHAIN_ID;
 const injected = injectedModule()
 const walletConnect = walletConnectModule()
 
-let ecosystemTokenAddress = '0x21921e727f71a5568e37C85F5bda0d5C1fa41102';
-let wizardNFTAddress = '0x444a9D9Bf54788322f3DbD3266910F8Eaf5868a7';
-let wizardTowerAddress = '0xcf28aeC9FA1fD50Ca73E52c517d31a8F1D86416E';
+let ecosystemTokenAddress = '0x81EB27e67164ae098886d2A7F1AdF4704A48B1D9';
+let wizardNFTAddress = '0xeF2249fdb81daacf6028236CBA3c583F15F2Eb65';
+let wizardTowerAddress = '0xF14B1a8Cf48295d49708969547782C827bb374eE';
 let wizardBattleAddress = '0x4Fd82bb0736D2364b7B944c2aFd4Ed47F5B36123';
-let wizardGovernanceAddress = '0xed221878eFadD155EA1C54853145e5abe20ACF12';
+let wizardGovernanceAddress = '0x47637ea1c7620A6eCAF87A2d79be8DE786e51698';
+let wizardAppointerAddress = '0x6D4A45B9D874692aa62984fa679CcFC26053AfB3';
 
 
  // load some data without metamask or signer
