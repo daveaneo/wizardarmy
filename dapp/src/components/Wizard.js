@@ -43,6 +43,7 @@ function Wizard(props) {
 
 
 
+
     // todo -- could combine this or import this function in MyWizards.js
     async function processWizardStruct(wiz, id) {
         let processedWizard = {};
@@ -69,9 +70,13 @@ function Wizard(props) {
         return processedWizard;
     }
 
-    async function Rebirth() {
-        let tx = await wizardNFTContract.rebirth(wizardId);
-        let res = await tx.wait(1)
+    checkStuff()
+
+    async function checkStuff() {
+        let isOnTheTower = await wizardTowerContract.isOnTheTower(wizardId);
+
+        console.log(`is on the tower: ${isOnTheTower}`);
+        let res = true;
         if(res){
 //            window.location.reload(false);
             setPageRefreshes(pageRefreshes+1); // reload all
@@ -112,15 +117,17 @@ function Wizard(props) {
 
 
     async function LoadMyFloor() {
+        console.log("loading floor")
         if(wizardTowerContract==undefined){ return;}
-        const _floor = parseInt(await wizardTowerContract.wizardIdToFloor(wizardId));
-        if (_floor!= 0){
+        const isOnTheTower = await wizardTowerContract.isOnTheTower(wizardId);
+        console.log(`isOnTheTower A: ${isOnTheTower}`)
+        if (isOnTheTower== true){
             setIsOnTheTower(true);
         }
         else if(isOnTheTower==true){
             setIsOnTheTower(false);
         }
-        setMyFloor(_floor);
+        setMyFloor(wizardId);
     }
 
     async function Initiate() {
@@ -257,16 +264,8 @@ function Wizard(props) {
                  { isOnTheTower===true &&
                  <div>
                      {myTowerTokens} <button onClick={WithdrawFromTower}>Withdraw from Tower</button> <br/>
-                    <Link to={"battle/"}>
-                      <button>Battle (Wizard tower Floors)</button> <br/>
-                    </Link>
                   </div>
                 }
-                { myPhase == (TOTALPHASES -1)
-                   && <div>
-                    <button onClick={Rebirth}>Rebirth</button> <br/>
-                   </div>
-                 }
             </div>
           }
         </div>

@@ -1,6 +1,7 @@
 #!/usr/bin/python3
+# brownie run scripts/launchEcosystem.py --network polygon-test
 
-from brownie import Wizards, Token, WizardTower, Appointer, Governance, accounts, network, config
+from brownie import Wizards, Token, WizardTower, Governance, Appointer, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -9,6 +10,7 @@ import time
 
 DUMP_ABI = True
 MINT_WIZARDS = True
+USE_PREVIOUS_CONTRACTS = True
 dev = accounts.add(config["wallets"]["from_key"]) # accounts[0]
 secondary = accounts.add(config["wallets"]["secondary"]) # accounts[1]
 print(f'network: {network.show_active()}')
@@ -24,13 +26,38 @@ print(f'required_confirmations: {required_confirmations}')
 # image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/" # simple images
 image_base_uri = "https://gateway.pinata.cloud/ipfs/QmancBkpiTwZc5HWcnBpCcWMxXqrmwLMs57UvViKe5QC7D/" # AI Generated
 
+def print_contract_addresses():
+    token = Token[-1]
+    wizards = Wizards[-1]
+    wizard_tower = WizardTower[-1]
+    governance = Governance[-1]
+    appointer = len(Appointer) > 0 and Appointer[-1]
+
+    print(f'token: {token.address}')
+    print(f'wizards: {wizards.address}')
+    print(f'wizard_tower: {wizard_tower.address}')
+    print(f'governance: {governance.address}')
+    print(f'appointer: {appointer and appointer.address}')
+
+
 def main():
-    token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
-    wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
-    wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
-    # wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
-    governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
-    appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
+    print_contract_addresses()
+    if USE_PREVIOUS_CONTRACTS:
+        token = Token[-1]
+        wizards = Wizards[-1]
+        wizard_tower = WizardTower[-1]
+        governance = Governance[-1]
+        appointer = Appointer[-1]
+        # appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
+    else:
+        token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
+        wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
+        wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
+        # wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
+        governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
+        appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
+
+    print_contract_addresses()
 
     # save addresses
     directory = os.getcwd()
@@ -84,6 +111,8 @@ def main():
     # fuel tower
     tx = token.transfer(wizard_tower.address, 10**10, {'from': accounts[0]} )
     tx.wait(required_confirmations)
+
+    exit(0)
 
     # create role contract
     roles_controlled = [i for i in range(15)]

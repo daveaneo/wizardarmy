@@ -18,12 +18,18 @@ const networkIdUsed = process.env.REACT_APP_CORRECT_CHAIN_ID;
 const injected = injectedModule()
 const walletConnect = walletConnectModule()
 
-let ecosystemTokenAddress = '0x81EB27e67164ae098886d2A7F1AdF4704A48B1D9';
-let wizardNFTAddress = '0xeF2249fdb81daacf6028236CBA3c583F15F2Eb65';
-let wizardTowerAddress = '0xF14B1a8Cf48295d49708969547782C827bb374eE';
+
+//token: 0x9f5634a07271A15DE249550FD05C834F1b42bd73
+//wizards: 0x429bC9a98403912d052f8b2508b1E0cbedA6bF91
+//wizard_tower: 0xD1f40a5354CE92dE3757c5158b863662fAdB0C82
+//governance: 0xe3cab2fbBCC5f5049C17fc813c7d04437a9766A4
+
+let ecosystemTokenAddress = '0x9f5634a07271A15DE249550FD05C834F1b42bd73';
+let wizardNFTAddress = '0x429bC9a98403912d052f8b2508b1E0cbedA6bF91';
+let wizardTowerAddress = '0xD1f40a5354CE92dE3757c5158b863662fAdB0C82';
 let wizardBattleAddress = '0x4Fd82bb0736D2364b7B944c2aFd4Ed47F5B36123';
-let wizardGovernanceAddress = '0x47637ea1c7620A6eCAF87A2d79be8DE786e51698';
-let wizardAppointerAddress = '0x6D4A45B9D874692aa62984fa679CcFC26053AfB3';
+let wizardGovernanceAddress = '0xe3cab2fbBCC5f5049C17fc813c7d04437a9766A4';
+let wizardAppointerAddress = '0x18Cd639Ca80d8096030897489a98F57dE498FBec';
 
 
  // load some data without metamask or signer
