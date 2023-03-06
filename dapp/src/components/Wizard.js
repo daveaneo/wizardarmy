@@ -72,14 +72,18 @@ function Wizard(props) {
 
     checkStuff()
 
+
+
     async function checkStuff() {
         let isOnTheTower = await wizardTowerContract.isOnTheTower(wizardId);
 
         console.log(`is on the tower: ${isOnTheTower}`);
+        console.log(`page refreshes: ${pageRefreshes}`)
+
         let res = true;
         if(res){
 //            window.location.reload(false);
-            setPageRefreshes(pageRefreshes+1); // reload all
+//            setPageRefreshes(pageRefreshes+1); // reload all
         }
         else{
           console.error("rebirth failed.")
@@ -131,6 +135,7 @@ function Wizard(props) {
     }
 
     async function Initiate() {
+        console.log("David initiate")
         let tx = await wizardNFTContract.initiate(wizardId);
         let res = await tx.wait(1);
         let tempWizard = {...myWizard}; // this creates a shallow copy (not nested arrays)
