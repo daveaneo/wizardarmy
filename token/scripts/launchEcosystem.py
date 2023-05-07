@@ -1,6 +1,7 @@
 #!/usr/bin/python3
+# brownie run scripts/launchEcosystem.py --network polygon-test
 
-from brownie import Wizards, Token, WizardTower, WizardBattle, Governance, accounts, network, config
+from brownie import Wizards, Token, WizardTower, Governance, Appointer, accounts, network, config
 from brownie.network.state import Chain
 import json
 import os
@@ -9,6 +10,7 @@ import time
 
 DUMP_ABI = True
 MINT_WIZARDS = True
+USE_PREVIOUS_CONTRACTS = True
 dev = accounts.add(config["wallets"]["from_key"]) # accounts[0]
 secondary = accounts.add(config["wallets"]["secondary"]) # accounts[1]
 print(f'network: {network.show_active()}')
@@ -22,14 +24,40 @@ print(f'required_confirmations: {required_confirmations}')
 
 # variables
 # image_base_uri = "https://gateway.pinata.cloud/ipfs/Qme17uaAhxas6YE2SC96CAstzeX9jHaZNEH1N2RKoxTRiG/" # simple images
-image_base_uri = "https://gateway.pinata.cloud/ipfs/QmVqAYo9SKUt2qTjtB7JBogBpXPpWnXbsn77P3FxYpGJpA/" # AI Generated
+image_base_uri = "https://gateway.pinata.cloud/ipfs/QmancBkpiTwZc5HWcnBpCcWMxXqrmwLMs57UvViKe5QC7D/" # AI Generated
+
+def print_contract_addresses():
+    token = Token[-1]
+    wizards = Wizards[-1]
+    wizard_tower = WizardTower[-1]
+    governance = Governance[-1]
+    appointer = len(Appointer) > 0 and Appointer[-1]
+
+    print(f'token: {token.address}')
+    print(f'wizards: {wizards.address}')
+    print(f'wizard_tower: {wizard_tower.address}')
+    print(f'governance: {governance.address}')
+    print(f'appointer: {appointer and appointer.address}')
+
 
 def main():
-    token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
-    wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
-    wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
-    wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
-    governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
+    print_contract_addresses()
+    if USE_PREVIOUS_CONTRACTS:
+        token = Token[-1]
+        wizards = Wizards[-1]
+        wizard_tower = WizardTower[-1]
+        governance = Governance[-1]
+        appointer = Appointer[-1]
+        # appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
+    else:
+        token = Token.deploy("Test Token", "TST", 18, 1e21, {'from': accounts[0]})
+        wizards = Wizards.deploy("Wizards", "WZD", token.address, image_base_uri, {'from': accounts[0]})
+        wizard_tower = WizardTower.deploy(token.address, wizards.address, {'from': accounts[0]})
+        # wizard_battle = WizardBattle.deploy(token.address, wizards.address, wizard_tower.address, {'from': accounts[0]})
+        governance = Governance.deploy(wizards.address, wizard_tower.address, {'from': accounts[0]})
+        appointer = Appointer.deploy(wizards.address, {'from': accounts[0]})
+
+    print_contract_addresses()
 
     # save addresses
     directory = os.getcwd()
@@ -44,23 +72,38 @@ def main():
         file.write(f'\ntoken: {token}')
         file.write(f'\nwizardsNFT: {wizards}')
         file.write(f'\nwizard_tower: {wizard_tower}')
-        file.write(f'\nwizard_battle: {wizard_battle}')
+        # file.write(f'\nwizard_battle: {wizard_battle}')
 
     # set modifier addresses
-    tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
-    tx = wizard_tower.updateBattler(wizard_battle.address, {'from': accounts[0]})
-    tx.wait(required_confirmations)
+    # tx = wizards.updateBattler(wizard_battle.address, {'from': accounts[0]})
+    # tx = wizard_tower.updateBattler(wizard_battle.address, {'from': accounts[0]})
+    # tx.wait(required_confirmations)
 
-    # create wizards
+    contract_settings = wizards.contractSettings()
+    initation_cost = contract_settings[1]
+    print(f'contractSettings: {contract_settings}')
+    print(f'initation_cost: {initation_cost}')
+
+    # create wizards (unitiated, active, exiled, regular)
     if MINT_WIZARDS:
         for i in range(1, 3):
-            tx = wizards.mint({'from': (accounts[1] if i > 1 else accounts[0])})
+            tx = wizards.mint(i-1, {'from': (accounts[1] if i > 1 else accounts[0])}) # different uplines
             tx.wait(required_confirmations)
-            tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0])})
+            tx = wizards.initiate(i, {'from': (accounts[1] if i > 1 else accounts[0]), "value": initation_cost})
             tx.wait(required_confirmations)
             print(f'wizard {i} initiated, resulting in event: {tx.events}')
             tx = wizard_tower.claimFloor(i, {'from': (accounts[1] if i > 1 else accounts[0])})
             tx.wait(required_confirmations)
+            upline = wizards.getUplineId(i)
+            print(f'upline of wizard: {upline}')
+
+    # mint uninitiated
+    tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
+    tx = wizards.mint(0, {'from': accounts[1]}) # different uplines
+    tx.wait(required_confirmations)
+
+    # cull (exile) wizard
+    tx = wizards.cull(4, {'from': accounts[0]}) # different uplines
 
     ts = wizards.totalSupply()
     print(f'total wizards: {ts}')
@@ -68,6 +111,19 @@ def main():
     # fuel tower
     tx = token.transfer(wizard_tower.address, 10**10, {'from': accounts[0]} )
     tx.wait(required_confirmations)
+
+    exit(0)
+
+    # create role contract
+    roles_controlled = [i for i in range(15)]
+    tx = appointer.createRole("boss", roles_controlled)
+    tx.wait(1)
+    role = appointer.getRole(1)
+    print(f'roll for boss: {role}')
+
+
+
+
 
     # chain.sleep(60*9)
     # chain.mine(1)
@@ -275,15 +331,15 @@ def main():
             # file.write(abi)
             json.dump(abi, file)
 
-        print(f'dumping wizardBattle...') # sdf sfd sdfsdf sdf
-        directory = os.getcwd()
-        path = os.path.join(directory, "abi_dump")
-        # print(f'path: {path}')
-        abi = str(wizard_battle.abi)
-        file_path = os.path.join(path, "wizardbattle.json")
-        with open(file_path, 'w') as file:
-            # file.write(abi)
-            json.dump(abi, file)
+        # print(f'dumping wizardBattle...') # sdf sfd sdfsdf sdf
+        # directory = os.getcwd()
+        # path = os.path.join(directory, "abi_dump")
+        # # print(f'path: {path}')
+        # abi = str(wizard_battle.abi)
+        # file_path = os.path.join(path, "wizardbattle.json")
+        # with open(file_path, 'w') as file:
+        #     # file.write(abi)
+        #     json.dump(abi, file)
 
 
         # todo -- save addresses

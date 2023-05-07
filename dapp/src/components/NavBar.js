@@ -99,7 +99,7 @@ function NavBar(props) {
 
 
   async function mintWizard() {
-     let tx = await wizardNFTContract.mint();
+     let tx = await wizardNFTContract.mint(0);
      let res = await tx.wait(1);
      if(res ){
         setNumWizards(numWizards + 1);

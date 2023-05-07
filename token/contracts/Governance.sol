@@ -84,7 +84,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
-    uint256 taskVerificationTimeBonus = 1 days; // 1 day
+    uint40 taskVerificationTimeBonus = 1 days; // 1 day
     uint256 boardSeats = 3;
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId, Task myTask);
@@ -115,20 +115,23 @@ contract Governance is ReentrancyGuard, Ownable {
     //////  Get Functions ///////
     /////////////////////////////
 
+    // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function isCallerOnBoard() public view returns (bool) {
-        for(uint256 i =1; i <= boardSeats;){
-            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
-                return true;
-            }
-            unchecked{++i;}
-        }
+//        for(uint256 i =1; i <= boardSeats;){
+//            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
+//                return true;
+//            }
+//            unchecked{++i;}
+//        }
+//        return false;
         return false;
     }
 
+    // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function isMyWizardOnBoard(uint256 _wizId) public view returns (bool) {
-        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
-            return true;
-        }
+//        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
+//            return true;
+//        }
         return false;
     }
 
@@ -481,7 +484,7 @@ contract Governance is ReentrancyGuard, Ownable {
         require(_fields.length > 0);
 
         Task memory myTask = tasks[_taskID];
-        uint256 count = 0;
+//        uint256 count = 0;
         bool deleteTaskFlag = true;
 
         // hash leaves if there is a refuter
@@ -503,8 +506,8 @@ contract Governance is ReentrancyGuard, Ownable {
             address payable taskSubmitter = payable(wizardsNFT.ownerOf(myTask.verifierID));
 //            address payable verifier = msg.sender;
 
-            wizardsNFT.verifyDuty(myTask.NFTID, myTask.timeBonus);
-            wizardsNFT.verifyDuty(myTask.verifierID, taskVerificationTimeBonus);
+            wizardsNFT.increaseProtectedUntilTimestamp(myTask.NFTID, myTask.timeBonus);
+            wizardsNFT.increaseProtectedUntilTimestamp(myTask.verifierID, taskVerificationTimeBonus);
 
             // myTask.payment=0; // thwart reentrancy attacks
             delete tasks[_taskID];
@@ -534,8 +537,8 @@ contract Governance is ReentrancyGuard, Ownable {
                 uint256 split = myTask.payment/2;
                 address payable taskRefuter = payable(wizardsNFT.ownerOf(myTask.refuterID));
 
-                wizardsNFT.verifyDuty(myTask.refuterID, taskVerificationTimeBonus);
-                wizardsNFT.verifyDuty(_wizId, taskVerificationTimeBonus);
+                wizardsNFT.increaseProtectedUntilTimestamp(myTask.refuterID, taskVerificationTimeBonus);
+                wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
 
                 // myTask.payment=0; // thwart reentrancy attacks
                 delete tasks[_taskID];

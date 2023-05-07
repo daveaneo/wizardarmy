@@ -82,13 +82,15 @@ contract RelativeTokenHolding is ReentrancyGuard {
     }
 
     function _myBalance(address _addy) internal view returns(uint256) {
+        if (totalRelativeStaking==0){
+            return 0;
+        }
         return rBalances[_addy] * getBalanceOf(_addy) / totalRelativeStaking;
     }
 
 
-    // todo -- msg.sender or _sender
     // To submit a new stake for the current window
-    function deposit(uint256 stakeAmount, address _sender) external {
+    function deposit(uint256 stakeAmount) external {
 
         // todo -- is address(this) a separate contract???
         uint256 old_total_balance = token.balanceOf(address(this));
