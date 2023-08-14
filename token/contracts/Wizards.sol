@@ -219,25 +219,12 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit Initiated(msg.sender, _wizardId, block.timestamp);
     }
 
-
-//    struct Stats { // todo -- reduce uint amount
-//        uint128 level;
-//        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
-//        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
-//        // todo -- have reputation smart contract and be able to get reputation from here
-//        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
-//        uint16 uplineId;  // 0 is default, 65k max?
-//        uint40 initiationTimestamp; // 0 if uninitiated
-//        uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//        ELEMENT element; // todo -- our wizards have 4 element fields. Can be Fire Fire Fire Fire.
-//    }
-
     function _resetWizard(uint256 tokenId) internal {
         Stats storage wizardStats = tokenIdToStats[tokenId];
 
         // Reset the states
         myStats = tokenIdToStats[tokenId]
-        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0, myStats.element); // todo confirm we can access like structure
+        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0, myStats.element);
     }
 
 
@@ -260,7 +247,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       */
     function _exile(uint256 _wizardId) internal {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id"); // todo -- potentially restrict this further
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id");
+        require(!isExiled(_wizardId), "wiz already in exile");
         tokenIdToStats[_wizardId].protectedUntilTimestamp = uint40(block.timestamp); // this saves the time of exile started
         tokenIdToStats[_wizardId].initiationTimestamp = 0;
     }
@@ -273,7 +261,6 @@ contract Wizards is ERC721Enumerable, Ownable {
 //    • "Egg"
 //    • Wizard -> Can join wizard tower
 
-    // todo -- consider adding elements to all images
     /** @dev get token URI
       * @param _wizardId id of wizard.
       * @return returns inline URI as string
