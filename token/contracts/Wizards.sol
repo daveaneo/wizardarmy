@@ -21,26 +21,28 @@ contract Wizards is ERC721Enumerable, Ownable {
     struct Stats { // todo -- reduce uint amount
         uint128 level;
         uint128 tokensClaimed; // maybe
-        uint128 contributionKarma; // maybe
-        uint16 role; // limit wizards to 1 role, which is a number
+        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
+        // todo -- have reputation smart contract and be able to get reputation from here
+        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
         uint16 uplineId;  // 0 is default, 65k max?
         uint40 initiationTimestamp; // 0 if uninitiated
         uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-        ELEMENT element;
+        ELEMENT element; // todo -- our wizards have 4 element fields. Can be Fire Fire Fire Fire.
     }
 
     struct ContractSettings { // todo refine, update setter
-        uint256 mintCost;
-        uint256 initiationCost;
+        uint256 mintCost; // Cost in ETH to mint NFT
+        uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
         // cull the herd and reduce to 1000... 400, and so forth? total or per role?
-        uint256 maxSupply;
-        uint256 protectionTimeExtension;
-        uint256 exileTimePenalty;
-        address ecosystemTokenAddress;
-        uint256 phaseDuration;
-        uint256 totalPhases;
+        immutable uint256 maxSupply; // Max supply of NFTs
+        uint256 maxActiveWizards; // Max supply of NFTs that can be active
+        uint256 protectionTimeExtension; //
+        uint256 exileTimePenalty; // time to wait before able to reactivate
+        address ecosystemTokenAddress; // address of ecoystem token
+        uint256 phaseDuration; // time in seconds for each phase of wizard life
+        uint256 totalPhases; // total phases for wizards -- aiming for 8
         uint256 maturityThreshold; // phase in which wizard can enter Wizard Tower
-        string imageBaseURI;
+        string imageBaseURI; // base URI where images are stored
     }
 
     ContractSettings public contractSettings;
@@ -55,8 +57,6 @@ contract Wizards is ERC721Enumerable, Ownable {
     event Exiled(address exilee, uint256 indexed wizardId, uint256 timestamp);
 
 
-    ///////
-
     ////////////////////
     ////    Get       //
     ////////////////////
@@ -66,7 +66,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true if active, false if inactive
       */
     function isActive(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
@@ -76,7 +76,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true -> exiled; false -> not exiled
       */
     function isExiled(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp != 0 && tokenIdToStats[_wizardId].initiationTimestamp ==0;
     }
 
@@ -85,32 +85,36 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true -> deserted; false -> has not deserted
       */
     function hasDeserted(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
     }
 
 
-    /** @dev Check if wizard is active
+    /** @dev Check if wizard is mature -- can be in wizard tower
       * @param _wizardId id of wizard.
       * @return true if active, false if inactive
       */
     function isMature(uint256 _wizardId) public view returns(bool) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return getPhaseOf(_wizardId) >= contractSettings.maturityThreshold;
     }
 
 
-    /** @dev Check if wizard is active
+    /** @dev Get upline of wizard
       * @param _wizardId id of wizard.
       * @return wizardId of upline
       */
     function getUplineId(uint256 _wizardId) public view returns(uint256) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].uplineId;
     }
 
+    /** @dev Get role of wizard
+      * @param _wizardId id of wizard.
+      * @return wizardId of upline
+      */
     function getRole(uint256 _wizardId) public view returns(uint256) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].role;
     }
 
@@ -120,7 +124,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return stats
       */
     function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId];
     }
 
@@ -130,12 +134,16 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return number representing phase
       */
     function getPhaseOf(uint256 _wizardId) public view returns(uint256) {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         uint256 phase =
           (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
           > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
           ;
         return phase;
+    }
+
+    function _isValidWizard(uint256 _wizardId) internal view returns (bool) {
+        return _wizardId != 0 && _wizardId <= totalSupply();
     }
 
 
@@ -372,7 +380,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////////////////////////////////////
 
     function appointRole(uint256 _wizardId, uint16 _role) external onlyAppointer {
-        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid wizard");
+        require(_isValidWizard(_wizardId), "invalid wizard");
         tokenIdToStats[_wizardId].role = _role;
     }
 
