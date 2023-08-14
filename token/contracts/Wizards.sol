@@ -15,12 +15,16 @@ contract Wizards is ERC721Enumerable, Ownable {
     address public culler; /// contract address to exile any wizard
     address public appointer; /// contract address to assign roles
 
+    contract reputationSmartContract;
+    contract taskSmartContract;
+
+
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
     // note -- stack gets too deep if add more
     struct Stats { // todo -- reduce uint amount
-        uint128 level;
-        uint128 tokensClaimed; // maybe
+        uint128 level; // todo -- this can liekly be changed to phase or something that continues to grow
+        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
         uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
         // todo -- have reputation smart contract and be able to get reputation from here
         uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
@@ -147,31 +151,37 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
+
     ///////////////////////////
     ////// Core Functions /////
     ///////////////////////////
-    /** @dev initiate Wizards NFT
-      * @param _name name of NFT
-      * @param _symbol symbol for NFT
-      * @param _ERC20Address address for ecosystem token (currency)
-      * @param _imageBaseURI base URI used for images
-      */
-    constructor(string memory _name, string memory _symbol, address _ERC20Address, string memory _imageBaseURI) ERC721(_name, _symbol) {
-        contractSettings.maxSupply = 10000;
-        contractSettings.initiationCost = 1;
-        contractSettings.mintCost = 5; // todo -- do in less steps
-        contractSettings.protectionTimeExtension = 1 days; // todo -- do in less steps
-        contractSettings.ecosystemTokenAddress = _ERC20Address; // todo -- do in less steps
-        contractSettings.phaseDuration = 60*60;// todo --
-        contractSettings.imageBaseURI = _imageBaseURI;// todo --
-        contractSettings.totalPhases = 8;
-        contractSettings.maturityThreshold = 0; // todo make it 5?
+    /**
+     * @dev initiate Wizards NFT
+     * @param _name name of NFT
+     * @param _symbol symbol for NFT
+     * @param _ERC20Address address for ecosystem token (currency)
+     * @param _imageBaseURI base URI used for images
+     */
+    constructor(string memory _name, string memory _symbol, address _ERC20Address, string memory _imageBaseURI)
+        ERC721(_name, _symbol)
+    {
+        contractSettings = ContractSettings({
+            maxSupply: 8192,
+            initiationCost: 10,
+            mintCost: 5,
+            protectionTimeExtension: 1 days,
+            ecosystemTokenAddress: _ERC20Address,
+            phaseDuration: 60*60,
+            imageBaseURI: _imageBaseURI,
+            totalPhases: 8,
+            maturityThreshold: 0
+        });
 
         verifier = msg.sender;
         culler = msg.sender;
         appointer = msg.sender;
-
     }
+
 
 
     /** @dev check if wizard has deserted and thus can be exiled
@@ -182,6 +192,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(_uplineId <= totalSupply(), "invalid upline--must be less than total supply");
 
         uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp)));
+
+        // todo -- I am not sure the mechanism we will be using to generate our NFTs and element rarity
         ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
 
         Stats memory myStats =  Stats(1, 0, 0, 0, _uplineId, 0, 0, element);
@@ -197,15 +209,35 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(ownerOf(_wizardId) == msg.sender, "must be owner");
         require(tokenIdToStats[_wizardId].initiationTimestamp == 0, "already initiated");
         require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp, "Exiled wizard not yet allowed to return.");
-        // todo -- receive fee
 
-        require(msg.value == contractSettings.initiationCost, "incorrect initiaton fee");
+        require(msg.value == contractSettings.initiationCost, "incorrect initiation fee");
 
         Stats storage myStats = tokenIdToStats[_wizardId];
         myStats.initiationTimestamp = uint40(block.timestamp);
         myStats.protectedUntilTimestamp = uint40(block.timestamp + contractSettings.protectionTimeExtension);
 
         emit Initiated(msg.sender, _wizardId, block.timestamp);
+    }
+
+
+//    struct Stats { // todo -- reduce uint amount
+//        uint128 level;
+//        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
+//        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
+//        // todo -- have reputation smart contract and be able to get reputation from here
+//        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
+//        uint16 uplineId;  // 0 is default, 65k max?
+//        uint40 initiationTimestamp; // 0 if uninitiated
+//        uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
+//        ELEMENT element; // todo -- our wizards have 4 element fields. Can be Fire Fire Fire Fire.
+//    }
+
+    function _resetWizard(uint256 tokenId) internal {
+        Stats storage wizardStats = tokenIdToStats[tokenId];
+
+        // Reset the states
+        myStats = tokenIdToStats[tokenId]
+        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0, myStats.element); // todo confirm we can access like structure
     }
 
 
@@ -385,6 +417,19 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
+
+    ////////////////////////////////////
+    ////// Override Functions     /////
+    ////////////////////////////////////
+
+    function transferFrom(address from, address to, uint256 tokenId) public override {
+        // Call the parent contract's implementation of transferFrom
+        super.transferFrom(from, to, tokenId);
+
+        // Reset the states of the wizard after transfer
+        _resetWizard(tokenId);
+    }
+
     /////////////////////////////////
     ////// Admin Functions      /////
     /////////////////////////////////
@@ -465,5 +510,10 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit NewAppointer(_appointer);
     }
 
+    // Allows the contract owner to withdraw the accumulated fees
+    function withdraw() external onlyOwner {
+        address payable recipient = payable(owner());
+        recipient.transfer(address(this).balance);
+    }
 
 }
