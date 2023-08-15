@@ -16,13 +16,15 @@ contract Appointer is Ownable {
 
     IERC721Wizard wizardContract;
     struct Role {
-        string name; // todo use bytes32, forcing limitations on name size
-        uint8[15] rolesCanAppoint;
+        bytes32 name; // todo use bytes32, forcing limitations on name size
+        uint16[12] rolesCanAppoint;
         bool valid;
     }
     mapping (uint256 => Role) public roles;
     uint256 public numRoles;
 
+    /// @notice Creates a new Appointer contract instance.
+    /// @param _wizardContract The address of the associated Wizard contract.
     constructor(address _wizardContract){
         wizardContract = IERC721Wizard(_wizardContract);
     }
@@ -32,7 +34,10 @@ contract Appointer is Ownable {
     ////// Get Functions      /////
     ///////////////////////////////
 
-    function getRole(uint256 _role) external view returns(Role memory) {
+    /// @notice Fetches the details of a specific role.
+    /// @param _role The ID of the role to fetch.
+    /// @return Returns the details of the role.    function getRole(uint256 _role) external view returns(Role memory) {
+    function getRoleInfo(uint256 _role) external view returns(Role memory) {
         require(_role <= numRoles && _role != 0, "non-existant role");
         return roles[_role];
     }
@@ -41,7 +46,11 @@ contract Appointer is Ownable {
     ////// Core Functions      /////
     ////////////////////////////////
 
-    function appoint(uint256 _appointerId, uint256 _appointeeId, uint256 _role) external {
+    /// @notice Allows a wizard to appoint another wizard to a specified role.
+    /// @param _appointerId The ID of the wizard making the appointment.
+    /// @param _appointeeId The ID of the wizard being appointed.
+    /// @param _role The role to which the _appointeeId wizard is being appointed.
+     function appoint(uint256 _appointerId, uint256 _appointeeId, uint256 _role) external {
         // msg.sender must own _appointerId
         require(wizardContract.ownerOf(_appointerId)==msg.sender);
 
@@ -65,7 +74,10 @@ contract Appointer is Ownable {
         wizardContract.appointRole(_appointeeId, _role);
     }
 
-
+    /// @notice Removes the role of a specified wizard.
+    /// @dev The calling address must own the appointer wizard and have authority over the appointee's role.
+    /// @param _appointerId The ID of the wizard making the removal.
+    /// @param _appointeeId The ID of the wizard whose role is being removed.
     function remove(uint256 _appointerId, uint256 _appointeeId) external {
         // msg.sender must own _appointerId
         require(wizardContract.ownerOf(_appointerId)==msg.sender);
@@ -93,7 +105,11 @@ contract Appointer is Ownable {
         wizardContract.appointRole(_appointeeId, 0);
     }
 
-    function createRole(string memory _name, uint8[15] memory _rolesCanAppoint) external onlyOwner {
+    /// @notice Creates a new role with the specified attributes.
+    /// @dev This function can only be called by the contract owner.
+    /// @param _name The name of the new role.
+    /// @param _rolesCanAppoint An array representing roles that can appoint this role.
+     function createRole(string memory _name, uint8[15] memory _rolesCanAppoint) external onlyOwner {
         Role memory role;
         role.name = _name;
         role.rolesCanAppoint = _rolesCanAppoint;
@@ -103,7 +119,31 @@ contract Appointer is Ownable {
     // pause/unpause role
     // implications? Can't appoint or can't do anything?
 
-    // todo toggleRoleActivated
+    /// @notice Sets the activation status of a specific role.
+    /// @dev This function can be called by the contract owner or a role with the appropriate authority.
+    /// @param _roleId The ID of the role to be set.
+    /// @param _status The activation status (true for active, false for inactive).
+    function setRoleActivated(uint256 _roleId, bool _status) external {
+        require(_roleId <= numRoles && _roleId != 0, "non-existant role");
+
+        // Check if the msg.sender is the owner or has authority over the role.
+        if (msg.sender != owner()) {
+            uint256 senderRole = wizardContract.getRole(msg.sender);
+            bool hasAuthority = false;
+
+            // Check if sender's role has permission to appoint the role in question.
+            for (uint256 i = 0; i < 15; i++) {
+                if (roles[senderRole].rolesCanAppoint[i] == _roleId) {
+                    hasAuthority = true;
+                    break;
+                }
+            }
+            require(hasAuthority, "No authority to set this role's activation status.");
+        }
+
+        // Set the role's activation status.
+        roles[_roleId].valid = _status;
+    }
 
     // todo whitelist and blacklist?
 
