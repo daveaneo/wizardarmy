@@ -15,10 +15,12 @@ contract Appointer is Ownable {
 
     IERC721Wizard wizardContract;
     struct Role {
-        bytes32 name; // todo use bytes32, forcing limitations on name size
-        uint16[12] rolesCanAppoint;
-        bool paused;  // true if the role is paused, false (default) if it's active
+        bytes32 name;
+        bool paused;
+        uint16 maxHolders;
+        uint16 currentHolders;
     }
+
     mapping (uint256 => Role) public roles;
     uint256 public numRoles;
     mapping(uint256 => mapping(uint256 => bool)) public canAppoint;
@@ -27,6 +29,9 @@ contract Appointer is Ownable {
     event RoleAppointed(uint256 wizardId, uint256 roleId);
     event RoleRemoved(uint256 wizardId);
     event RoleActivationChanged(uint256 roleId, bool paused);
+    event RoleCanAppointAdded(uint16 role, uint16 canAppointRole);
+    event RoleCanAppointRemoved(uint16 role, uint16 canAppointRole);
+
 
     /// @notice Creates a new Appointer contract instance.
     /// @param _wizardContract The address of the associated Wizard contract.
@@ -92,20 +97,53 @@ contract Appointer is Ownable {
 
     }
 
+    /// @notice Sets the ability of a role to appoint another role.
+    /// @dev This function can only be called by the contract owner.
+    /// @param _roleId The ID of the role being modified.
+    /// @param _canAppointRoleId The role ID that the role can/cannot appoint.
+    /// @param _status True if the role should be able to appoint, false otherwise.
+    function setCanAppoint(uint256 _roleId, uint256 _canAppointRoleId, bool _status)
+        external
+        onlyOwner
+        roleExists(_roleId)
+        roleExists(_canAppointRoleId)
+    {
+        require(canAppoint[_roleId][_canAppointRoleId] != _status, "Given role can already appoint this role.")
+        canAppoint[_roleId][_canAppointRoleId] = _status;
+
+        if (_status) {
+            emit RoleCanAppointAdded(uint16(_roleId), uint16(_canAppointRoleId));
+        } else {
+            emit RoleCanAppointRemoved(uint16(_roleId), uint16(_canAppointRoleId));
+        }
+    }
 
 
     /// @notice Creates a new role with the specified attributes.
     /// @dev This function can only be called by the contract owner.
     /// @param _name The name of the new role.
-    /// @param _rolesCanAppoint An array representing roles that can appoint this role.
-     function createRole(string memory _name, uint8[15] memory _rolesCanAppoint) external onlyOwner {
-        Role memory role;
-        role.name = _name;
-        role.rolesCanAppoint = _rolesCanAppoint;
+    /// @param _rolesCanAppoint An array representing roles that the new role can appoint.
+    function createRole(string memory _name, uint16 _maxHolders, uint256[] memory _rolesCanAppoint) external onlyOwner {
+        // Increment the number of roles
         numRoles += 1;
-        roles[numRoles] = role;
-        emit RoleCreated(numRoles, _name, false);
 
+        roles[numRoles] = Role({
+            name: bytes32(bytes(_name)),
+            paused: false,   // the default value, can be omitted if you wish
+            maxHolders: _maxHolders,
+            currentHolders: 0   // since it's a new role, currentHolders is 0
+        });
+
+        // Loop through the roles this role can appoint
+        for (uint i = 0; i < _rolesCanAppoint.length; i++) {
+            uint256 roleToAppoint = _rolesCanAppoint[i];
+            require(roleToAppoint <= numRoles, "Role to appoint does not exist.");
+            canAppoint[numRoles][roleToAppoint] = true;
+            emit RoleCanAppointAdded(uint16(numRoles), uint16(roleToAppoint));
+        }
+
+        // Emit event
+        emit RoleCreated(numRoles, _name, false);
     }
 
 
