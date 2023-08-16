@@ -69,9 +69,12 @@ contract Appointer is Ownable {
     {
         //  and have no role (role==0)
         require(wizardContract.getRole(_appointeeId) == 0, "must have no role.");
+        require(roles[_roleId].currentHolders < roles[_roleId].maxHolders, "role maxed out.")
+
 
         // appoint role
         wizardContract.appointRole(_appointeeId, _roleId);
+        roles[_roleId].currentHolders += 1;
     }
 
     /// @notice Removes the role of a specified wizard.
@@ -93,6 +96,7 @@ contract Appointer is Ownable {
         );
 
         wizardContract.appointRole(_appointeeId, 0);
+        roles[appointeeRole].currentHolders -= 1;
         emit RoleRemoved(_appointeeId);
 
     }
@@ -128,7 +132,7 @@ contract Appointer is Ownable {
         numRoles += 1;
 
         roles[numRoles] = Role({
-            name: bytes32(bytes(_name)),
+            name: bytes32(_name),
             paused: false,   // the default value, can be omitted if you wish
             maxHolders: _maxHolders,
             currentHolders: 0   // since it's a new role, currentHolders is 0
