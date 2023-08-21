@@ -1,0 +1,13 @@
+> rewards smart contract for NFT minting
+>> retain MLM structure
+>> after full mint, users can claim rewards
+>> need to be active to claim rewards
+>> limited time to claim rewards
+>>
+
+> We want to limit our active wizards to role, at some point. In other words, we don't want 6000 general wizards. We will
+want, for example, 5 solidity devs, 10 designers, 100 marketers, and so forth. There should be a constraint on who can initialize.
+They will need to be initialized with a role.
+>> more functions -- must initialize with role
+
+> Guest wizard? Does it make sense to have a few spaces for guest wizards when there are no NFT spaces available? I don't think so, as that is what makes our NFTs valuable.

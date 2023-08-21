@@ -57,11 +57,27 @@ contract Governance is ReentrancyGuard, Ownable {
         uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
+    struct Proposal {
+        string IPFSHash;
+        uint16 numberOfOptions;
+        uint16[8] votes;
+        uint40 totalVotes;
+        uint40 begTimestamp;
+        uint40 endTimestamp;
+    }
+
+
+
     TaskType[] public taskTypes; // we must keep task types low in quantity to avoid gas issues
 
     // todo -- these should be dequeues
     DoubleEndedQueue.Bytes32Deque public tasksWaitingConfirmation;
+//    uint256[] public tasksVerifying; // reduce size?
 
+//    DoubleEndedQueue.Bytes32Deque  public myQueue;
+
+    mapping (uint256 => Proposal) public proposals;
+    uint256 totalProposals;
 
     mapping (uint256 => Task) public tasks;
     uint256 public totalTasksAttempted;
@@ -69,6 +85,7 @@ contract Governance is ReentrancyGuard, Ownable {
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
+    uint256 boardSeats = 3;
 
     event VerificationAssigned(uint256 wizardId, uint256 taskId, Task myTask);
     event VerificationFailed(uint256 VerifierIdFirst, uint256 VerifierIdSecond, uint256 taskId);
@@ -82,11 +99,33 @@ contract Governance is ReentrancyGuard, Ownable {
     //////  TEMP Functions ///////
     /////////////////////////////
 
+    /*
+    function getFront() view external returns ( uint256) {
+        require(DoubleEndedQueue.length(myQueue)!=0, "Empty Dequeue");
+        return uint256(DoubleEndedQueue.front(myQueue));
+    }
+
+    function pushFront(bytes32 _data) external {
+    //  Task memory myTask = Task("0 - MYIPFSHASH", 1, keccak256(4), 3, 4, 5, 6, 7);
+        DoubleEndedQueue.pushFront(myQueue,bytes32(_data));
+    }
+    */
 
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
 
+    // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
+    function isCallerOnBoard() public view returns (bool) {
+//        for(uint256 i =1; i <= boardSeats;){
+//            if(wizardsNFT.ownerOf(wizardTower.getWizardOnFloor(i)) == msg.sender ){
+//                return true;
+//            }
+//            unchecked{++i;}
+//        }
+//        return false;
+        return false;
+    }
 
     // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function isMyWizardOnBoard(uint256 _wizId) public view returns (bool) {
@@ -96,9 +135,13 @@ contract Governance is ReentrancyGuard, Ownable {
         return false;
     }
 
-//    todo -- we want to limit certain tasks to certain roles. How to do this in a department?
 
-
+/*
+// todo -- delete this helper function
+    function getTaskTypeFields(uint256 _id) external view returns (uint8 ) {
+        return taskTypes[_id].numFieldsToHash;
+    }
+*/
     function getTaskById(uint256 _taskId) external view returns (Task memory) {
         return tasks[_taskId];
     }

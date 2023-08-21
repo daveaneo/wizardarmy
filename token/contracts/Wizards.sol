@@ -31,7 +31,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint16 uplineId;  // 0 is default, 65k max?
         uint40 initiationTimestamp; // 0 if uninitiated
         uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-        ELEMENT element; // todo -- our wizards have 4 element fields. Can be Fire Fire Fire Fire.
+//        ELEMENT[4] genes; # this will be determined by the wizards properties not stored separately
     }
 
     struct ContractSettings { // todo refine, update setter
@@ -50,8 +50,15 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
     ContractSettings public contractSettings;
-    // 8 images????
 
+    // Random number for creating wizard genes
+    uint256 public randomNumber;
+    bool private randomNumberSet = false;
+
+
+
+
+    // 8 images????
     // 8 phases, must initiate first
 
     event NewVerifier(address verifier);
@@ -145,6 +152,25 @@ contract Wizards is ERC721Enumerable, Ownable {
           ;
         return phase;
     }
+
+    /** @dev Returns phase of wizard
+      * @param _wizardId id of wizard.
+      * @return number representing phase
+      */
+    function getWizardGenes(uint256 _wizardId) public view returns(uint256) randomNumberSet {
+        require(_isValidWizard(_wizardId), "invalid wizard");
+        uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, randomNumber)));
+
+        ELEMENT[4] memory result;
+
+        for (uint i = 0; i < 4; i++) {
+            uint256 value = (myRandNum >> (i * 64)) % 4; // Shift by 64 bits for each number
+            result[i] = ELEMENT(value);
+        }
+
+        return result;
+    }
+
 
     function _isValidWizard(uint256 _wizardId) internal view returns (bool) {
         return _wizardId != 0 && _wizardId <= totalSupply();
@@ -269,7 +295,11 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(_exists(_wizardId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
         string memory linkExtension;
-        if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
+
+        if(!randomNumberSet){
+            linkExtension = "placeholder"; // todo -- placeholder image before random number set
+        }
+        else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
             linkExtension = "uninitiated"; // todo -- shameful uninitiated picture
         }
         else if(isExiled(_wizardId)){ // exiled
@@ -379,6 +409,13 @@ contract Wizards is ERC721Enumerable, Ownable {
 //    }
 
 
+    //    todo -- make an actual random number generator with chainlink
+    function setRandomNumber(uint256 _randomNumber) external randomNumberSet onlyOwner {
+        randomNumber = _randomNumber;
+        randomNumberSet = true;
+    }
+
+
     ///////////////////////////////////
     ////// Verifier Functions     /////
     ///////////////////////////////////
@@ -465,6 +502,13 @@ contract Wizards is ERC721Enumerable, Ownable {
         );
         _;
     }
+
+
+    modifier randomNumberSet() {
+        require(!randomNumberSet, "Number is already set");
+        _;
+    }
+
 
     ///////////////////////////
     ////// Admin      /////
