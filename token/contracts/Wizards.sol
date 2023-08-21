@@ -5,6 +5,7 @@ pragma solidity 0.8.15;
 import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
 import "./libraries/Strings.sol";
+import "./Base64.sol";  // Assuming you have a Base64 encoding library
 
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
@@ -52,14 +53,8 @@ contract Wizards is ERC721Enumerable, Ownable {
     ContractSettings public contractSettings;
 
     // Random number for creating wizard genes
-    uint256 public randomNumber;
-    bool private randomNumberSet = false;
-
-
-
-
-    // 8 images????
-    // 8 phases, must initiate first
+    uint256 public wizardSalt;
+    bool private wizardSaltSet = false;
 
     event NewVerifier(address verifier);
     event NewCuller(address culler);
@@ -157,9 +152,9 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return number representing phase
       */
-    function getWizardGenes(uint256 _wizardId) public view returns(uint256) randomNumberSet {
+    function getMagicGenes(uint256 _wizardId) public view returns(uint256) wizardSaltSet {
         require(_isValidWizard(_wizardId), "invalid wizard");
-        uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, randomNumber)));
+        uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
 
         ELEMENT[4] memory result;
 
@@ -172,15 +167,48 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
+    /**
+     * @dev Returns the basic genes of a wizard.
+     *
+     * This function generates a pseudo-random number based on the wizard ID, a constant salt for basic genes ('b'),
+     * and a global salt (wizardSalt). It then derives genes for 13 different traits, where each trait can have a
+     * value between 0 and 8 (inclusive).
+     *
+     * @param _wizardId The ID of the wizard.
+     * @return An array of 13 integers, each representing the gene for one trait. Each gene will have a value
+     * between 0 and 8 (inclusive).
+     */
+    function getBasicGenes(uint256 _wizardId) public view returns (uint256[13] memory) {
+        require(_isValidWizard(_wizardId), "Invalid wizard");
+
+        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'b', wizardSalt)));
+
+        uint256[13] memory genes;
+        for (uint i = 0; i < 13; i++) {
+            genes[i] = (pseudoRandNum >> (i * 19)) % 9;
+        }
+
+        return genes;
+    }
+
+
+
+    /**
+     * @dev Checks if the given wizard ID is valid.
+     * A valid wizard ID is non-zero and less than or equal to the total supply of wizards.
+     *
+     * @param _wizardId The ID of the wizard to be checked.
+     * @return True if the wizard ID is valid, otherwise false.
+     */
     function _isValidWizard(uint256 _wizardId) internal view returns (bool) {
         return _wizardId != 0 && _wizardId <= totalSupply();
     }
 
 
-
     ///////////////////////////
     ////// Core Functions /////
     ///////////////////////////
+
     /**
      * @dev initiate Wizards NFT
      * @param _name name of NFT
@@ -208,21 +236,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         appointer = msg.sender;
     }
 
-
-
-    /** @dev check if wizard has deserted and thus can be exiled
+    /**
+      * @dev check if wizard has deserted and thus can be exiled
       * @param _uplineId id of referring wizard. use 0 if no referral
       */
     function mint(uint16 _uplineId) external {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
         require(_uplineId <= totalSupply(), "invalid upline--must be less than total supply");
 
-        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(totalSupply(), msg.sender, block.timestamp)));
-
-        // todo -- I am not sure the mechanism we will be using to generate our NFTs and element rarity
-        ELEMENT element = ELEMENT((pseudoRandNum/10*6) % 4);
-
-        Stats memory myStats =  Stats(1, 0, 0, 0, _uplineId, 0, 0, element);
+        Stats memory myStats =  Stats(1, 0, 0, 0, _uplineId, 0, 0);
         tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
     }
@@ -235,7 +257,6 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(ownerOf(_wizardId) == msg.sender, "must be owner");
         require(tokenIdToStats[_wizardId].initiationTimestamp == 0, "already initiated");
         require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp, "Exiled wizard not yet allowed to return.");
-
         require(msg.value == contractSettings.initiationCost, "incorrect initiation fee");
 
         Stats storage myStats = tokenIdToStats[_wizardId];
@@ -245,12 +266,18 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit Initiated(msg.sender, _wizardId, block.timestamp);
     }
 
+    /**
+     * @dev Resets the statistics of a given wizard by its token ID.
+     * The function sets the wizard's statistics back to default values while preserving the upline ID.
+     *
+     * @param tokenId The ID of the wizard whose statistics are to be reset.
+     */
     function _resetWizard(uint256 tokenId) internal {
         Stats storage wizardStats = tokenIdToStats[tokenId];
 
         // Reset the states
         myStats = tokenIdToStats[tokenId]
-        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0, myStats.element);
+        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0);
     }
 
 
@@ -287,6 +314,71 @@ contract Wizards is ERC721Enumerable, Ownable {
 //    • "Egg"
 //    • Wizard -> Can join wizard tower
 
+
+    /**
+     * @dev Generates an SVG representation of an adult wizard.
+     *
+     * The SVG is constructed based on the genes of the wizard, and each gene
+     * corresponds to an image layer in the SVG. These layers are represented
+     * as base64 PNG images. The genes determine the type and order of these
+     * layers, with some genes resulting in prefixed image names.
+     *
+     * @param _wizardId The ID of the wizard for which the SVG is to be generated.
+     * @return svg The resulting SVG string representation of the wizard.
+     */
+    function getAdultWizardImage(uint256 _wizardId) public view returns (string memory) {
+        uint256 phase = getPhaseOf(_wizardId);
+        require(phase < 8, "Invalid phase");
+
+        // Start with the SVG header
+        string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
+
+
+        uint8[4] magicGenes  = getMagicGenes(_wizardId);
+        uint8[13] basicGenes  = getBasicGenes(_wizardId);
+        // Map the magicGenes (ELEMENT enums) to their corresponding letters
+        string[4] memory magicLetters = ["f", "w", "a", "e"];
+
+        // todo -- update mapping to correct map
+        string[13] memory basicPrefixes = [
+            "",
+            "",
+            magicLetters[magicGenes[0]],
+            magicLetters[magicGenes[0]],
+            magicLetters[magicGenes[1]],
+            magicLetters[magicGenes[1]],
+            "",
+            magicLetters[magicGenes[2]],
+            "",
+            "",
+            "",
+            "",
+            magicLetters[magicGenes[3]]
+        ];
+
+
+        // Add the 13 base layers
+        for (uint i = 0; i < 13; i++) {
+            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, basicPrefixes[i], Strings.toString(basicGenes[i]), '.png" />'));
+        }
+
+        //        Bonus layer if fully one element
+        if (magicGenes[0] == magicGenes[1]) && (magicGenes[1] == magicGenes[2]) && (magicGenes[2] == magicGenes[3]){
+            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, basicPrefixes[i], Strings.toString(basicGenes[i]), '.png" />'));
+
+        }
+
+        // Close the SVG
+        svg = string(abi.encodePacked(svg, '</svg>'));
+
+
+        // Convert the SVG to a data URI
+        string memory base64EncodedSVG = Base64.encode(bytes(svg));
+        string memory dataURI = string(abi.encodePacked("data:image/svg+xml;charset=UTF-8;base64,", base64EncodedSVG));
+
+        return dataURI;
+    }
+
     /** @dev get token URI
       * @param _wizardId id of wizard.
       * @return returns inline URI as string
@@ -295,8 +387,11 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(_exists(_wizardId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
         string memory linkExtension;
+        myPhase = getPhaseOf(_wizardId)
 
-        if(!randomNumberSet){
+        string memory imageURI = "";
+
+        if(!wizardSaltSet){
             linkExtension = "placeholder"; // todo -- placeholder image before random number set
         }
         else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
@@ -308,10 +403,19 @@ contract Wizards is ERC721Enumerable, Ownable {
         else if(!isActive(_wizardId)){ // not protected
             linkExtension = "inactive"; // todo -- shameful, sleeping picture
         }
-        else{ // todo -- this didn't use getPhaseOf
-            linkExtension = Strings.toString(getPhaseOf(_wizardId));
+        else if(myPhase<4){
+            linkExtension = Strings.toString(myPhase); // todo -- shameful, sleeping picture
         }
-        string memory imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
+        else{
+            imageURI = getAdultWizardImage(_wizardId)
+        }
+
+
+
+        if (!imageURI){
+            imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
+        }
+
         return formatTokenURI(_wizardId, imageURI);
     }
 
@@ -410,9 +514,9 @@ contract Wizards is ERC721Enumerable, Ownable {
 
 
     //    todo -- make an actual random number generator with chainlink
-    function setRandomNumber(uint256 _randomNumber) external randomNumberSet onlyOwner {
-        randomNumber = _randomNumber;
-        randomNumberSet = true;
+    function setRandomNumber(uint256 _wizardSalt) external wizardSaltSet onlyOwner {
+        wizardSalt = _wizardSalt;
+        wizardSaltSet = true;
     }
 
 
@@ -504,8 +608,8 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
-    modifier randomNumberSet() {
-        require(!randomNumberSet, "Number is already set");
+    modifier wizardSaltSet() {
+        require(!wizardSaltSet, "Number is already set");
         _;
     }
 
