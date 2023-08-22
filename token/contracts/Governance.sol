@@ -1,7 +1,7 @@
 pragma solidity 0.8.15;
 // SPDX-License-Identifier: Unlicensed
 
-import "./wizards.sol";
+import "./Wizards.sol";
 import "./interfaces/IERC20.sol";
 import "./interfaces/IERC165.sol";
 import "./interfaces/IERC721.sol";

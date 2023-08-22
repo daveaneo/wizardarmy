@@ -6,7 +6,7 @@ import '../contracts/helpers/Ownable.sol';
 import '../contracts/helpers/ReentrancyGuard.sol';
 import '../contracts/interfaces/IERC20.sol';
 import '../contracts/interfaces/IERC721.sol';
-import '../contracts/wizards.sol';
+import '../contracts/Wizards.sol';
 //import "../contracts/libraries/PRBMathSD59x18Typed.sol";
 
 

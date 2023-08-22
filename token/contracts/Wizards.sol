@@ -4,11 +4,18 @@ pragma solidity 0.8.15;
 //import "./helpers/ERC721.sol";
 import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
+import "./helpers/Base64.sol";
 import "./libraries/Strings.sol";
-import "./Base64.sol";  // Assuming you have a Base64 encoding library
 
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
+
+/// @title Interface for Reputation Contract
+/// @dev This interface describes the functions that the reputation contract should implement.
+interface IReputationContract {
+    function getReputation(uint256 wizardId) external view returns (uint256);
+}
+
 
 contract Wizards is ERC721Enumerable, Ownable {
     mapping (uint256 => Stats) public tokenIdToStats;
@@ -16,17 +23,20 @@ contract Wizards is ERC721Enumerable, Ownable {
     address public culler; /// contract address to exile any wizard
     address public appointer; /// contract address to assign roles
 
-    contract reputationSmartContract;
-    contract taskSmartContract;
+    IReputationContract public reputationSmartContract;
+    //    address taskSmartContractAddress;
 
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
+//    todo -- we can have base stats and extended stats
+//    base stats will be what is located on this contract
+//    extended stats will draw from other contracts
     // note -- stack gets too deep if add more
     struct Stats { // todo -- reduce uint amount
-        uint128 level; // todo -- this can liekly be changed to phase or something that continues to grow
-        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
-        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
+//        uint128 level; // todo -- this can liekly be changed to phase or something that continues to grow
+//        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
+//        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
         // todo -- have reputation smart contract and be able to get reputation from here
         uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
         uint16 uplineId;  // 0 is default, 65k max?
@@ -39,7 +49,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 mintCost; // Cost in ETH to mint NFT
         uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
         // cull the herd and reduce to 1000... 400, and so forth? total or per role?
-        immutable uint256 maxSupply; // Max supply of NFTs
+        uint256 immutable maxSupply; // Max supply of NFTs
         uint256 maxActiveWizards; // Max supply of NFTs that can be active
         uint256 protectionTimeExtension; //
         uint256 exileTimePenalty; // time to wait before able to reactivate
@@ -124,6 +134,14 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].role;
     }
 
+    /// @notice A function in Wizards that uses the reputation contract.
+    /// @param _wizardId The ID of the wizard whose reputation needs to be fetched.
+    /// @return The reputation value of the specified wizard.
+    function getReputation(uint256 _wizardId) public view returns (uint256) {
+        /// @dev Fetching the reputation from the reputation contract.
+        return reputationSmartContract.getReputation(_wizardId);
+    }
+
 
     /** @dev returns stats of wizard, potentially amplified by level or phase
       * @param _wizardId id of wizard.
@@ -132,6 +150,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
         require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId];
+        //todo -- extended stats
     }
 
 
@@ -152,7 +171,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return number representing phase
       */
-    function getMagicGenes(uint256 _wizardId) public view returns(uint256) wizardSaltSet {
+    function getMagicGenes(uint256 _wizardId) public view afterSaltSet returns(uint256)  {
         require(_isValidWizard(_wizardId), "invalid wizard");
         uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
 
@@ -236,6 +255,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         appointer = msg.sender;
     }
 
+
     /**
       * @dev check if wizard has deserted and thus can be exiled
       * @param _uplineId id of referring wizard. use 0 if no referral
@@ -244,7 +264,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(totalSupply() < contractSettings.maxSupply, "at max supply.");
         require(_uplineId <= totalSupply(), "invalid upline--must be less than total supply");
 
-        Stats memory myStats =  Stats(1, 0, 0, 0, _uplineId, 0, 0);
+        Stats memory myStats =  Stats(0, _uplineId, 0, 0);
         tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
     }
@@ -276,8 +296,9 @@ contract Wizards is ERC721Enumerable, Ownable {
         Stats storage wizardStats = tokenIdToStats[tokenId];
 
         // Reset the states
-        myStats = tokenIdToStats[tokenId]
-        wizardStats =  Stats(1, 0, 0, 0, myStats.uplineId, 0, 0);
+        Stats memory myStats = tokenIdToStats[tokenId];
+        wizardStats =  Stats(0, myStats.uplineId, 0, 0);
+
     }
 
 
@@ -328,7 +349,7 @@ contract Wizards is ERC721Enumerable, Ownable {
      */
     function getAdultWizardImage(uint256 _wizardId) public view returns (string memory) {
         uint256 phase = getPhaseOf(_wizardId);
-        require(phase < 8, "Invalid phase");
+        require(phase < contractSettings.totalPhases ** phase >= contractSettings.maturityThreshold, "Invalid phase");
 
         // Start with the SVG header
         string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
@@ -363,8 +384,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         }
 
         //        Bonus layer if fully one element
-        if (magicGenes[0] == magicGenes[1]) && (magicGenes[1] == magicGenes[2]) && (magicGenes[2] == magicGenes[3]){
-            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, basicPrefixes[i], Strings.toString(basicGenes[i]), '.png" />'));
+        if ((magicGenes[0] == magicGenes[1]) && (magicGenes[1] == magicGenes[2]) && (magicGenes[2] == magicGenes[3])){
+            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, 'complete_element', '.png" />'));
 
         }
 
@@ -387,7 +408,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(_exists(_wizardId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
         string memory linkExtension;
-        myPhase = getPhaseOf(_wizardId)
+        uint256 myPhase = getPhaseOf(_wizardId);
 
         string memory imageURI = "";
 
@@ -407,7 +428,7 @@ contract Wizards is ERC721Enumerable, Ownable {
             linkExtension = Strings.toString(myPhase); // todo -- shameful, sleeping picture
         }
         else{
-            imageURI = getAdultWizardImage(_wizardId)
+            imageURI = getAdultWizardImage(_wizardId);
         }
 
 
@@ -514,7 +535,7 @@ contract Wizards is ERC721Enumerable, Ownable {
 
 
     //    todo -- make an actual random number generator with chainlink
-    function setRandomNumber(uint256 _wizardSalt) external wizardSaltSet onlyOwner {
+    function setRandomNumber(uint256 _wizardSalt) external afterSaltSet onlyOwner {
         wizardSalt = _wizardSalt;
         wizardSaltSet = true;
     }
@@ -579,6 +600,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         contractSettings.maturityThreshold = _maturityThreshold;
     }
 
+
+    /// @notice Sets the address of the reputation contract.
+    /// @dev Can only be called by the owner of the Wizards contract.
+    /// @param _reputationContractAddress The address of the reputation contract.
+    function setReputationSmartContract(address _reputationContractAddress) external onlyOwner {
+        reputationSmartContract = IReputationContract(_reputationContractAddress);
+    }
+
+
     ///////////////////////////
     ////// Modifiers      /////
     ///////////////////////////
@@ -608,7 +638,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
-    modifier wizardSaltSet() {
+    modifier afterSaltSet() {
         require(!wizardSaltSet, "Number is already set");
         _;
     }
