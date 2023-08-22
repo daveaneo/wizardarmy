@@ -19,12 +19,19 @@ import './libraries/Address.sol';
 import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
+
+interface IAppointer {
+    function canRoleCreateTaskTypes(uint256 _roleId) external view returns(bool);
+}
+
+
 //contract BMMultipass is ERC721Enumerable, ReentrancyGuard, Ownable {
 contract Governance is ReentrancyGuard, Ownable {
 
 //    IERC20  ecosystemTokens;
     Wizards wizardsNFT;
     WizardTower wizardTower;
+    IAppointer appointerContract;
 
     // the value stored here is shifted over by one because 0 means no vote, 1 means voting for slot 0
     mapping (uint256 => mapping (uint256 => uint256)) public proposalToNFTVotes;
@@ -83,54 +90,48 @@ contract Governance is ReentrancyGuard, Ownable {
     /////////////////////////////
 
 
+    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
+        bytes memory unencoded = abi.encodePacked(_fields[0]);
+        if(_refuted) {
+            for(uint256 i = 0; i < _fields.length;){
+                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+                unchecked{++i;}
+            }
+        }
+        bytes32 myHash = keccak256(abi.encodePacked(_fields));
+        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
+    }
+
+    // working for regular but not refuted.
+    //    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
+    //        bytes memory unencoded = abi.encodePacked(_fields[0]);
+    //        if(_refuted) {
+    //            for(uint256 i = 0; i < _fields.length;){
+    //                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+    //                unchecked{++i;}
+    //            }
+    //        }
+    //        bytes32 myHash = keccak256(abi.encodePacked(_fields));
+    //        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
+    //    }
+
+
+
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
 
 
     // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
-    function isMyWizardOnBoard(uint256 _wizId) public view returns (bool) {
-//        if(wizardsNFT.ownerOf(_wizId)==msg.sender && wizardTower.isOnTheTower(_wizId) && wizardTower.getFloorGivenWizard(_wizId) <=boardSeats){
-//            return true;
-//        }
-        return false;
+    function canCreateTaskTypes(uint256 _wizId) public view returns (bool) {
+        uint256 roleId = wizardsNFT.getRole(_wizId);
+        return wizardsNFT.isActive(_wizId) && appointerContract.canRoleCreateTaskTypes(roleId);
     }
 
 //    todo -- we want to limit certain tasks to certain roles. How to do this in a department?
 
-
     function getTaskById(uint256 _taskId) external view returns (Task memory) {
         return tasks[_taskId];
-    }
-
-    function getVotes(uint256 proposalID) external view returns (uint16[] memory) {
-        require(proposalID < totalProposals, "no such proposal");
-        uint16[] memory voteArray = new uint16[](proposals[proposalID].numberOfOptions);
-        for(uint256 i = 0; i< voteArray.length; i++){
-            voteArray[i] = proposals[proposalID].votes[i];
-        }
-        return voteArray;
-    }
-
-    function getWinningVote(uint256 proposalID) external view returns (uint256 ) {
-        require(proposalID < totalProposals, "no such proposal");
-        require( block.timestamp > proposals[proposalID].endTimestamp, "voting still active"); // todo -- end voting only on time? Or, what?
-        // todo -- is there a need to win by a certain percent?
-        uint256 winningVote;
-        uint256 winningVoteAmount;
-        uint256 tie=0;
-        for(uint256 i=0; i< proposals[proposalID].numberOfOptions; i++){ // start at 1 as 0 means no vote???
-            if(proposals[proposalID].votes[i] > winningVoteAmount) {
-                winningVoteAmount = proposals[proposalID].votes[i];
-                winningVote = i;
-                if (tie==1) { tie = 0;}
-            }
-            else if(proposals[proposalID].votes[i] == winningVoteAmount){
-                tie=1;
-            }
-        }
-        require(tie==0, "there was a tie.");
-        return winningVote;
     }
 
     // todo -- delete tasktype function
@@ -138,10 +139,7 @@ contract Governance is ReentrancyGuard, Ownable {
     function areTasksAvailableToConfirm(uint256 _wizId) external view returns (bool) {
         uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
         Task memory myTask;
-//        uint256 taskId;
-
         // todo --implement randomness
-//        uint256[25] memory potentialTasks;
 
         for(uint256 i =0; i < totalTasksSubmitted; ){
             myTask = tasks[uint256(DoubleEndedQueue.at(tasksWaitingConfirmation,i))];
@@ -173,8 +171,6 @@ contract Governance is ReentrancyGuard, Ownable {
         if (count==0) {
             Task[] memory myReturn= new Task[](1);
             uint256[] memory myReturnUint= new uint256[](1);
-//            myReturn[0].NFTID=0;
-//            myReturn[0] = "";
             return (myReturn, myReturnUint);
         }
 
@@ -206,11 +202,6 @@ contract Governance is ReentrancyGuard, Ownable {
             ) {
                 unchecked{++count;}
             }
-//            else {
-//                string[] memory myReturn= new string[](1);
-//                myReturn[0] = "";
-//                return myReturn;
-//            }
             unchecked{++i;}
         }
 
@@ -248,32 +239,18 @@ contract Governance is ReentrancyGuard, Ownable {
         wizardsNFT = Wizards(_addy);
     }
 
-
-//    function setERC20Address(address _addy) external onlyOwner {
-//        ecosystemTokens = IERC20(_addy);
-//    }
+    function setAppointerAddress(address _addy) external onlyOwner {
+        appointerContract = _addy;
+    }
 
     function deleteTaskTypeByIPFSHash(string memory _IPFSHash) external {
         for(uint256 i=0; i<taskTypes.length;){
             if(keccak256(abi.encodePacked(taskTypes[i].IPFSHash)) == keccak256(abi.encodePacked(_IPFSHash))){
-//                taskTypes[i] = taskTypes[taskTypes.length-1];
                 TaskType storage myTaskType = taskTypes[i];
                 TaskType storage displacedTaskType = taskTypes[taskTypes.length-1];
-//                myTaskType.nextActiveTimeThreshold = displacedTaskType.nextActiveTimeThreshold;
                 myTaskType = displacedTaskType;
                 delete taskTypes[taskTypes.length-1];
                 // todo see if this works at all
-//        mapping (uint40 => uint256) nextActiveTimeThreshold; // for recurring tasks -- todo -- add waitTime or ...
-//        string IPFSHash; // holds description
-//        bool paused;
-//        uint40 proposalID; // proposal ID or 0 if task
-//        uint8 numFieldsToHash;
-//        uint24 timeBonus;
-//        uint40 begTimestamp;
-//        uint40 endTimestamp;
-//        uint16 availableSlots;
-
-
                 delete taskTypes[taskTypes.length-1];
                 break;
             }
@@ -304,37 +281,36 @@ contract Governance is ReentrancyGuard, Ownable {
     receive() external payable {
     }
 
-    function vote(uint256 proposalID, uint256 NFTID, uint256 _vote) external onlyMember {
-        require(proposalID < totalProposals, "no such proposal");
-        require(wizardsNFT.ownerOf(NFTID)==msg.sender, "not owner of NFT");
-        require(proposalToNFTVotes[proposalID][NFTID]==0, "already voted");
-        require(_vote!=0 && _vote <= proposals[proposalID].numberOfOptions);
-        require(block.timestamp < proposals[proposalID].endTimestamp);
-        proposalToNFTVotes[proposalID][NFTID] = _vote + 1; // vote reference shifted by one
-        proposals[proposalID].votes[_vote] += 1; // increment votes
-        proposals[proposalID].totalVotes += 1;
-    }
 
-    // votes won't need to be confirmed
-    function createProposal(string calldata _IPFSHash, uint16 _numberOfOptions, uint24 _timeBonus, uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots) external onlyBoard {
-        require(_numberOfOptions > 1 && _numberOfOptions < 257, "invalid number of options");
-        totalProposals += 1; // keep nothing at 0
-        Proposal storage myProposal = proposals[totalProposals];
-            myProposal.begTimestamp = _begTimestamp;
-            myProposal.endTimestamp = _endTimestamp;
-            myProposal.numberOfOptions = _numberOfOptions;
-            myProposal.IPFSHash = _IPFSHash;
-
-        _createTaskType(_IPFSHash, uint40(totalProposals), 0, _timeBonus, _begTimestamp, _endTimestamp, _availableSlots);
-        // todo --  emit event
-    }
-
-
-    function createTaskType(string calldata _IPFSHash, uint8 _numFieldsToHash, uint24 _timeBonus, uint40 _begTimestamp,
-                uint40 _endTimestamp, uint16 _availableSlots) external onlyBoard {
+    /// @notice Creates a new task type.
+    /// @dev Only the owner, or a wizard with the appropriate role can create a task type.
+    /// @param _wizardId The ID of the wizard being used for authentication.
+    /// @param _IPFSHash The IPFS hash of the task details.
+    /// @param _numFieldsToHash Number of fields to hash.
+    /// @param _timeBonus Time-based bonus for the task.
+    /// @param _begTimestamp Beginning timestamp for the task.
+    /// @param _endTimestamp Ending timestamp for the task.
+    /// @param _availableSlots Number of available slots for the task.
+    function createTaskType(
+        uint256 _wizardId,
+        string calldata _IPFSHash,
+        uint8 _numFieldsToHash,
+        uint24 _timeBonus,
+        uint40 _begTimestamp,
+        uint40 _endTimestamp,
+        uint16 _availableSlots
+    ) external onlyTaskCreators(_wizardId) {
         _createTaskType(_IPFSHash, 0, _numFieldsToHash, _timeBonus, _begTimestamp, _endTimestamp, _availableSlots);
     }
 
+    /// @notice Creates a new task type.
+    /// @dev Only the owner, or a wizard with the appropriate role can create a task type.
+    /// @param _IPFSHash The IPFS hash of the task details.
+    /// @param _numFieldsToHash Number of fields to hash.
+    /// @param _timeBonus Time-based bonus for the task.
+    /// @param _begTimestamp Beginning timestamp for the task.
+    /// @param _endTimestamp Ending timestamp for the task.
+    /// @param _availableSlots Number of available slots for the task.
     function _createTaskType(string calldata _IPFSHash, uint40 _proposalID, uint8 _numFieldsToHash, uint24 _timeBonus,
              uint40 _begTimestamp, uint40 _endTimestamp, uint16 _availableSlots) internal {
         uint256 taskTypesLength = taskTypes.length;
@@ -406,31 +382,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
 
     }
-
-    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
-        bytes memory unencoded = abi.encodePacked(_fields[0]);
-        if(_refuted) {
-            for(uint256 i = 0; i < _fields.length;){
-                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
-                unchecked{++i;}
-            }
-        }
-        bytes32 myHash = keccak256(abi.encodePacked(_fields));
-        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
-    }
-
-// working for regular but not refuted.
-//    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
-//        bytes memory unencoded = abi.encodePacked(_fields[0]);
-//        if(_refuted) {
-//            for(uint256 i = 0; i < _fields.length;){
-//                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
-//                unchecked{++i;}
-//            }
-//        }
-//        bytes32 myHash = keccak256(abi.encodePacked(_fields));
-//        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
-//    }
 
 
 
@@ -565,11 +516,14 @@ contract Governance is ReentrancyGuard, Ownable {
         _;
     }
 
-    // top x in tower?
-    modifier onlyBoard() {
-        // check caller against top 3 wizards on tower
-        require(isCallerOnBoard(), "Must be on the board");
-//        require(true,'Must be on the board'); // todo -- onlyBoard
+    /// @dev Modifier to check if the caller is authorized to create a task.
+    /// @param _wizardId The ID of the wizard being used for authentication.
+    modifier onlyTaskCreators(uint256 _wizardId) {
+        require(
+            msg.sender == owner() || // Owner of the contract has unrestricted access.
+            (msg.sender == wizardsNFT.ownerOf(_wizardId) && canCreateTaskTypes(_wizardId)), // Check if the caller owns the specified wizard and if the wizard has the right to create task types.
+            "Must own a qualified wizard or be the contract owner"
+        );
         _;
     }
 

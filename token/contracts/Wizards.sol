@@ -49,7 +49,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 mintCost; // Cost in ETH to mint NFT
         uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
         // cull the herd and reduce to 1000... 400, and so forth? total or per role?
-        uint256 immutable maxSupply; // Max supply of NFTs
+        uint256 maxSupply; // Max supply of NFTs
         uint256 maxActiveWizards; // Max supply of NFTs that can be active
         uint256 protectionTimeExtension; //
         uint256 exileTimePenalty; // time to wait before able to reactivate
@@ -171,7 +171,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return number representing phase
       */
-    function getMagicGenes(uint256 _wizardId) public view afterSaltSet returns(uint256)  {
+    function getMagicGenes(uint256 _wizardId) public view afterSaltSet returns(ELEMENT[4] memory)  {
         require(_isValidWizard(_wizardId), "invalid wizard");
         uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
 
@@ -228,6 +228,23 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Core Functions /////
     ///////////////////////////
 
+
+//    struct ContractSettings { // todo refine, update setter
+//        uint256 mintCost; // Cost in ETH to mint NFT
+//        uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
+//        // cull the herd and reduce to 1000... 400, and so forth? total or per role?
+//        uint256 maxSupply; // Max supply of NFTs
+//        uint256 maxActiveWizards; // Max supply of NFTs that can be active
+//        uint256 protectionTimeExtension; //
+//        uint256 exileTimePenalty; // time to wait before able to reactivate
+//        address ecosystemTokenAddress; // address of ecoystem token
+//        uint256 phaseDuration; // time in seconds for each phase of wizard life
+//        uint256 totalPhases; // total phases for wizards -- aiming for 8
+//        uint256 maturityThreshold; // phase in which wizard can enter Wizard Tower
+//        string imageBaseURI; // base URI where images are stored
+//    }
+
+
     /**
      * @dev initiate Wizards NFT
      * @param _name name of NFT
@@ -239,15 +256,17 @@ contract Wizards is ERC721Enumerable, Ownable {
         ERC721(_name, _symbol)
     {
         contractSettings = ContractSettings({
-            maxSupply: 8192,
-            initiationCost: 10,
             mintCost: 5,
+            initiationCost: 10,
+            maxSupply: 8192,
+            maxActiveWizards: 8192,
             protectionTimeExtension: 1 days,
+            exileTimePenalty: 30 days,
             ecosystemTokenAddress: _ERC20Address,
             phaseDuration: 60*60,
-            imageBaseURI: _imageBaseURI,
             totalPhases: 8,
-            maturityThreshold: 0
+            maturityThreshold: 0,
+            imageBaseURI: _imageBaseURI
         });
 
         verifier = msg.sender;
@@ -355,8 +374,8 @@ contract Wizards is ERC721Enumerable, Ownable {
         string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
 
 
-        uint8[4] magicGenes  = getMagicGenes(_wizardId);
-        uint8[13] basicGenes  = getBasicGenes(_wizardId);
+        uint8[4] memory magicGenes  = getMagicGenes(_wizardId);
+        uint8[13] memory basicGenes  = getBasicGenes(_wizardId);
         // Map the magicGenes (ELEMENT enums) to their corresponding letters
         string[4] memory magicLetters = ["f", "w", "a", "e"];
 

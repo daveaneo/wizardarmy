@@ -17,6 +17,7 @@ contract Appointer is Ownable {
     struct Role {
         bytes32 name;
         bool paused;
+        bool canCreateTaskTypes;
         uint16 maxHolders;
         uint16 currentHolders;
     }
@@ -46,11 +47,21 @@ contract Appointer is Ownable {
 
     /// @notice Fetches the details of a specific role.
     /// @param _roleId The ID of the role to fetch.
-    /// @return Returns the details of the role.    function getRole(uint256 _roleId) external view returns(Role memory) {
+    /// @return Returns the details of the role.
     function getRoleInfo(uint256 _roleId) external view returns(Role memory) {
         require(_roleId <= numRoles && _roleId != 0, "non-existant role");
         return roles[_roleId];
     }
+
+    /// @notice Determines if role can create TaskTypes
+    /// @param _roleId The ID of the role to fetch.
+    /// @return Returns the details of the role.
+    function canRoleCreateTaskTypes(uint256 _roleId) external view returns(bool) {
+        require(_roleId <= numRoles && _roleId != 0, "non-existant role");
+        return roles[_roleId].canCreateTaskTypes;
+    }
+
+
 
     ////////////////////////////////
     ////// Core Functions      /////
@@ -112,7 +123,7 @@ contract Appointer is Ownable {
         roleExists(_roleId)
         roleExists(_canAppointRoleId)
     {
-        require(canAppoint[_roleId][_canAppointRoleId] != _status, "Given role can already appoint this role.")
+        require(canAppoint[_roleId][_canAppointRoleId] != _status, "Given role can already appoint this role.");
         canAppoint[_roleId][_canAppointRoleId] = _status;
 
         if (_status) {
@@ -127,13 +138,14 @@ contract Appointer is Ownable {
     /// @dev This function can only be called by the contract owner.
     /// @param _name The name of the new role.
     /// @param _rolesCanAppoint An array representing roles that the new role can appoint.
-    function createRole(string memory _name, uint16 _maxHolders, uint256[] memory _rolesCanAppoint) external onlyOwner {
+    function createRole(string memory _name, bool _canCreateTaskTypes, uint16 _maxHolders, uint256[] memory _rolesCanAppoint) external onlyOwner {
         // Increment the number of roles
         numRoles += 1;
 
         roles[numRoles] = Role({
             name: bytes32(_name),
             paused: false,   // the default value, can be omitted if you wish
+            canCreateTaskTypes : _canCreateTaskTypes,
             maxHolders: _maxHolders,
             currentHolders: 0   // since it's a new role, currentHolders is 0
         });
