@@ -240,7 +240,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
     function setAppointerAddress(address _addy) external onlyOwner {
-        appointerContract = _addy;
+        appointerContract = IAppointer(_addy);
     }
 
     function deleteTaskTypeByIPFSHash(string memory _IPFSHash) external {

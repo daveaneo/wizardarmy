@@ -197,14 +197,14 @@ contract Wizards is ERC721Enumerable, Ownable {
      * @return An array of 13 integers, each representing the gene for one trait. Each gene will have a value
      * between 0 and 8 (inclusive).
      */
-    function getBasicGenes(uint256 _wizardId) public view returns (uint256[13] memory) {
+    function getBasicGenes(uint256 _wizardId) public view returns (uint8[13] memory) {
         require(_isValidWizard(_wizardId), "Invalid wizard");
 
         uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'b', wizardSalt)));
 
-        uint256[13] memory genes;
+        uint8[13] memory genes;
         for (uint i = 0; i < 13; i++) {
-            genes[i] = (pseudoRandNum >> (i * 19)) % 9;
+            genes[i] = uint8((pseudoRandNum >> (i * 19)) % 9);
         }
 
         return genes;
@@ -312,12 +312,9 @@ contract Wizards is ERC721Enumerable, Ownable {
      * @param tokenId The ID of the wizard whose statistics are to be reset.
      */
     function _resetWizard(uint256 tokenId) internal {
-        Stats storage wizardStats = tokenIdToStats[tokenId];
-
         // Reset the states
         Stats memory myStats = tokenIdToStats[tokenId];
-        wizardStats =  Stats(0, myStats.uplineId, 0, 0);
-
+        tokenIdToStats[tokenId] = Stats(0, myStats.uplineId, 0, 0);
     }
 
 
@@ -368,13 +365,13 @@ contract Wizards is ERC721Enumerable, Ownable {
      */
     function getAdultWizardImage(uint256 _wizardId) public view returns (string memory) {
         uint256 phase = getPhaseOf(_wizardId);
-        require(phase < contractSettings.totalPhases ** phase >= contractSettings.maturityThreshold, "Invalid phase");
+        require(phase < contractSettings.totalPhases && phase >= contractSettings.maturityThreshold, "Invalid phase");
 
         // Start with the SVG header
         string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
 
 
-        uint8[4] memory magicGenes  = getMagicGenes(_wizardId);
+        ELEMENT[4] memory magicGenes  = getMagicGenes(_wizardId);
         uint8[13] memory basicGenes  = getBasicGenes(_wizardId);
         // Map the magicGenes (ELEMENT enums) to their corresponding letters
         string[4] memory magicLetters = ["f", "w", "a", "e"];
@@ -383,17 +380,17 @@ contract Wizards is ERC721Enumerable, Ownable {
         string[13] memory basicPrefixes = [
             "",
             "",
-            magicLetters[magicGenes[0]],
-            magicLetters[magicGenes[0]],
-            magicLetters[magicGenes[1]],
-            magicLetters[magicGenes[1]],
+            magicLetters[uint8(magicGenes[0])],
+            magicLetters[uint8(magicGenes[0])],
+            magicLetters[uint8(magicGenes[1])],
+            magicLetters[uint8(magicGenes[1])],
             "",
-            magicLetters[magicGenes[2]],
-            "",
-            "",
+            magicLetters[uint8(magicGenes[2])],
             "",
             "",
-            magicLetters[magicGenes[3]]
+            "",
+            "",
+            magicLetters[uint8(magicGenes[3])]
         ];
 
 
@@ -450,9 +447,8 @@ contract Wizards is ERC721Enumerable, Ownable {
             imageURI = getAdultWizardImage(_wizardId);
         }
 
-
-
-        if (!imageURI){
+        //    bytes32 constant EMPTY_STRING_HASH = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470; // keccak256 hash of ""
+        if (keccak256(abi.encodePacked(imageURI)) != 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470) {
             imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
         }
 
@@ -474,8 +470,9 @@ contract Wizards is ERC721Enumerable, Ownable {
              imageURI, '"',
             ', "name": "Wizard"',
             // attributes
-            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
-            Strings.toString(myStats.level), ' }'
+//            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
+//            Strings.toString(myStats.level),
+            ' }'
         ));
 
         // use this format to add extra properties
@@ -496,16 +493,16 @@ contract Wizards is ERC721Enumerable, Ownable {
             Strings.toString(999),   ' }'
         ));
 
-
-        // use this format to add extra properties
-        json_str = string(abi.encodePacked(json_str,
-            ', {"display_type": "number", "trait_type": "losses", "value": ',
-            Strings.toString(999),   ' }',
-            ', {"display_type": "number", "trait_type": "battles", "value": ',
-            Strings.toString(999),   ' }',
-                ', {"display_type": "number", "trait_type": "tokensClaimed", "value": ',
-            Strings.toString(myStats.tokensClaimed),   ' }'
-        ));
+//
+//        // use this format to add extra properties
+//        json_str = string(abi.encodePacked(json_str,
+//            ', {"display_type": "number", "trait_type": "losses", "value": ',
+//            Strings.toString(999),   ' }',
+//            ', {"display_type": "number", "trait_type": "battles", "value": ',
+//            Strings.toString(999),   ' }',
+//                ', {"display_type": "number", "trait_type": "tokensClaimed", "value": ',
+//            Strings.toString(myStats.tokensClaimed),   ' }'
+//        ));
 
         // end string
         json_str = string(abi.encodePacked(json_str, ']','}'));
@@ -590,7 +587,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Override Functions     /////
     ////////////////////////////////////
 
-    function transferFrom(address from, address to, uint256 tokenId) public override {
+    function transferFrom(address from, address to, uint256 tokenId) public override(ERC721, IERC721)  {
         // Call the parent contract's implementation of transferFrom
         super.transferFrom(from, to, tokenId);
 

@@ -2,11 +2,17 @@
 # brownie run scripts/launchEcosystem.py --network polygon-test
 
 from brownie import Wizards, Token, WizardTower, Governance, Appointer, accounts, network, config
+# from brownie import accounts, network, config
+# from brownie import Appointer
 from brownie.network.state import Chain
 import json
 import os
 from datetime import date
 import time
+import brownie
+
+# Wizards, Token, WizardTower, Governance, Appointer = brownie.Wizards, brownie.Token, brownie.WizardTower, brownie.Governance, brownie.Appointer
+
 
 DUMP_ABI = True
 MINT_WIZARDS = True
