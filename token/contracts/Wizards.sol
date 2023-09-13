@@ -461,7 +461,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return returns inline URI as string
       */
     function formatTokenURI(uint256 _wizardId, string memory imageURI) public view returns (string memory) {
-        Stats memory myStats = tokenIdToStats[_wizardId];
+//        Stats memory myStats = tokenIdToStats[_wizardId];
 
         string memory json_str = string(abi.encodePacked(
             '{"description": "WizardArmy"',

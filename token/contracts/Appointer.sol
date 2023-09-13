@@ -1,5 +1,5 @@
-//pragma solidity 0.8.15;
-// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.15;
+// SPDX-License-Identifier: MIT
 
 interface IERC721Wizard{
     function getUplineId(uint256 _wizardId) external view returns(uint256);
@@ -80,7 +80,7 @@ contract Appointer is Ownable {
     {
         //  and have no role (role==0)
         require(wizardContract.getRole(_appointeeId) == 0, "must have no role.");
-        require(roles[_roleId].currentHolders < roles[_roleId].maxHolders, "role maxed out.")
+        require(roles[_roleId].currentHolders < roles[_roleId].maxHolders, "role maxed out.");
 
 
         // appoint role
@@ -138,12 +138,24 @@ contract Appointer is Ownable {
     /// @dev This function can only be called by the contract owner.
     /// @param _name The name of the new role.
     /// @param _rolesCanAppoint An array representing roles that the new role can appoint.
+
+    /// @notice Creates a new role with the specified attributes.
+    /// @dev This function can only be called by the contract owner.
+    /// @param _name The name of the new role.
+    /// @param _rolesCanAppoint An array representing roles that the new role can appoint.
     function createRole(string memory _name, bool _canCreateTaskTypes, uint16 _maxHolders, uint256[] memory _rolesCanAppoint) external onlyOwner {
+        // Ensure role name is 32 bytes or less
+        bytes memory roleNameBytes = bytes(_name);
+        require(roleNameBytes.length <= 32, "Role name too long!");
+
+        // Convert role name string to bytes32
+        bytes32 roleNameAsBytes32 = bytes32(uint256(keccak256(roleNameBytes)));
+
         // Increment the number of roles
         numRoles += 1;
 
         roles[numRoles] = Role({
-            name: bytes32(_name),
+            name: roleNameAsBytes32,
             paused: false,   // the default value, can be omitted if you wish
             canCreateTaskTypes : _canCreateTaskTypes,
             maxHolders: _maxHolders,
@@ -161,6 +173,8 @@ contract Appointer is Ownable {
         // Emit event
         emit RoleCreated(numRoles, _name, false);
     }
+
+
 
 
     /// @notice Sets the activation status of a specific role.
