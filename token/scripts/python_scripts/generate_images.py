@@ -62,14 +62,18 @@ def main(sample_size=None):
         sample_size (int, optional): If provided, a random sample of this size will be generated instead of creating all permutations. Default is None.
     """
 
-    # Clean previous permutations
+    # Ensure 'permutations' folder exists
     output_folder = os.path.join(DIR_PATH, 'permutations')
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Clean previous permutations
     clear_directory(output_folder)
 
     # List and sort all the folders in the provided directory.
     # List and sort all the folders in the provided directory, excluding the 'permutations' folder.
     folders = sorted([os.path.join(DIR_PATH, d) for d in os.listdir(DIR_PATH) if
-                      os.path.isdir(os.path.join(DIR_PATH, d)) and d.isnumeric() ])
+                      os.path.isdir(os.path.join(DIR_PATH, d)) and d.isnumeric()],
+                     key=lambda x: int(os.path.basename(x)))
 
     # Load images from each folder.
     # This creates a dictionary where the key is the folder path and the value is a list of Image objects.
@@ -78,10 +82,6 @@ def main(sample_size=None):
         images = [Image.open(os.path.join(folder, img_file)) for img_file in os.listdir(folder) if img_file.endswith(('.png', '.jpg', '.jpeg'))]
         folder_images[folder] = images
 
-    # print(f'folders')
-    # for f in folders:
-    #     print(f)
-    # exit(0)
 
     # Generate permutations of images.
     if sample_size:
@@ -100,9 +100,40 @@ def main(sample_size=None):
     os.makedirs(output_folder, exist_ok=True)
 
     # For each permutation, combine the images, and then save the result.
-    for i, permutation in enumerate(permutations):
+    for i, permutation in enumerate(permutations, start=1):
         result = combine_images(list(permutation))
-        result.save(os.path.join(output_folder, f'{i}.png'))
+        # result.save(os.path.join(output_folder, f'{i}.png'))
+        # result.save(os.path.join(output_folder, f'{i}.webp'), "WEBP", quality=80)
+        result = result.convert("RGB")
+        result.save(os.path.join(output_folder, f'{i}.jpg'), "JPEG", quality=90)
+
+    create_image_grid(output_folder)
+
+def create_image_grid(directory, output_file="grid.jpg"):
+    # Load all images
+    images = [Image.open(os.path.join(directory, f)) for f in os.listdir(directory) if f.endswith(('.png', '.jpg', '.jpeg'))]
+
+    # Determine cell size
+    cell_width = max(img.width for img in images)
+    cell_height = max(img.height for img in images)
+
+    # Determine grid size
+    grid_cols = int(len(images) ** 0.5)  # For square grid
+    grid_rows = -(-len(images) // grid_cols)  # Ceiling division
+
+    # Create blank canvas
+    grid_img = Image.new('RGB', (cell_width * grid_cols, cell_height * grid_rows))
+
+    # Paste images
+    for index, img in enumerate(images):
+        row = index // grid_cols
+        col = index % grid_cols
+        grid_img.paste(img, (cell_width * col, cell_height * row))
+
+    # Save the grid image
+    output_file_path = os.path.join(directory, output_file)
+    grid_img.save(output_file_path)
+    # grid_img.save(output_file_path,  "JPEG", quality=90)
 
 if __name__ == "__main__":
     # User interface for the script.
