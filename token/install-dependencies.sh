@@ -23,7 +23,13 @@ echo "Installing Ethers..."
 npm install --save-dev ethers@$ETHERS_VERSION
 
 echo "Installing Hardhat plugins..."
-npm install --save-dev @nomiclabs/hardhat-ethers@2.2.3  # This version should be compatible with ethers@5.7.2
+# npm install --save-dev @nomiclabs/hardhat-ethers@2.2.3  # This version should be compatible with ethers@5.7.2
+npm install --save-dev @nomiclabs/hardhat-ethers 'ethers@^5.0.0'
 npm install --save-dev @nomiclabs/hardhat-waffle@2.0.6  # This version is compatible with hardhat-ethers 2.2.3
+npm install --save-dev hardhat-contract-sizer
+
+
+echo "Installing OpenZeppelin contracts..."
+npm install @openzeppelin/contracts
 
 echo "Done!"

@@ -24,15 +24,25 @@ contract Wizards is ERC721Enumerable, Ownable {
     address public appointer; /// contract address to assign roles
 
     IReputationContract public reputationSmartContract;
+    //    address taskSmartContractAddress;
+
 
     enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
+//    todo -- we can have base stats and extended stats
+//    base stats will be what is located on this contract
+//    extended stats will draw from other contracts
+    // note -- stack gets too deep if add more
     struct Stats { // todo -- reduce uint amount
+//        uint128 level; // todo -- this can liekly be changed to phase or something that continues to grow
+//        uint128 tokensClaimed; // maybe -- probably best to store elsewhere
+//        uint128 contributionKarma; // todo -- have reputation smart contract and be able to get reputation from here
         // todo -- have reputation smart contract and be able to get reputation from here
         uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
         uint16 uplineId;  // 0 is default, 65k max?
         uint40 initiationTimestamp; // 0 if uninitiated
         uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
+//        ELEMENT[4] genes; # this will be determined by the wizards properties not stored separately
     }
 
     struct ContractSettings { // todo refine, update setter
@@ -48,13 +58,13 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 totalPhases; // total phases for wizards -- aiming for 8
         uint256 maturityThreshold; // phase in which wizard can enter Wizard Tower
         string imageBaseURI; // base URI where images are stored
-        bool wizardSaltSet;
     }
 
     ContractSettings public contractSettings;
 
     // Random number for creating wizard genes
-    uint256 private wizardSalt;
+    uint256 public wizardSalt;
+    bool private wizardSaltSet = false;
 
     event NewVerifier(address verifier);
     event NewCuller(address culler);
@@ -72,7 +82,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true if active, false if inactive
       */
     function isActive(uint256 _wizardId) public view returns(bool) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp > block.timestamp;
     }
 
@@ -82,7 +92,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true -> exiled; false -> not exiled
       */
     function isExiled(uint256 _wizardId) public view returns(bool) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp != 0 && tokenIdToStats[_wizardId].initiationTimestamp ==0;
     }
 
@@ -91,7 +101,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return true -> deserted; false -> has not deserted
       */
     function hasDeserted(uint256 _wizardId) public view returns(bool) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
     }
 
@@ -100,8 +110,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return true if active, false if inactive
       */
-    function isMature(uint256 _wizardId) external view returns(bool) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+    function isMature(uint256 _wizardId) public view returns(bool) {
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return getPhaseOf(_wizardId) >= contractSettings.maturityThreshold;
     }
 
@@ -110,8 +120,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return wizardId of upline
       */
-    function getUplineId(uint256 _wizardId) external view returns(uint256) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+    function getUplineId(uint256 _wizardId) public view returns(uint256) {
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].uplineId;
     }
 
@@ -119,15 +129,15 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return wizardId of upline
       */
-    function getRole(uint256 _wizardId) external view returns(uint256) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+    function getRole(uint256 _wizardId) public view returns(uint256) {
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId].role;
     }
 
     /// @notice A function in Wizards that uses the reputation contract.
     /// @param _wizardId The ID of the wizard whose reputation needs to be fetched.
     /// @return The reputation value of the specified wizard.
-    function getReputation(uint256 _wizardId) external view returns (uint256) {
+    function getReputation(uint256 _wizardId) public view returns (uint256) {
         /// @dev Fetching the reputation from the reputation contract.
         return reputationSmartContract.getReputation(_wizardId);
     }
@@ -138,7 +148,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return stats
       */
     function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         return tokenIdToStats[_wizardId];
         //todo -- extended stats
     }
@@ -149,7 +159,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return number representing phase
       */
     function getPhaseOf(uint256 _wizardId) public view returns(uint256) {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         uint256 phase =
           (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
           > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
@@ -162,7 +172,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return number representing phase
       */
     function getMagicGenes(uint256 _wizardId) public view afterSaltSet returns(ELEMENT[4] memory)  {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
 
         ELEMENT[4] memory result;
@@ -187,17 +197,14 @@ contract Wizards is ERC721Enumerable, Ownable {
      * @return An array of 13 integers, each representing the gene for one trait. Each gene will have a value
      * between 0 and 8 (inclusive).
      */
-    function getBasicGenes(uint256 _wizardId) internal view returns (uint8[13] memory) {
-        require(_isValidWizard(_wizardId)); // dev: "Invalid wizard"
+    function getBasicGenes(uint256 _wizardId) public view returns (uint8[13] memory) {
+        require(_isValidWizard(_wizardId), "Invalid wizard");
+
         uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'b', wizardSalt)));
 
         uint8[13] memory genes;
-
-        for (uint i = 0; i < 13;) {
-            unchecked {
-                genes[i] = uint8((pseudoRandNum >> (i * 19)) % 9);
-                ++i;
-            }
+        for (uint i = 0; i < 13; i++) {
+            genes[i] = uint8((pseudoRandNum >> (i * 19)) % 9);
         }
 
         return genes;
@@ -221,6 +228,23 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Core Functions /////
     ///////////////////////////
 
+
+//    struct ContractSettings { // todo refine, update setter
+//        uint256 mintCost; // Cost in ETH to mint NFT
+//        uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
+//        // cull the herd and reduce to 1000... 400, and so forth? total or per role?
+//        uint256 maxSupply; // Max supply of NFTs
+//        uint256 maxActiveWizards; // Max supply of NFTs that can be active
+//        uint256 protectionTimeExtension; //
+//        uint256 exileTimePenalty; // time to wait before able to reactivate
+//        address ecosystemTokenAddress; // address of ecoystem token
+//        uint256 phaseDuration; // time in seconds for each phase of wizard life
+//        uint256 totalPhases; // total phases for wizards -- aiming for 8
+//        uint256 maturityThreshold; // phase in which wizard can enter Wizard Tower
+//        string imageBaseURI; // base URI where images are stored
+//    }
+
+
     /**
      * @dev initiate Wizards NFT
      * @param _name name of NFT
@@ -242,8 +266,7 @@ contract Wizards is ERC721Enumerable, Ownable {
             phaseDuration: 60*60,
             totalPhases: 8,
             maturityThreshold: 0,
-            imageBaseURI: _imageBaseURI,
-            wizardSaltSet : false
+            imageBaseURI: _imageBaseURI
         });
 
         verifier = msg.sender;
@@ -257,8 +280,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _uplineId id of referring wizard. use 0 if no referral
       */
     function mint(uint16 _uplineId) external {
-        require(totalSupply() < contractSettings.maxSupply); // dev: "at max supply."
-        require(_uplineId <= totalSupply()); // dev: "invalid upline--must be less than total supply"
+        require(totalSupply() < contractSettings.maxSupply, "at max supply.");
+        require(_uplineId <= totalSupply(), "invalid upline--must be less than total supply");
 
         Stats memory myStats =  Stats(0, _uplineId, 0, 0);
         tokenIdToStats[totalSupply()+1] = myStats;
@@ -269,11 +292,11 @@ contract Wizards is ERC721Enumerable, Ownable {
     /** @dev Changes NFT from uninitated or exiled to initiated
       * @param _wizardId id of wizard.
       */
-    function initiate(uint256 _wizardId) public payable {
-        require(ownerOf(_wizardId) == msg.sender); // dev: "must be owner"
-        require(tokenIdToStats[_wizardId].initiationTimestamp == 0); // dev: "already initiated"
-        require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp); // dev: "Exiled wizard not yet allowed to return."
-        require(msg.value == contractSettings.initiationCost); // dev: "incorrect initiation fee"
+    function initiate(uint256 _wizardId) external payable {
+        require(ownerOf(_wizardId) == msg.sender, "must be owner");
+        require(tokenIdToStats[_wizardId].initiationTimestamp == 0, "already initiated");
+        require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp, "Exiled wizard not yet allowed to return.");
+        require(msg.value == contractSettings.initiationCost, "incorrect initiation fee");
 
         Stats storage myStats = tokenIdToStats[_wizardId];
         myStats.initiationTimestamp = uint40(block.timestamp);
@@ -306,7 +329,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       */
     function exile(uint256 _wizardId) external {
-        require(hasDeserted(_wizardId)); // dev: "wizard can not be exiled."
+        require(hasDeserted(_wizardId), "wizard can not be exiled.");
         _exile(_wizardId);
     }
 
@@ -314,12 +337,19 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       */
     function _exile(uint256 _wizardId) internal {
-        require(_wizardId!=0 && _wizardId <= totalSupply()); // dev: "invalid id"
-        require(!isExiled(_wizardId)); // dev: "wiz already in exile"
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id");
+        require(!isExiled(_wizardId), "wiz already in exile");
         tokenIdToStats[_wizardId].protectedUntilTimestamp = uint40(block.timestamp); // this saves the time of exile started
         tokenIdToStats[_wizardId].initiationTimestamp = 0;
     }
 
+
+
+//    • Uninitiated
+//    • Exiled
+//      Inactive
+//    • "Egg"
+//    • Wizard -> Can join wizard tower
 
 
     /**
@@ -333,9 +363,9 @@ contract Wizards is ERC721Enumerable, Ownable {
      * @param _wizardId The ID of the wizard for which the SVG is to be generated.
      * @return svg The resulting SVG string representation of the wizard.
      */
-    function getAdultWizardImage(uint256 _wizardId) internal view returns (string memory) {
+    function getAdultWizardImage(uint256 _wizardId) public view returns (string memory) {
         uint256 phase = getPhaseOf(_wizardId);
-        require(phase < contractSettings.totalPhases && phase >= contractSettings.maturityThreshold); // dev: "Invalid phase"
+        require(phase < contractSettings.totalPhases && phase >= contractSettings.maturityThreshold, "Invalid phase");
 
         // Start with the SVG header
         string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
@@ -391,14 +421,14 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @return returns inline URI as string
       */
     function tokenURI(uint256 _wizardId) public view virtual override returns (string memory) {
-        require(_exists(_wizardId)); // dev: "ERC721Metadata: URI query for nonexistent token"
+        require(_exists(_wizardId), "ERC721Metadata: URI query for nonexistent token");
         // todo -- update image
         string memory linkExtension;
         uint256 myPhase = getPhaseOf(_wizardId);
 
         string memory imageURI = "";
 
-        if(!contractSettings.wizardSaltSet){
+        if(!wizardSaltSet){
             linkExtension = "placeholder"; // todo -- placeholder image before random number set
         }
         else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
@@ -500,11 +530,30 @@ contract Wizards is ERC721Enumerable, Ownable {
         return json_str;
     }
 
+//    function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+//        if (_i == 0) {
+//            return "0";
+//        }
+//        uint j = _i;
+//        uint len;
+//        while (j != 0) {
+//            len++;
+//            j /= 10;
+//        }
+//        bytes memory bstr = new bytes(len);
+//        uint k = len - 1;
+//        while (_i != 0) {
+//            bstr[k--] = bytes1(uint8(48 + _i % 10));
+//            _i /= 10;
+//        }
+//        return string(bstr);
+//    }
+
 
     //    todo -- make an actual random number generator with chainlink
     function setRandomNumber(uint256 _wizardSalt) external afterSaltSet onlyOwner {
         wizardSalt = _wizardSalt;
-        contractSettings.wizardSaltSet = true;
+        wizardSaltSet = true;
     }
 
 
@@ -517,8 +566,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _timeReward amout of time in seconds to add to current protectedUntilTimestamp
       */
     function increaseProtectedUntilTimestamp(uint256 _wizardId, uint40 _timeReward) external onlyVerifier {
-        require(_wizardId!=0 && _wizardId <= totalSupply()); // dev: "invalid id"
-        require(tokenIdToStats[_wizardId].initiationTimestamp!=0); // dev: "is not initiated"
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id");
+        require(tokenIdToStats[_wizardId].initiationTimestamp!=0, "is not initiated");
         tokenIdToStats[_wizardId].protectedUntilTimestamp += _timeReward;
     }
 
@@ -528,7 +577,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////////////////////////////////////
 
     function appointRole(uint256 _wizardId, uint16 _role) external onlyAppointer {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        require(_isValidWizard(_wizardId), "invalid wizard");
         tokenIdToStats[_wizardId].role = _role;
     }
 
@@ -581,29 +630,32 @@ contract Wizards is ERC721Enumerable, Ownable {
     ///////////////////////////
 
     modifier onlyVerifier() {
-        require(msg.sender == verifier); // dev: 'only verifier' // todo -- decide who will verify--one or many addresses
+        require(msg.sender == verifier, 'only verifier'); // todo -- decide who will verify--one or many addresses
         _;
     }
 
     modifier onlyAppointer() {
-        require(msg.sender == appointer); // dev: 'only appointer'
+        require(msg.sender == appointer, 'only appointer');
         _;
     }
 
 
     modifier onlyHolder() {
-        require(msg.sender != address(this)); // dev: 'only holder' // todo -- decide who will verify--one or many addresses
+        require(msg.sender != address(this), 'only holder'); // todo -- decide who will verify--one or many addresses
         _;
     }
 
     modifier onlyCuller() {
-        require( msg.sender == culler); // dev: "Only culler can call this function."
+        require(
+            msg.sender == culler, // todo -- one or many addresses?
+            "Only culler can call this function."
+        );
         _;
     }
 
 
     modifier afterSaltSet() {
-        require(!contractSettings.wizardSaltSet); // dev: "Number is already set"
+        require(!wizardSaltSet, "Number is already set");
         _;
     }
 
@@ -616,7 +668,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _culler new address for culler, the wallet/contract which can exile wizards without contraint
       */
     function updateCuller(address _culler) external onlyOwner {
-        require(_culler != address(0) && _culler != culler); // dev: "Invalid operator address"
+        require(_culler != address(0) && _culler != culler, "Invalid operator address");
         culler = _culler;
         emit NewCuller(_culler);
     }
@@ -625,7 +677,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _verifier the new address for verifier, the contract which can add protectedUntil time for wizards
       */
     function updateVerifier(address _verifier) external onlyOwner {
-        require(_verifier != address(0) && _verifier != verifier); // dev: "Invalid operator address"
+        require(_verifier != address(0) && _verifier != verifier, "Invalid operator address");
         verifier = _verifier;
         emit NewVerifier(_verifier);
     }
@@ -634,7 +686,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _appointer the new address for appointer, the contract which can appoint and create roles
       */
     function updateAppointer(address _appointer) external onlyOwner {
-        require(_appointer != address(0) && _appointer != appointer); // dev: "Invalid operator address"
+        require(_appointer != address(0) && _appointer != appointer, "Invalid operator address");
         appointer = _appointer;
         emit NewAppointer(_appointer);
     }
