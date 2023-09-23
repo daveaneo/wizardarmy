@@ -6,11 +6,6 @@ import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
 import "./helpers/Base64.sol";
 import "./libraries/Strings.sol";
-import "./libraries/GeneLogic.sol";
-import "./libraries/CommonDefinitions.sol";
-import "./libraries/SVGGenerator.sol";
-import "./libraries/TokenURILibrary.sol";
-
 
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
@@ -23,22 +18,22 @@ interface IReputationContract {
 
 
 contract Wizards is ERC721Enumerable, Ownable {
-    mapping (uint256 => CommonDefinitions.WizardStats) public tokenIdToStats;
+    mapping (uint256 => Stats) public tokenIdToStats;
     address public verifier; /// contract address to update stats
     address public culler; /// contract address to exile any wizard
     address public appointer; /// contract address to assign roles
 
     IReputationContract public reputationSmartContract;
 
-//    enum ElementEnum.ELEMENT {FIRE, WIND, WATER, EARTH}
+    enum ELEMENT {FIRE, WIND, WATER, EARTH}
 
-//    struct Stats { // todo -- reduce uint amount
-//        // todo -- have reputation smart contract and be able to get reputation from here
-//        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
-//        uint16 uplineId;  // 0 is default, 65k max?
-//        uint40 initiationTimestamp; // 0 if uninitiated
-//        uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//    }
+    struct Stats { // todo -- reduce uint amount
+        // todo -- have reputation smart contract and be able to get reputation from here
+        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
+        uint16 uplineId;  // 0 is default, 65k max?
+        uint40 initiationTimestamp; // 0 if uninitiated
+        uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
+    }
 
     struct ContractSettings { // todo refine, update setter
         uint256 mintCost; // Cost in ETH to mint NFT
@@ -142,7 +137,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _wizardId id of wizard.
       * @return stats
       */
-    function getStatsGivenId(uint256 _wizardId) external view returns(CommonDefinitions.WizardStats memory) {
+    function getStatsGivenId(uint256 _wizardId) external view returns(Stats memory) {
         require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
         return tokenIdToStats[_wizardId];
         //todo -- extended stats
@@ -161,6 +156,54 @@ contract Wizards is ERC721Enumerable, Ownable {
           ;
         return phase;
     }
+
+    /** @dev Returns phase of wizard
+      * @param _wizardId id of wizard.
+      * @return number representing phase
+      */
+    function getMagicGenes(uint256 _wizardId) public view afterSaltSet returns(ELEMENT[4] memory)  {
+        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
+        uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
+
+        ELEMENT[4] memory result;
+
+        for (uint i = 0; i < 4; i++) {
+            uint256 value = (myRandNum >> (i * 64)) % 4; // Shift by 64 bits for each number
+            result[i] = ELEMENT(value);
+        }
+
+        return result;
+    }
+
+
+    /**
+     * @dev Returns the basic genes of a wizard.
+     *
+     * This function generates a pseudo-random number based on the wizard ID, a constant salt for basic genes ('b'),
+     * and a global salt (wizardSalt). It then derives genes for 13 different traits, where each trait can have a
+     * value between 0 and 8 (inclusive).
+     *
+     * @param _wizardId The ID of the wizard.
+     * @return An array of 13 integers, each representing the gene for one trait. Each gene will have a value
+     * between 0 and 8 (inclusive).
+     */
+    function getBasicGenes(uint256 _wizardId) internal view returns (uint8[13] memory) {
+        require(_isValidWizard(_wizardId)); // dev: "Invalid wizard"
+        uint256 pseudoRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'b', wizardSalt)));
+
+        uint8[13] memory genes;
+
+        for (uint i = 0; i < 13;) {
+            unchecked {
+                genes[i] = uint8((pseudoRandNum >> (i * 19)) % 9);
+                ++i;
+            }
+        }
+
+        return genes;
+    }
+
+
 
     /**
      * @dev Checks if the given wizard ID is valid.
@@ -217,7 +260,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(totalSupply() < contractSettings.maxSupply); // dev: "at max supply."
         require(_uplineId <= totalSupply()); // dev: "invalid upline--must be less than total supply"
 
-        CommonDefinitions.WizardStats memory myStats =  CommonDefinitions.WizardStats(0, _uplineId, 0, 0);
+        Stats memory myStats =  Stats(0, _uplineId, 0, 0);
         tokenIdToStats[totalSupply()+1] = myStats;
         _safeMint(msg.sender, totalSupply()+1 ); // with with 1 as id
     }
@@ -226,13 +269,13 @@ contract Wizards is ERC721Enumerable, Ownable {
     /** @dev Changes NFT from uninitated or exiled to initiated
       * @param _wizardId id of wizard.
       */
-    function initiate(uint256 _wizardId) external payable {
+    function initiate(uint256 _wizardId) public payable {
         require(ownerOf(_wizardId) == msg.sender); // dev: "must be owner"
         require(tokenIdToStats[_wizardId].initiationTimestamp == 0); // dev: "already initiated"
         require(tokenIdToStats[_wizardId].protectedUntilTimestamp + contractSettings.exileTimePenalty <  block.timestamp); // dev: "Exiled wizard not yet allowed to return."
         require(msg.value == contractSettings.initiationCost); // dev: "incorrect initiation fee"
 
-        CommonDefinitions.WizardStats storage myStats = tokenIdToStats[_wizardId];
+        Stats storage myStats = tokenIdToStats[_wizardId];
         myStats.initiationTimestamp = uint40(block.timestamp);
         myStats.protectedUntilTimestamp = uint40(block.timestamp + contractSettings.protectionTimeExtension);
 
@@ -247,8 +290,8 @@ contract Wizards is ERC721Enumerable, Ownable {
      */
     function _resetWizard(uint256 tokenId) internal {
         // Reset the states
-        CommonDefinitions.WizardStats memory myStats = tokenIdToStats[tokenId];
-        tokenIdToStats[tokenId] = CommonDefinitions.WizardStats(0, myStats.uplineId, 0, 0);
+        Stats memory myStats = tokenIdToStats[tokenId];
+        tokenIdToStats[tokenId] = Stats(0, myStats.uplineId, 0, 0);
     }
 
 
@@ -278,6 +321,71 @@ contract Wizards is ERC721Enumerable, Ownable {
     }
 
 
+
+    /**
+     * @dev Generates an SVG representation of an adult wizard.
+     *
+     * The SVG is constructed based on the genes of the wizard, and each gene
+     * corresponds to an image layer in the SVG. These layers are represented
+     * as base64 PNG images. The genes determine the type and order of these
+     * layers, with some genes resulting in prefixed image names.
+     *
+     * @param _wizardId The ID of the wizard for which the SVG is to be generated.
+     * @return svg The resulting SVG string representation of the wizard.
+     */
+    function getAdultWizardImage(uint256 _wizardId) internal view returns (string memory) {
+        uint256 phase = getPhaseOf(_wizardId);
+        require(phase < contractSettings.totalPhases && phase >= contractSettings.maturityThreshold); // dev: "Invalid phase"
+
+        // Start with the SVG header
+        string memory svg = '<svg width="500" height="500" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">';
+
+
+        ELEMENT[4] memory magicGenes  = getMagicGenes(_wizardId);
+        uint8[13] memory basicGenes  = getBasicGenes(_wizardId);
+        // Map the magicGenes (ELEMENT enums) to their corresponding letters
+        string[4] memory magicLetters = ["f", "w", "a", "e"];
+
+        // todo -- update mapping to correct map
+        string[13] memory basicPrefixes = [
+            "",
+            "",
+            magicLetters[uint8(magicGenes[0])],
+            magicLetters[uint8(magicGenes[0])],
+            magicLetters[uint8(magicGenes[1])],
+            magicLetters[uint8(magicGenes[1])],
+            "",
+            magicLetters[uint8(magicGenes[2])],
+            "",
+            "",
+            "",
+            "",
+            magicLetters[uint8(magicGenes[3])]
+        ];
+
+
+        // Add the 13 base layers
+        for (uint i = 0; i < 13; i++) {
+            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, basicPrefixes[i], Strings.toString(basicGenes[i]), '.png" />'));
+        }
+
+        //        Bonus layer if fully one element
+        if ((magicGenes[0] == magicGenes[1]) && (magicGenes[1] == magicGenes[2]) && (magicGenes[2] == magicGenes[3])){
+            svg = string(abi.encodePacked(svg, '<image x="0" y="0" width="500" height="500" xlink:href="data:image/png;base64,', contractSettings.imageBaseURI, 'complete_element', '.png" />'));
+
+        }
+
+        // Close the SVG
+        svg = string(abi.encodePacked(svg, '</svg>'));
+
+
+        // Convert the SVG to a data URI
+        string memory base64EncodedSVG = Base64.encode(bytes(svg));
+        string memory dataURI = string(abi.encodePacked("data:image/svg+xml;charset=UTF-8;base64,", base64EncodedSVG));
+
+        return dataURI;
+    }
+
     /** @dev get token URI
       * @param _wizardId id of wizard.
       * @return returns inline URI as string
@@ -285,52 +393,90 @@ contract Wizards is ERC721Enumerable, Ownable {
     function tokenURI(uint256 _wizardId) public view virtual override returns (string memory) {
         require(_exists(_wizardId)); // dev: "ERC721Metadata: URI query for nonexistent token"
         // todo -- update image
-        string memory imageURI =  TokenURILibrary.getImageURI(_wizardId, wizardSalt, getPhaseOf(_wizardId), contractSettings.totalPhases,
-                                           contractSettings.maturityThreshold, contractSettings.imageBaseURI,
-                                           tokenIdToStats[_wizardId].initiationTimestamp==0,  isExiled(_wizardId), isActive(_wizardId));
+        string memory linkExtension;
+        uint256 myPhase = getPhaseOf(_wizardId);
 
+        string memory imageURI = "";
 
-        return TokenURILibrary.formatTokenURI(_wizardId, imageURI, tokenIdToStats[_wizardId]);
+        if(!contractSettings.wizardSaltSet){
+            linkExtension = "placeholder"; // todo -- placeholder image before random number set
+        }
+        else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
+            linkExtension = "uninitiated"; // todo -- shameful uninitiated picture
+        }
+        else if(isExiled(_wizardId)){ // exiled
+            linkExtension = "exiled"; // todo -- shameful banished/exiled picture
+        }
+        else if(!isActive(_wizardId)){ // not protected
+            linkExtension = "inactive"; // todo -- shameful, sleeping picture
+        }
+        else if(myPhase<4){
+            linkExtension = Strings.toString(myPhase); // todo -- shameful, sleeping picture
+        }
+        else{
+            imageURI = getAdultWizardImage(_wizardId);
+        }
 
-//        string memory linkExtension;
-//        uint256 myPhase = getPhaseOf(_wizardId);
-//
-//        string memory imageURI = "";
-//
-//        if(!contractSettings.wizardSaltSet){
-//            linkExtension = "placeholder"; // todo -- placeholder image before random number set
-//        }
-//        else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
-//            linkExtension = "uninitiated"; // todo -- shameful uninitiated picture
-//        }
-//        else if(isExiled(_wizardId)){ // exiled
-//            linkExtension = "exiled"; // todo -- shameful banished/exiled picture
-//        }
-//        else if(!isActive(_wizardId)){ // not protected
-//            linkExtension = "inactive"; // todo -- shameful, sleeping picture
-//        }
-//        else if(myPhase<4){
-//            linkExtension = Strings.toString(myPhase); // todo -- shameful, sleeping picture
-//        }
-//        else{
-//            imageURI = SVGGenerator.getAdultWizardImage(_wizardId,  wizardSalt, myPhase, contractSettings.totalPhases,
-//                contractSettings.maturityThreshold, contractSettings.imageBaseURI);
-//        }
-//
-//        //    bytes32 constant EMPTY_STRING_HASH = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470; // keccak256 hash of ""
-//        if (keccak256(abi.encodePacked(imageURI)) != 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470) {
-//            imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
-//        }
-//
-//        return formatTokenURI(_wizardId, imageURI);
+        //    bytes32 constant EMPTY_STRING_HASH = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470; // keccak256 hash of ""
+        if (keccak256(abi.encodePacked(imageURI)) != 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470) {
+            imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
+        }
+
+        return formatTokenURI(_wizardId, imageURI);
     }
 
-//    /** @dev format URI based on image and _wizardId
-//      * @param _wizardId id of wizard.
-//      * @param imageURI inline SVG string.
-//      * @return returns inline URI as string
-//      */
-//    function formatTokenURI(uint256 _wizardId, string memory imageURI) internal view returns (string memory) {
+    /** @dev format URI based on image and _wizardId
+      * @param _wizardId id of wizard.
+      * @param imageURI inline SVG string.
+      * @return returns inline URI as string
+      */
+    function formatTokenURI(uint256 _wizardId, string memory imageURI) public view returns (string memory) {
+//        Stats memory myStats = tokenIdToStats[_wizardId];
+
+        string memory json_str = string(abi.encodePacked(
+            '{"description": "WizardArmy"',
+            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
+            ', "image": "',
+             imageURI, '"',
+            ', "name": "Wizard"',
+            // attributes
+//            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
+//            Strings.toString(myStats.level),
+            ' }'
+        ));
+
+        // use this format to add extra properties
+        json_str = string(abi.encodePacked(json_str,
+            ', {"display_type": "number", "trait_type": "hp", "value": ',
+            Strings.toString(999),   ' }',
+            ', {"display_type": "number", "trait_type": "magical power", "value": ',
+            Strings.toString(999),   ' }',
+                ', {"display_type": "number", "trait_type": "magical defense", "value": ',
+            Strings.toString(9999),   ' }'
+        ));
+
+        // use this format to add extra properties
+        json_str = string(abi.encodePacked(json_str,
+            ', {"display_type": "number", "trait_type": "speed", "value": ',
+            Strings.toString(999),   ' }',
+            ', {"display_type": "number", "trait_type": "wins", "value": ',
+            Strings.toString(999),   ' }'
+        ));
+
+//
+//        // use this format to add extra properties
+//        json_str = string(abi.encodePacked(json_str,
+//            ', {"display_type": "number", "trait_type": "losses", "value": ',
+//            Strings.toString(999),   ' }',
+//            ', {"display_type": "number", "trait_type": "battles", "value": ',
+//            Strings.toString(999),   ' }',
+//                ', {"display_type": "number", "trait_type": "tokensClaimed", "value": ',
+//            Strings.toString(myStats.tokensClaimed),   ' }'
+//        ));
+
+        // end string
+        json_str = string(abi.encodePacked(json_str, ']','}'));
+
 //        string memory json_str = string(abi.encodePacked(
 //            '{"description": "WizardArmy"',
 //            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
@@ -338,33 +484,21 @@ contract Wizards is ERC721Enumerable, Ownable {
 //             imageURI, '"',
 //            ', "name": "Wizard"',
 //            // attributes
-//            ' }'
+//            ', "attributes": [{"display_type": "number", "trait_type": "level", "value": ',
+//            '11111111',   ' }'
 //        ));
-//
-//        // use this format to add extra properties
 //        json_str = string(abi.encodePacked(json_str,
 //            ', {"display_type": "number", "trait_type": "hp", "value": ',
-//            Strings.toString(999),   ' }',
-//            ', {"display_type": "number", "trait_type": "magical power", "value": ',
-//            Strings.toString(999),   ' }',
-//                ', {"display_type": "number", "trait_type": "magical defense", "value": ',
-//            Strings.toString(9999),   ' }'
+//            '2222222222',   ' }',
+//            ', {"display_type": "number", "trait_type": "mp", "value": ',
+//            '33333333333333333',   ' }',
+//                ', {"display_type": "number", "trait_type": "wins", "value": ',
+//            '4444444444',   ' }',
+//            ']', // End Attributes
+//            '}'
 //        ));
-//
-//        // use this format to add extra properties
-//        json_str = string(abi.encodePacked(json_str,
-//            ', {"display_type": "number", "trait_type": "speed", "value": ',
-//            Strings.toString(999),   ' }',
-//            ', {"display_type": "number", "trait_type": "wins", "value": ',
-//            Strings.toString(999),   ' }'
-//        ));
-//
-//
-//        // end string
-//        json_str = string(abi.encodePacked(json_str, ']','}'));
-//
-//        return json_str;
-//    }
+        return json_str;
+    }
 
 
     //    todo -- make an actual random number generator with chainlink

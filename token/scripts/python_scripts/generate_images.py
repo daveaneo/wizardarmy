@@ -109,6 +109,7 @@ def main(sample_size=None):
 
     create_image_grid(output_folder)
 
+
 def create_image_grid(directory, output_file="grid.jpg"):
     # Load all images
     images = [Image.open(os.path.join(directory, f)) for f in os.listdir(directory) if f.endswith(('.png', '.jpg', '.jpeg'))]
