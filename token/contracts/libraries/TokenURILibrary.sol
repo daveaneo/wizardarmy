@@ -21,7 +21,7 @@ library TokenURILibrary {
     ) external view returns (string memory imageURI) {
 //        require(_exists(_wizardId));
 
-        string memory linkExtension;
+        string memory linkExtension="";
 
         if (wizardSalt == 0) { // todo -- confirm we don't need wizardSaltSet
             linkExtension = "placeholder";
@@ -46,6 +46,9 @@ library TokenURILibrary {
         if (keccak256(abi.encodePacked(imageURI)) != 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470) {
             imageURI = string(abi.encodePacked(_imageBaseURI, linkExtension, '.jpg'));
         }
+        else {
+            imageURI = "NO SALT"; // todo -- have mystery image for when no salt is there
+        }
         
 //        return imageURI;
         return imageURI;
@@ -55,7 +58,7 @@ library TokenURILibrary {
     function formatTokenURI(uint256 _wizardId, string memory imageURI, CommonDefinitions.WizardStats memory attributes) external pure returns (string memory) {
         string memory json_str = string(abi.encodePacked(
             '{"description": "WizardArmy"',
-            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
+            ', "external_url": "https://www.wizards.club"',
             ', "image": "', imageURI, '"',
             ', "name": "Wizard"',
             ', "attributes": [',
