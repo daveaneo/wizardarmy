@@ -1,6 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 
+function getRandomUint256() {
+  const max = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"); // 2^256 - 1
+  const rand = BigInt(Math.floor(Math.random() * Number(max)));
+  return rand;
+}
+
+
 async function main() {
     const [deployer, secondary] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
@@ -33,6 +40,7 @@ async function main() {
     // Deploying the TokenURILibrary
     const TokenURILibrary = await ethers.getContractFactory("TokenURILibrary", {
         libraries: {
+            "GeneLogic": geneLogic.address,
             "SVGGenerator": svgGenerator.address
         }
     });
@@ -101,6 +109,13 @@ async function main() {
     // mint wizard
     await wizards.mint(0); // upline id
     console.log("Minted a wizard for:", deployer.address);
+
+    // Set Salt
+
+    const randomNumber = getRandomUint256();
+    await wizards.setRandomNumber(randomNumber); // upline id
+    console.log("salt set as: ", randomNumber.toString());
+
 
     // get token URI
     const tokenId = 1; // or whatever your starting tokenId is

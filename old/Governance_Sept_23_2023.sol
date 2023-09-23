@@ -32,21 +32,20 @@ contract Governance is ReentrancyGuard, Ownable {
     WizardTower wizardTower;
     IAppointer appointerContract;
 
-    // redoable after some time period?
+    // used to find active tasks
     struct TaskType {
         mapping (uint40 => uint256) nextActiveTimeThreshold; // for recurring tasks -- todo -- add waitTime or ...
         string IPFSHash; // holds description
         bool paused;
-//        uint40 proposalID; // proposal ID or 0 if task
+        uint40 proposalID; // proposal ID or 0 if task
         uint8 numFieldsToHash;
         uint24 timeBonus;
         uint40 begTimestamp;
         uint40 endTimestamp;
         uint16 availableSlots;
-        uint16[8] restrictedTo; // roles that can do this task. 0 means no restriction
-        uint16[8] restrictedFrom; // roles that can't do this task. 0 means no restriction
     }
 
+    // include parent???
     struct Task {
         string IPFSHash; // holds description
         uint40 NFTID; // wizard ID of who is assigned task
@@ -61,13 +60,12 @@ contract Governance is ReentrancyGuard, Ownable {
         uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
-    // todo -- reconsider contract
-
-    // todo -- make tasktypes into mapping
     TaskType[] public taskTypes; // we must keep task types low in quantity to avoid gas issues
+
     DoubleEndedQueue.Bytes32Deque public tasksWaitingConfirmation;
-    mapping (uint256 => Task) public tasks; // tasks
-    uint256 public totalTasksAttempted; // todo what does this do?
+
+    mapping (uint256 => Task) public tasks;
+    uint256 public totalTasksAttempted;
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes
@@ -82,10 +80,10 @@ contract Governance is ReentrancyGuard, Ownable {
     event TaskAccepted(uint256 wizardId, uint256 taskId, string IPFSHash, uint256 data);
     event TaskCompleted(uint256 wizardId, uint256 taskId, string IPFSHash, uint256 data);
 
-
     /////////////////////////////
     //////  TEMP Functions ///////
     /////////////////////////////
+
 
     function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
         bytes memory unencoded = abi.encodePacked(_fields[0]);
@@ -99,10 +97,25 @@ contract Governance is ReentrancyGuard, Ownable {
         emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
     }
 
+    // working for regular but not refuted.
+    //    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
+    //        bytes memory unencoded = abi.encodePacked(_fields[0]);
+    //        if(_refuted) {
+    //            for(uint256 i = 0; i < _fields.length;){
+    //                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
+    //                unchecked{++i;}
+    //            }
+    //        }
+    //        bytes32 myHash = keccak256(abi.encodePacked(_fields));
+    //        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
+    //    }
+
+
 
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
+
 
     // todo -- update this function as we know long have board but have roles that can assign tasks to other roles
     function canCreateTaskTypes(uint256 _wizId) public view returns (bool) {
@@ -115,15 +128,106 @@ contract Governance is ReentrancyGuard, Ownable {
         return tasks[_taskId];
     }
 
+    /**
+     * @notice Check if there are any tasks available for confirmation for a given wizard.
+     * @param _wizId The ID of the wizard.
+     * @return True if tasks are available for confirmation; otherwise, false.
+     * @dev Ensures the caller is not another smart contract.
+     */
+    function areTasksAvailableToConfirm(uint256 _wizId) external view onlyEOA returns (bool) {
+        uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
+        Task memory myTask;
+        // todo --implement randomness
 
-    //////////////////////////////////////
-    // handled externally by events //////
-    //////////////////////////////////////
+        for(uint256 i =0; i < totalTasksSubmitted; ){
+            myTask = tasks[uint256(DoubleEndedQueue.at(tasksWaitingConfirmation,i))];
+            if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizId && myTask.refuterID!= _wizId){
+                return true;
+            }
+            unchecked{++i;}
+        }
+        return false;
+    }
 
-//    function getTasksAssignedToWiz(uint40 _wizId) external view returns (Task[] memory, uint256[] memory) {
-//    function getMyAvailableTaskTypes(uint40 _wizId) external view returns (string[] memory) {
-//    function deleteTaskTypeByIPFSHash(string memory _IPFSHash) external
-//    function areTasksAvailableToConfirm(uint256 _wizId) external view onlyEOA returns (bool) // potentially have a uint256 handling this
+
+    // todo -- refactor. No for loops like this. We will have to use events.
+    function getTasksAssignedToWiz(uint40 _wizId) external view returns (Task[] memory, uint256[] memory) {
+        uint256 totalTasksAssigned = DoubleEndedQueue.length(tasksWaitingConfirmation);
+        Task memory myTask;
+        uint256 taskId;
+        uint256 count=0;
+
+        for(uint256 i =0; i < totalTasksAssigned; ){
+            taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+            myTask = tasks[taskId];
+            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.verifierID== _wizId){
+                unchecked{++count;}
+            }
+            unchecked{++i;}
+        }
+
+        // if no tasks, return empty array
+        if (count==0) {
+            Task[] memory myReturn= new Task[](1);
+            uint256[] memory myReturnUint= new uint256[](1);
+            return (myReturn, myReturnUint);
+        }
+
+        uint256 counter = 0;
+        Task[] memory myTasks = new Task[](count);
+        uint256[] memory myTaskIds = new uint256[](count);
+        for(uint256 i =0; i < totalTasksAssigned; ){
+            taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+            myTask = tasks[taskId];
+            if( myTask.verificationReservedTimestamp > block.timestamp && myTask.verifierID== _wizId){
+                myTasks[counter] = myTask;
+                myTaskIds[counter] = taskId;
+                unchecked{++counter;}
+                if(counter>count){break;}
+            }
+            unchecked{++i;}
+        }
+        return (myTasks, myTaskIds);
+    }
+
+    // todo -- remove because of for loop
+    // todo -- see if we need to include IDs here -- may not need to
+    function getMyAvailableTaskTypes(uint40 _wizId) external view returns (string[] memory) {
+        uint256 count;
+        for(uint256 i=0; i< taskTypes.length;){
+            if(taskTypes[i].nextActiveTimeThreshold[_wizId] < block.timestamp
+            && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
+            && taskTypes[i].availableSlots > 1
+            ) {
+                unchecked{++count;}
+            }
+            unchecked{++i;}
+        }
+
+        // if no tasks, return empty array
+        if (count==0) {
+            string[] memory myReturn= new string[](1);
+            myReturn[0] = "";
+            return myReturn;
+        }
+
+        string[] memory myTasks = new string[](count);
+        uint256 counter = 0;
+        for(uint256 i=0; i< taskTypes.length;){
+            if(taskTypes[i].nextActiveTimeThreshold[_wizId] < block.timestamp
+            && taskTypes[i].begTimestamp <= block.timestamp && taskTypes[i].endTimestamp > block.timestamp
+            && taskTypes[i].availableSlots > 1
+            ) {
+                myTasks[counter] = taskTypes[i].IPFSHash;
+                unchecked{++counter;}
+                if(counter >= count) {
+                    break;
+                }
+            }
+            unchecked{++i;}
+        }
+        return myTasks;
+    }
 
 
     /////////////////////////////
@@ -137,6 +241,23 @@ contract Governance is ReentrancyGuard, Ownable {
     function setAppointerAddress(address _addy) external onlyOwner {
         appointerContract = IAppointer(_addy);
     }
+
+    // todo -- inefficient
+    function deleteTaskTypeByIPFSHash(string memory _IPFSHash) external {
+        for(uint256 i=0; i<taskTypes.length;){
+            if(keccak256(abi.encodePacked(taskTypes[i].IPFSHash)) == keccak256(abi.encodePacked(_IPFSHash))){
+                TaskType storage myTaskType = taskTypes[i];
+                TaskType storage displacedTaskType = taskTypes[taskTypes.length-1];
+                myTaskType = displacedTaskType;
+                delete taskTypes[taskTypes.length-1];
+                // todo see if this works at all
+                delete taskTypes[taskTypes.length-1];
+                break;
+            }
+            unchecked{++i;}
+        }
+    }
+
 
 //    todo -- make another function where authorized users can delete the taskType
     function deleteTaskType(uint256 _taskId) external onlyOwner {
@@ -213,16 +334,20 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-    function claimRandomTaskForVerification(uint256 _wizId) onlyWizardOwner(_wizId) external {
+    function claimRandomTaskForVerification(uint256 _wizId) external {
         uint256 totalTasksSubmitted = DoubleEndedQueue.length(tasksWaitingConfirmation);
         Task memory myTask;
         uint256 taskId;
 
         // todo --implement randomness
+        // uint256[25] memory potentialTasks;
+
         for(uint256 i =0; i < totalTasksSubmitted; ){
             taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
             myTask = tasks[taskId];
             if( myTask.verificationReservedTimestamp < block.timestamp && myTask.NFTID != _wizId && myTask.refuterID!= _wizId){
+//                taskId = uint256(DoubleEndedQueue.at(tasksWaitingConfirmation, i));
+//                myTask = tasks[taskId];
 
                 // update task
                 myTask.verifierID = uint16(_wizId);
@@ -235,8 +360,7 @@ contract Governance is ReentrancyGuard, Ownable {
 //        emit VerificationAssigned(_wizId, taskId);
     }
 
-//    todo -- complete task using task ID
-    function completeTask(string memory _IPFSHash, bytes32 _hash, uint40 _wizId) onlyWizardOwner(_wizId) external {
+    function completeTask(string memory _IPFSHash, bytes32 _hash, uint40 _wizId) external {
         // IPFS, hash, wizardID
 
         // find the task type -- can't be too many
@@ -264,8 +388,10 @@ contract Governance is ReentrancyGuard, Ownable {
 
     }
 
+
+
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted tasks must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
+    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) external {
     //todo -- uncomment out requirement (testing)
         require(wizardsNFT.ownerOf(_wizId) == msg.sender && tasks[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
         require(_fields.length > 0);
@@ -375,10 +501,23 @@ contract Governance is ReentrancyGuard, Ownable {
     ////// Modifiers /////
     //////////////////////
 
-    /// @notice Checks if the message sender is the owner of the token.
-    /// @param tokenId ID of the token to check ownership of.
-    modifier onlyWizardOwner(uint256 tokenId) {
-        require(wizardsNFT.ownerOf(tokenId) == msg.sender); // dev: "Caller is not the owner of this NFT"
+    modifier onlyAdmin() {
+        require(false,'Must be admin');
+        _;
+    }
+
+    modifier onlyNFTOwner() {
+        require(false,'Must be admin');
+        _;
+    }
+
+    modifier onlyLessee() {
+        require(false,'Must be lessee');
+        _;
+    }
+
+    modifier onlyMember() { // todo -- onlyMember
+        require(false,'Must be member');
         _;
     }
 
@@ -390,7 +529,7 @@ contract Governance is ReentrancyGuard, Ownable {
         _;
     }
 
-    /// @dev Modifier to check if the caller is authorized to create a task -- owns and has right permissions.
+    /// @dev Modifier to check if the caller is authorized to create a task.
     /// @param _wizardId The ID of the wizard being used for authentication.
     modifier onlyTaskCreators(uint256 _wizardId) {
         require(

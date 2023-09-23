@@ -4,7 +4,7 @@ pragma solidity 0.8.15;
 //import "./helpers/ERC721.sol";
 import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
-import "./helpers/Base64.sol";
+import "./libraries/Base64.sol";
 import "./libraries/Strings.sol";
 import "./libraries/GeneLogic.sol";
 import "./libraries/CommonDefinitions.sol";
@@ -29,16 +29,6 @@ contract Wizards is ERC721Enumerable, Ownable {
     address public appointer; /// contract address to assign roles
 
     IReputationContract public reputationSmartContract;
-
-//    enum ElementEnum.ELEMENT {FIRE, WIND, WATER, EARTH}
-
-//    struct Stats { // todo -- reduce uint amount
-//        // todo -- have reputation smart contract and be able to get reputation from here
-//        uint16 role; // limit wizards to 1 role, which is a number --         // todo -- have role smart contract and be able to get role from here
-//        uint16 uplineId;  // 0 is default, 65k max?
-//        uint40 initiationTimestamp; // 0 if uninitiated
-//        uint40 protectedUntilTimestamp; // after this timestamp, NFT can be crushed
-//    }
 
     struct ContractSettings { // todo refine, update setter
         uint256 mintCost; // Cost in ETH to mint NFT
@@ -290,85 +280,12 @@ contract Wizards is ERC721Enumerable, Ownable {
                                            tokenIdToStats[_wizardId].initiationTimestamp==0,  isExiled(_wizardId), isActive(_wizardId));
 
 
-        return TokenURILibrary.formatTokenURI(_wizardId, imageURI, tokenIdToStats[_wizardId]);
+        return TokenURILibrary.formatTokenURI(_wizardId, imageURI, tokenIdToStats[_wizardId], wizardSalt);
 
-//        string memory linkExtension;
-//        uint256 myPhase = getPhaseOf(_wizardId);
-//
-//        string memory imageURI = "";
-//
-//        if(!contractSettings.wizardSaltSet){
-//            linkExtension = "placeholder"; // todo -- placeholder image before random number set
-//        }
-//        else if(tokenIdToStats[_wizardId].initiationTimestamp==0){ // uninitiated
-//            linkExtension = "uninitiated"; // todo -- shameful uninitiated picture
-//        }
-//        else if(isExiled(_wizardId)){ // exiled
-//            linkExtension = "exiled"; // todo -- shameful banished/exiled picture
-//        }
-//        else if(!isActive(_wizardId)){ // not protected
-//            linkExtension = "inactive"; // todo -- shameful, sleeping picture
-//        }
-//        else if(myPhase<4){
-//            linkExtension = Strings.toString(myPhase); // todo -- shameful, sleeping picture
-//        }
-//        else{
-//            imageURI = SVGGenerator.getAdultWizardImage(_wizardId,  wizardSalt, myPhase, contractSettings.totalPhases,
-//                contractSettings.maturityThreshold, contractSettings.imageBaseURI);
-//        }
-//
-//        //    bytes32 constant EMPTY_STRING_HASH = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470; // keccak256 hash of ""
-//        if (keccak256(abi.encodePacked(imageURI)) != 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470) {
-//            imageURI = string(abi.encodePacked(contractSettings.imageBaseURI, linkExtension, '.jpg'));
-//        }
-//
-//        return formatTokenURI(_wizardId, imageURI);
     }
 
-//    /** @dev format URI based on image and _wizardId
-//      * @param _wizardId id of wizard.
-//      * @param imageURI inline SVG string.
-//      * @return returns inline URI as string
-//      */
-//    function formatTokenURI(uint256 _wizardId, string memory imageURI) internal view returns (string memory) {
-//        string memory json_str = string(abi.encodePacked(
-//            '{"description": "WizardArmy"',
-//            ', "external_url": "https://wizardarmyNFT.com (or something like this)"',
-//            ', "image": "',
-//             imageURI, '"',
-//            ', "name": "Wizard"',
-//            // attributes
-//            ' }'
-//        ));
-//
-//        // use this format to add extra properties
-//        json_str = string(abi.encodePacked(json_str,
-//            ', {"display_type": "number", "trait_type": "hp", "value": ',
-//            Strings.toString(999),   ' }',
-//            ', {"display_type": "number", "trait_type": "magical power", "value": ',
-//            Strings.toString(999),   ' }',
-//                ', {"display_type": "number", "trait_type": "magical defense", "value": ',
-//            Strings.toString(9999),   ' }'
-//        ));
-//
-//        // use this format to add extra properties
-//        json_str = string(abi.encodePacked(json_str,
-//            ', {"display_type": "number", "trait_type": "speed", "value": ',
-//            Strings.toString(999),   ' }',
-//            ', {"display_type": "number", "trait_type": "wins", "value": ',
-//            Strings.toString(999),   ' }'
-//        ));
-//
-//
-//        // end string
-//        json_str = string(abi.encodePacked(json_str, ']','}'));
-//
-//        return json_str;
-//    }
-
-
     //    todo -- make an actual random number generator with chainlink
-    function setRandomNumber(uint256 _wizardSalt) external afterSaltSet onlyOwner {
+    function setRandomNumber(uint256 _wizardSalt) external saltNotSet onlyOwner {
         wizardSalt = _wizardSalt;
         contractSettings.wizardSaltSet = true;
     }
@@ -446,30 +363,29 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Modifiers      /////
     ///////////////////////////
 
+
+    /// @dev Ensures that the caller is the verifier.
     modifier onlyVerifier() {
-        require(msg.sender == verifier); // dev: 'only verifier' // todo -- decide who will verify--one or many addresses
+        require(msg.sender == verifier, "only verifier");
         _;
     }
 
+    /// @dev Ensures that the caller is the appointer.
     modifier onlyAppointer() {
-        require(msg.sender == appointer); // dev: 'only appointer'
+        require(msg.sender == appointer, "only appointer");
         _;
     }
 
 
-    modifier onlyHolder() {
-        require(msg.sender != address(this)); // dev: 'only holder' // todo -- decide who will verify--one or many addresses
-        _;
-    }
-
+    /// @dev Ensures that the caller is the culler.
     modifier onlyCuller() {
-        require( msg.sender == culler); // dev: "Only culler can call this function."
+        require(msg.sender == culler, "Only culler can call this function.");
         _;
     }
 
-
-    modifier afterSaltSet() {
-        require(!contractSettings.wizardSaltSet); // dev: "Number is already set"
+    /// @dev Ensures that the wizard salt has not been set.
+    modifier saltNotSet() {
+        require(!contractSettings.wizardSaltSet, "Number is already set");
         _;
     }
 
@@ -505,10 +421,15 @@ contract Wizards is ERC721Enumerable, Ownable {
         emit NewAppointer(_appointer);
     }
 
-    // Allows the contract owner to withdraw the accumulated fees
+    /**
+     * @notice Allows the contract owner to withdraw the accumulated fees.
+     * @dev Withdraws all Ether stored in the contract and sends it to the owner.
+     * Only callable by the contract owner.
+     */
     function withdraw() external onlyOwner {
         address payable recipient = payable(owner());
         recipient.transfer(address(this).balance);
     }
+
 
 }
