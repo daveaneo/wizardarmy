@@ -11,6 +11,8 @@ interface IERC721Wizard{
 
 import './helpers/Ownable.sol';
 
+/// @title A contract to manage roles and appointments for Wizards.
+/// @notice This contract allows for the creation of roles and the appointment of wizards to those roles.
 contract Appointer is Ownable {
 
     IERC721Wizard wizardContract;
@@ -24,7 +26,7 @@ contract Appointer is Ownable {
 
     mapping (uint256 => Role) public roles;
     uint256 public numRoles;
-    mapping(uint256 => mapping(uint256 => bool)) public canAppoint;
+    mapping(uint256 => mapping(uint256 => bool)) public canAppoint; // maps role to a mapping of roles they can create tasks for
 
     event RoleCreated(uint256 roleId, string name, bool paused);
     event RoleAppointed(uint256 wizardId, uint256 roleId);
@@ -53,14 +55,25 @@ contract Appointer is Ownable {
         return roles[_roleId];
     }
 
+
+    /// @notice Determines if role can appoint a delegate over specific role.
+    /// @param _appointerRoleId The ID of the role that delegates.
+    /// @param _appointeeRoleId The ID of the role that is delegated.
+    /// @return Returns true if can delegate given role; false otherwise.
+    function canDelegateRole(uint256 _appointerRoleId, uint256 _appointeeRoleId) external view returns(bool) {
+        require(_appointerRoleId <= numRoles && _appointerRoleId != 0); // dev: "non-existant role"
+        require(_appointeeRoleId <= numRoles && _appointeeRoleId != 0); // dev: "non-existant role"
+        return roles[_appointerRoleId].canCreateTaskTypes && canAppoint[_appointerRoleId][_appointeeRoleId];
+    }
+
+
     /// @notice Determines if role can create TaskTypes
     /// @param _roleId The ID of the role to fetch.
-    /// @return Returns the details of the role.
+    /// @return Returns true if can appoint; false otherwise.
     function canRoleCreateTaskTypes(uint256 _roleId) external view returns(bool) {
         require(_roleId <= numRoles && _roleId != 0, "non-existant role");
         return roles[_roleId].canCreateTaskTypes;
     }
-
 
 
     ////////////////////////////////
@@ -205,22 +218,26 @@ contract Appointer is Ownable {
     ////// Modifiers           /////
     ////////////////////////////////
 
+    /// @notice Ensures that the caller is the owner of the specified wizard.
     modifier isWizardOwner(uint256 wizardId) {
         require(wizardContract.ownerOf(wizardId) == msg.sender, "Not the owner of the specified wizard.");
         _;
     }
 
+    /// @notice Ensures that the specified role exists.
     modifier roleExists(uint256 roleId) {
         require(roleId > 0 && roleId <= numRoles, "Role does not exist.");
         _;
     }
 
+    /// @notice Checks if the specified wizard has permission to appoint the given role.
     modifier canAppointRole(uint256 appointerId, uint256 targetRole) {
         uint256 appointerRole = wizardContract.getRole(appointerId);
         require(canAppoint[appointerRole][targetRole], "No permission to appoint this role.");
         _;
     }
 
+    /// @notice Ensures that the specified wizard is active.
     modifier isActiveWizard(uint256 wizardId) {
         require(wizardContract.isActive(wizardId), "Wizard is not active.");
         _;
