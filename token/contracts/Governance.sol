@@ -75,10 +75,14 @@ contract Governance is ReentrancyGuard, Ownable {
         bytes32 hash; // hashed input to be validated
         bytes32 refuterHash; // correct hash according to refuter
         uint128 taskId;
-//        uint40 verificationReservedTimestamp; // time when verification period ends
+        uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
-    DoubleEndedQueue.Bytes32Deque public reportsWaitingConfirmation;
+    uint256[] public reportsWaitingConfirmation;
+//    uint256[] public reportsClaimedForConfirmation;
+
+//    DoubleEndedQueue.Bytes32Deque public reportsWaitingConfirmation;
+    DoubleEndedQueue.Bytes32Deque public reportsClaimedForConfirmation;
 
     // This mapping holds the next active time thresholds for each task.
     // The outer mapping uses the task ID as the key.
@@ -93,7 +97,7 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 public reportsCount; // todo what does this do?
 
     // todo -- Adjustable
-    uint256 verificationTime = 10*60; // 10 minutes
+    uint256 verificationTime = 10*60; // 10 minutes // todo -- bigger tasks may want custom verification
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
 
     /// @notice Emitted when a verification is assigned to a wizard for a task.
@@ -200,6 +204,15 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+//    /**
+//     * @notice Returns the number of reports currently waiting for confirmation.
+//     * @return The number of reports in the waiting confirmation queue.
+//     */
+//    function reportsWaitingConfirmationLength() external view returns (uint256) {
+//        return DoubleEndedQueue.length(reportsWaitingConfirmation);
+//    }
+
+
     //////////////////////////////////////
     // handled externally by events //////
     //////////////////////////////////////
@@ -275,65 +288,11 @@ contract Governance is ReentrancyGuard, Ownable {
 //        ecosystemTokens = IERC20(_erc20);
         wizardsNFT = Wizards(_nft);
         wizardTower = WizardTower(_wizardTower);
-
-//        contractSettings = ContractSettings({
-//        });
-
     }
 
     // Required to receive ETH
     receive() external payable {
     }
-
-//
-//    /// @notice Creates a new task type.
-//    /// @dev Only the owner, or a wizard with the appropriate role can create a task type.
-//    /// @param _wizardId The ID of the wizard being used for authentication.
-//    /// @param _IPFSHash The IPFS hash of the task details.
-//    /// @param _numFieldsToHash Number of fields to hash.
-//    /// @param _begTimestamp Beginning timestamp for the task.
-//    /// @param _endTimestamp Ending timestamp for the task.
-//    /// @param _availableSlots Number of available slots for the task.
-//    function createTask(
-//        uint256 _wizardId,
-//        string calldata _IPFSHash,
-//        bool _paused,
-//        uint8 _numFieldsToHash,
-//        uint24 _timeBonus,
-//        uint24 _waitTime,
-//        uint40 _begTimestamp,
-//        uint40 _endTimestamp,
-//        uint16 _availableSlots,
-//        TASKTYPE _taskType,
-//        uint16[8] memory _restrictedTo
-//    ) external onlyTaskCreators(_wizardId) {
-//        tasksCount++;
-//
-//        Task memory newTask = Task({
-//            timeDetails: TimeDetails({
-//                begTimestamp: _begTimestamp,
-//                endTimestamp: _endTimestamp,
-//                waitTime: _waitTime,
-//                timeBonus: _timeBonus
-//            }),
-//            roleDetails: RoleDetails({
-//                creatorRole: uint16(wizardsNFT.getRole(_wizardId)),
-//                restrictedTo: _restrictedTo,
-//                availableSlots: _availableSlots
-//            }),
-//            coreDetails: CoreDetails({
-//                IPFSHash: _IPFSHash,
-//                state: _paused ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE,
-//                numFieldsToHash: _numFieldsToHash,
-//                taskType: _taskType
-//            })
-//        });
-//
-//        tasks[tasksCount] = newTask;
-//
-//        emit NewTaskCreated(tasks[tasksCount]);
-//    }
-//
 
     function createTask(
         uint256 _wizardId,
@@ -355,82 +314,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
         emit NewTaskCreated(tasks[tasksCount]);
     }
-
-
-
-
-    function claimRandomTaskForVerification(uint256 _wizId) onlyWizardOwner(_wizId) external {
-        uint256 totalTasksSubmitted = DoubleEndedQueue.length(reportsWaitingConfirmation);
-        Report memory myReport;
-        uint256 taskId;
-
-        // todo --implement randomness
-        for(uint256 i =0; i < totalTasksSubmitted; ){
-            taskId = uint256(DoubleEndedQueue.at(reportsWaitingConfirmation, i));
-            myReport = reports[taskId];
-            if( myReport.reporterID != _wizId && myReport.refuterID!= _wizId){
-
-                // update task
-                myReport.verifierID = uint16(_wizId);
-//                myReport.verificationReservedTimestamp = uint40(block.timestamp + verificationTime);
-                reports[taskId] = myReport;
-                emit VerificationAssigned(_wizId, taskId, reports[taskId]);
-            }
-            unchecked{++i;}
-        }
-//        emit VerificationAssigned(_wizId, taskId);
-    }
-
-//    function completeTask(uint256 _reportId, bytes32 _hash, uint16 _wizId) onlyWizardOwner(_wizId) external {
-//        // IPFS, hash, wizardID
-//
-//        // find the task type -- can't be too many
-//        for(uint256 i = 0; i<tasks.length;){
-//            if(keccak256(abi.encode(tasks[i].IPFSHash)) == keccak256(abi.encode(_IPFSHash))){ // hashed to compare
-//                // verify it is viable
-//                require(tasks[i].begTimestamp <= block.timestamp && block.timestamp <= tasks[i].endTimestamp, "Outside time period");
-//                // create new task
-//                Report memory myReport = Report(_IPFSHash,_wizId, _hash, 0, tasks[i].numFieldsToHash, tasks[i].timeBonus, 0, 0, 0, 0);
-//                DoubleEndedQueue.pushBack(reportsWaitingConfirmation, bytes32(reportsCount));
-//                reports[reportsCount] = myReport;
-//                reportsCount+=1;
-//
-//                // update Tasks
-//                tasks[i].nextActiveTimeThreshold[_wizId] = block.timestamp + 1 days;
-//                tasks[i].availableSlots = tasks[i].availableSlots - 1;
-//
-//                emit TaskCompleted(_wizId,reportsCount -1, _IPFSHash, block.timestamp);
-//                break;
-//            }
-//            unchecked{++i;}
-//        }
-//        // failed
-//
-//    }
-
-    /// @notice Allows a wizard to complete a task by submitting a hash.
-    /// @dev This function updates the report with the submitted hash, changes the report's state to submitted,
-    /// adds the report ID to the double-ended queue, and emits a TaskCompleted event.
-    /// @param _reportId The ID of the report being updated.
-    /// @param _hash The hash being submitted for the task completion.
-    /// @param _wizId The ID of the wizard completing the task.
-    function completeTask(uint256 _reportId, bytes32 _hash, uint16 _wizId) onlyWizardOwner(_wizId) external {
-        // Ensure the report exists and belongs to the wizard
-        require(reports[_reportId].reporterID == _wizId); // dev: "Wizard is not the reporter for this task."
-
-        // Update the report's hash and state
-        reports[_reportId].hash = _hash;
-        reports[_reportId].reportState = REPORTSTATE.SUBMITTED;
-
-        // todo -- determine if we still need this doubleEndedQueue or if we can just get away with a list
-        // Add the report ID to the double-ended queue
-        // Assuming the queue's name is 'reportQueue' and it has an 'enqueue' function
-        DoubleEndedQueue.pushBack(reportsWaitingConfirmation, bytes32(_reportId));
-
-        // Emit the TaskCompleted event
-        emit TaskCompleted(_wizId, _reportId);
-    }
-
 
 
     /**
@@ -464,6 +347,33 @@ contract Governance is ReentrancyGuard, Ownable {
         uint256 reportId = createReport(_wizId, _taskId);
     }
 
+
+    /// @notice Allows a wizard to complete a task by submitting a hash.
+    /// @dev This function updates the report with the submitted hash, changes the report's state to submitted,
+    /// adds the report ID to the double-ended queue, and emits a TaskCompleted event.
+    /// @param _reportId The ID of the report being updated.
+    /// @param _hash The hash being submitted for the task completion.
+    /// @param _wizId The ID of the wizard completing the task.
+    function completeTask(uint256 _reportId, bytes32 _hash, uint16 _wizId) onlyWizardOwner(_wizId) external {
+        // Ensure the report exists and belongs to the wizard
+        require(reports[_reportId].reporterID == _wizId); // dev: "Wizard is not the reporter for this task."
+
+        // Update the report's hash and state
+        reports[_reportId].hash = _hash;
+        reports[_reportId].reportState = REPORTSTATE.SUBMITTED;
+
+        // todo -- determine if we still need this doubleEndedQueue or if we can just get away with a list
+        // Add the report ID to the double-ended queue
+        // Assuming the queue's name is 'reportQueue' and it has an 'enqueue' function
+//        DoubleEndedQueue.pushBack(reportsWaitingConfirmation, bytes32(_reportId));
+        reportsWaitingConfirmation.push(_reportId);
+
+
+        // Emit the TaskCompleted event
+        emit TaskCompleted(_wizId, _reportId);
+    }
+
+
     /**
      * @notice Creates a report for a claimed task.
      * @dev This function initializes a report with the reporter's ID and sets it to the ACTIVE state.
@@ -488,7 +398,112 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+//    todo -- tasks that are restrictedTo will cause this to be a problem. We need them to go somewhere else.
 
+    /// @notice Allows a wizard to claim a random task for verification.
+    /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
+    /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
+    /// @param _wizId The ID of the wizard claiming the task for verification.
+    function claimRandomTaskForVerification(uint256 _wizId) onlyWizardOwner(_wizId) external {
+        // Ensure the caller is not a contract
+        require(tx.origin == msg.sender); // dev: "Contracts are not allowed to claim tasks."
+        require(reportsWaitingConfirmation.length > 0); // dev: "No tasks available for verification."
+
+        // Implement randomness - for simplicity, using blockhash and modulo. In a real-world scenario, consider a more robust method.
+        uint256 randomIndex = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), _wizId))) % reportsWaitingConfirmation.length;
+        uint256 taskId = reportsWaitingConfirmation[randomIndex];
+
+        Report memory myReport = reports[taskId];
+        require(myReport.reporterID != _wizId && myReport.refuterID != _wizId); // dev: "Wizard is not allowed to verify/refute their own task."
+
+        // Update the report's verifierID and move it from one queue to another
+        myReport.verifierID = uint16(_wizId);
+        reports[taskId] = myReport;
+
+        // Moving from reportsWaitingConfirmation to reportsClaimed
+        // Assuming you have a function in DoubleEndedQueue to remove an item at a specific index
+//        DoubleEndedQueue.removeAt(reportsWaitingConfirmation, randomIndex);
+//        DoubleEndedQueue.enqueue(reportsClaimedForConfirmation, taskId);
+
+        DoubleEndedQueue.pushBack(reportsClaimedForConfirmation, bytes32(taskId));
+//        reportsClaimedForConfirmation.push(taskId);
+        removeElement(reportsWaitingConfirmation, randomIndex);
+
+        processReportsClaimedForConfirmation(3); // todo -- adjustable variable
+
+        emit VerificationAssigned(_wizId, taskId, reports[taskId]);
+    }
+
+    /**
+     * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
+     * @dev Iterates through reportsClaimedForConfirmation and handles them based on their REPORTSTATE.
+     * If the verificationReservedTimestamp of a report has expired, it processes the report and moves it to reportsWaitingConfirmation.
+     * It will process up to the smaller of 'n' reports or the total length of reportsClaimedForConfirmation.
+     * @param n The maximum number of reports to process from the reportsClaimedForConfirmation array.
+     */
+    function processReportsClaimedForConfirmation(uint256 n) public {
+        uint256 totalReportsClaimed = DoubleEndedQueue.length(reportsClaimedForConfirmation);
+        uint256 toProcess = n < totalReportsClaimed ? n : totalReportsClaimed;
+        uint256 processed = 0;
+
+        while (processed < toProcess) {
+            uint256 reportId = uint256(DoubleEndedQueue.front(reportsClaimedForConfirmation));
+            Report storage report = reports[reportId];
+
+            // If the report's verification timestamp hasn't passed yet, break out of the loop
+            if (report.verificationReservedTimestamp > block.timestamp) {
+                break;
+            }
+
+            // Remove the front element from reportsClaimedForConfirmation
+            DoubleEndedQueue.popFront(reportsClaimedForConfirmation);
+
+            // Check the state of the report
+            if (report.reportState == REPORTSTATE.SUBMITTED) {
+                // Handle the case where the report was submitted but time ran out
+                handleReportPastDeadline(reportId);
+            } else if (report.reportState == REPORTSTATE.REFUTED) {
+                // Handle the refuted state
+                handleRefutedReport(reportId);
+            } else if (report.reportState == REPORTSTATE.VERIFIED) {
+                // Handle the verified state
+                handleVerifiedReport(reportId);
+            } else if (report.reportState == REPORTSTATE.FAILED) {
+                // Handle the failed state
+                handleFailedReport(reportId);
+            } else {
+                //this should never happen
+            }
+
+            unchecked {
+                processed++;
+            }
+        }
+    }
+
+
+    // Dummy function handlers for each state. You should replace these with actual implementations.
+    function handleReportPastDeadline(uint256 reportId) internal {
+        // Implementation for handling SUBMITTED state
+    }
+
+    function handleRefutedReport(uint256 reportId) internal {
+        // Implementation for handling REFUTED state
+    }
+
+    function handleVerifiedReport(uint256 reportId) internal {
+        // Implementation for handling VERIFIED state
+    }
+
+    function handleFailedReport(uint256 reportId) internal {
+        // Implementation for handling FAILED state
+    }
+
+
+
+
+
+    // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
     function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
     //todo -- uncomment out requirement (testing)
@@ -502,8 +517,8 @@ contract Governance is ReentrancyGuard, Ownable {
         if(myReport.reportState == REPORTSTATE.SUBMITTED){
 
         }
-        else if(myReport.reportState == REPORTSTATE.){
-        }
+//        else if(myReport.reportState == REPORTSTATE.){
+//        }
 
         if(myReport.reportState == REPORTSTATE.REFUTED){
 //        if(myReport.refuterID > 0) {
@@ -583,24 +598,43 @@ contract Governance is ReentrancyGuard, Ownable {
             }
         }
 
+        // todo -- reconsider this, as it is likely done elsewhere
             // delete task from double ended queue
-        if(deleteTaskFlag){
-            uint256 totalTasksSubmitted = DoubleEndedQueue.length(reportsWaitingConfirmation);
-//            Report memory myReport;
-
-            // delete task from doubleEndedQueue
-            for(uint256 i =0; i < totalTasksSubmitted; ){
-                if( uint256(DoubleEndedQueue.at(reportsWaitingConfirmation, i))==_taskID){
-                    bytes32 prevFront = DoubleEndedQueue.popFront(reportsWaitingConfirmation);
-                    if(i!=0){ // add back on if we weren't meant to remove front
-                        reportsWaitingConfirmation._data[int128(reportsWaitingConfirmation._begin + int(i))] = prevFront;
-                    }
-                }
-                unchecked{++i;}
-            }
-        }
+//        if(deleteTaskFlag){
+////            uint256 totalTasksSubmitted = DoubleEndedQueue.length(reportsWaitingConfirmation);
+//            uint256 totalTasksSubmitted = reportsWaitingConfirmation.length;
+////            Report memory myReport;
+//
+//            // delete task from doubleEndedQueue
+//            for(uint256 i =0; i < totalTasksSubmitted; ){
+//                if( uint256(DoubleEndedQueue.at(reportsWaitingConfirmation, i))==_taskID){
+//                    bytes32 prevFront = DoubleEndedQueue.popFront(reportsWaitingConfirmation);
+//                    if(i!=0){ // add back on if we weren't meant to remove front
+//                        reportsWaitingConfirmation._data[int128(reportsWaitingConfirmation._begin + int(i))] = prevFront;
+//                    }
+//                }
+//                unchecked{++i;}
+//            }
+//        }
 
     }
+
+    //////////////////////
+    ////// Util /////
+    //////////////////////
+
+    function removeElement(uint[] storage arr, uint index) internal {
+        require(index < arr.length); // dev: "Index out of bounds"
+
+        // If it's not the last element, swap with the last one
+        if (index != arr.length - 1) {
+            arr[index] = arr[arr.length - 1];
+        }
+
+        // Remove the last element
+        arr.pop();
+    }
+
 
     //////////////////////
     ////// Modifiers /////
