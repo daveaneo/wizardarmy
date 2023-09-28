@@ -84,6 +84,8 @@ contract Governance is ReentrancyGuard, Ownable {
 //    DoubleEndedQueue.Bytes32Deque public reportsWaitingConfirmation;
     DoubleEndedQueue.Bytes32Deque public reportsClaimedForConfirmation;
 
+    // todo -- do we need to pass more information in the report?
+
     // This mapping holds the next active time thresholds for each task.
     // The outer mapping uses the task ID as the key.
     // The inner mapping uses a uint40 (presumably a timestamp or similar) as the key,
@@ -95,6 +97,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     uint256 public tasksCount;
     uint256 public reportsCount; // todo what does this do?
+    uint256 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
 
     // todo -- Adjustable
     uint256 verificationTime = 10*60; // 10 minutes // todo -- bigger tasks may want custom verification
@@ -129,12 +132,12 @@ contract Governance is ReentrancyGuard, Ownable {
 
     /// @notice Emitted when a new task is created.
     /// @param task The new task that was created.
-    event NewTaskCreated(Task task);
+    event NewTaskCreated(uint256 taskId, Task task);
 
     /// @notice Emitted when a task is completed by a wizard.
     /// @param wizardId ID of the wizard who completed the task.
     /// @param reportId ID of the completed task.
-    event TaskCompleted(uint256 indexed wizardId, uint256 indexed reportId);
+    event TaskCompleted(uint256 indexed wizardId, uint256 indexed reportId, uint256 indexed taskId);
 
     /// @notice Emitted when a task is accepted by a wizard.
     /// @param reportId ID of the report associated with the accepted task.
@@ -275,8 +278,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
 
 
-
-
     //////////////////////////////
     //////  Main Functions ///////
     //////////////////////////////
@@ -299,7 +300,7 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails calldata coreDetails,
         TimeDetails calldata timeDetails,
         RoleDetails calldata roleDetails
-    ) external onlyTaskCreators(_wizardId) {
+    ) external onlyTaskCreators(_wizardId)  {
         tasksCount++;
 
         tasks[tasksCount] = Task({
@@ -312,7 +313,7 @@ contract Governance is ReentrancyGuard, Ownable {
         tasks[tasksCount].coreDetails.state = coreDetails.state == TASKSTATE.PAUSED ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE;
         tasks[tasksCount].roleDetails.creatorRole = uint16(wizardsNFT.getRole(_wizardId));
 
-        emit NewTaskCreated(tasks[tasksCount]);
+        emit NewTaskCreated(tasksCount, tasks[tasksCount]);
     }
 
 
@@ -324,17 +325,20 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _taskId The ID of the task to accept.
      * @param _wizId The ID of the wizard accepting the task.
      */
-    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external {
-        require(_taskId <= tasksCount && _taskId != 0); // dev: invalid task
+    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external returns(uint256 reportId) {
+        require(_taskId <= tasksCount && _taskId != 0, "invalid task"); // dev: invalid task
         Task memory myTask = tasks[_taskId];
 
         // Make sure the wizard is eligible
         uint16 wizRole = uint16(wizardsNFT.getRole(_wizId));
+//        todo include time restrictions with start and stop and pause
         require(((
                 myTask.roleDetails.restrictedTo == 0) || (myTask.roleDetails.restrictedTo == wizRole))
                 && block.timestamp >= nextEligibleTime[_taskId][_wizId]
+                && block.timestamp >= myTask.timeDetails.begTimestamp && block.timestamp < myTask.timeDetails.endTimestamp
+                && myTask.coreDetails.state == TASKSTATE.ACTIVE
                 && myTask.roleDetails.availableSlots > 0
-        ); // dev: "Wizard not eligible"
+        , "wizard not elible"); // dev: "Wizard not eligible"
 
 
         // Decrease the available slots
@@ -345,6 +349,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Create a report and emit the event
         uint256 reportId = createReport(_wizId, _taskId);
+        return reportId;
     }
 
 
@@ -362,15 +367,23 @@ contract Governance is ReentrancyGuard, Ownable {
         reports[_reportId].hash = _hash;
         reports[_reportId].reportState = REPORTSTATE.SUBMITTED;
 
+
         // todo -- determine if we still need this doubleEndedQueue or if we can just get away with a list
         // Add the report ID to the double-ended queue
         // Assuming the queue's name is 'reportQueue' and it has an 'enqueue' function
 //        DoubleEndedQueue.pushBack(reportsWaitingConfirmation, bytes32(_reportId));
-        reportsWaitingConfirmation.push(_reportId);
+//        reportsWaitingConfirmation.push(_reportId);
+
+        // if this is restrictedTo -- and can only be approved by one role -- do not put into the confirmation queue
+        if (tasks[reports[_reportId].taskId].roleDetails.restrictedTo == 0){
+            reportsWaitingConfirmation.push(_reportId);
+        }
 
 
         // Emit the TaskCompleted event
-        emit TaskCompleted(_wizId, _reportId);
+        emit TaskCompleted(_wizId, _reportId, reports[_reportId].taskId);
+//        we may need to have restrictedTo
+
     }
 
 
@@ -398,7 +411,8 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-//    todo -- tasks that are restrictedTo will cause this to be a problem. We need them to go somewhere else.
+    //    todo -- tasks that are restrictedTo will cause this to be a problem. We need them to go somewhere else.
+    // how about those tasks don't get sent here
 
     /// @notice Allows a wizard to claim a random task for verification.
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
@@ -407,6 +421,10 @@ contract Governance is ReentrancyGuard, Ownable {
     function claimRandomTaskForVerification(uint256 _wizId) onlyWizardOwner(_wizId) external {
         // Ensure the caller is not a contract
         require(tx.origin == msg.sender); // dev: "Contracts are not allowed to claim tasks."
+
+        // process reports
+        processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS); // todo -- adjustable variable
+
         require(reportsWaitingConfirmation.length > 0); // dev: "No tasks available for verification."
 
         // Implement randomness - for simplicity, using blockhash and modulo. In a real-world scenario, consider a more robust method.
@@ -420,19 +438,31 @@ contract Governance is ReentrancyGuard, Ownable {
         myReport.verifierID = uint16(_wizId);
         reports[taskId] = myReport;
 
-        // Moving from reportsWaitingConfirmation to reportsClaimed
-        // Assuming you have a function in DoubleEndedQueue to remove an item at a specific index
-//        DoubleEndedQueue.removeAt(reportsWaitingConfirmation, randomIndex);
-//        DoubleEndedQueue.enqueue(reportsClaimedForConfirmation, taskId);
-
+        // place into queue for processing
         DoubleEndedQueue.pushBack(reportsClaimedForConfirmation, bytes32(taskId));
-//        reportsClaimedForConfirmation.push(taskId);
+        // remove from current queue
         removeElement(reportsWaitingConfirmation, randomIndex);
-
-        processReportsClaimedForConfirmation(3); // todo -- adjustable variable
 
         emit VerificationAssigned(_wizId, taskId, reports[taskId]);
     }
+
+    /**
+     * @notice Allows a wizard with a specific role to verify a report for a restricted task.
+     * @dev Only the owner of the specified wizard can call this function, and the wizard must have the same role as the creator of the task.
+     * @param _wizId The ID of the wizard performing the verification.
+     * @param _reportId The ID of the report being verified.
+     * @param approve If `true`, the report is approved; otherwise, it is failed.
+     */
+    function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external {
+        require(tasks[reports[_reportId].taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
+        if (approve){
+            // todo -- handle approval
+        }
+        else{
+            // todo -- handle failure
+        }
+    }
+
 
     /**
      * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
@@ -502,7 +532,8 @@ contract Governance is ReentrancyGuard, Ownable {
 
 
 
-
+    // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
+    // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
     function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
@@ -510,16 +541,10 @@ contract Governance is ReentrancyGuard, Ownable {
 //        require(wizardsNFT.ownerOf(_wizId) == msg.sender && reports[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
         require(_fields.length > 0);
 
-        Report memory myReport = reports[_taskID];
+        Report storage myReport = reports[_taskID];
         bool deleteTaskFlag = true;
 
-        // hash leaves if there is a refuter
-        if(myReport.reportState == REPORTSTATE.SUBMITTED){
-
-        }
-//        else if(myReport.reportState == REPORTSTATE.){
-//        }
-
+        // if refuted, we want to hash the leaves
         if(myReport.reportState == REPORTSTATE.REFUTED){
 //        if(myReport.refuterID > 0) {
             for(uint256 i = 0; i < _fields.length;){
@@ -531,9 +556,16 @@ contract Governance is ReentrancyGuard, Ownable {
         bytes32 myHash = keccak256(abi.encodePacked(_fields));
         uint256 hashIsCorrect = myReport.hash == myHash ? 1 : 0;
 
+        // consider if this should be one event for success, failure, or state
         emit VerificationSucceeded(_wizId, myReport.reporterID, _taskID, myHash, hashIsCorrect==1);
 
         if (hashIsCorrect ==1){
+            // todo -- the amount to send is wrong. We want to give the verifier back their funds
+            // todo -- we want to reward the task submitter with any reward
+            // todo -- we want to reward the task submitter with any fee
+            // todo -- consider eth fee, stablecoin, or wizard gold
+            // todo -- consider set fee or adjustable. If later, we will need to save this info in the report
+
             // if refuterId exists, then refuter gets no refund
             uint256 split = tasks[myReport.taskId].coreDetails.payment/2;
             address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.verifierID));
@@ -542,8 +574,7 @@ contract Governance is ReentrancyGuard, Ownable {
             wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
             wizardsNFT.increaseProtectedUntilTimestamp(myReport.verifierID, taskVerificationTimeBonus);
 
-            // myReport.payment=0; // thwart reentrancy attacks
-            delete reports[_taskID];
+            myReport.reportState = REPORTSTATE.VERIFIED;
 
             // send to task submitter
             (bool sent, bytes memory data) = taskSubmitter.call{value: split}("");
@@ -558,65 +589,51 @@ contract Governance is ReentrancyGuard, Ownable {
             // case 2 -- if no match, send to DAO
 
 
-            if(myReport.refuterID==0){
+            // could also check state
+            if(myReport.refuterID==0){ // myReport.reportState == REPORTSTATE.SUBMITTED
                 myReport.refuterID=uint16(_wizId);
                 myReport.refuterHash=myHash;
-                reports[_taskID] = myReport;
-                deleteTaskFlag = false;
+                myReport.reportState = REPORTSTATE.REFUTED;
             }
+            else {
+                // case 1 -- if matches hash of refuter, split
+                if(myReport.refuterHash==myHash){
+                    uint256 split = tasks[myReport.taskId].coreDetails.payment/2;
+                    address payable taskRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
 
-            // case 1 -- if matches hash of refuter, split
-            if(myReport.refuterHash==myHash){
-                uint256 split = tasks[myReport.taskId].coreDetails.payment/2;
-                address payable taskRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
+                    wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
+                    wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
 
-                wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
-                wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
+                    // myReport.payment=0; // thwart reentrancy attacks
+                    delete reports[_taskID];
 
-                // myReport.payment=0; // thwart reentrancy attacks
-                delete reports[_taskID];
+                    // send to task submitter
+                    (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
+                    require(sent); // dev: "Failed to send Ether"
 
-                // send to task submitter
-                (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
-                require(sent); // dev: "Failed to send Ether"
+                    // send to verifier
+                    (sent, data) = msg.sender.call{value: split}("");
+                    require(sent); // dev: "Failed to send Ether"
+                    myReport.reportState = REPORTSTATE.FAILED; // todo -- consider if we have REFUTED or FAILED here -- ie, should we have a third state (?DISPARATE) to ackowlege 0 consensus
+                    // todo -- perhaps we can include a bool to say if there is consensus
 
-                // send to verifier
-                (sent, data) = msg.sender.call{value: split}("");
-                require(sent); // dev: "Failed to send Ether"
+                    // emit event
+                }
+                else{
+                    // no agreement in the 3 submissions
+                    // send ETH to DAO
+                    uint256 split = tasks[myReport.taskId].coreDetails.payment;
+                    delete reports[_taskID];
+                    (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+                    require(sent); // dev: "Failed to send Ether"
 
-                // emit event
-            }
-            else{
-                // no agreement in the 3 submissions
-                // send ETH to DAO
-                uint256 split = tasks[myReport.taskId].coreDetails.payment;
-                delete reports[_taskID];
-                (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
-                require(sent); // dev: "Failed to send Ether"
 
-                // emit event
+                    myReport.reportState = REPORTSTATE.FAILED;
+
+                    // emit event
+                }
             }
         }
-
-        // todo -- reconsider this, as it is likely done elsewhere
-            // delete task from double ended queue
-//        if(deleteTaskFlag){
-////            uint256 totalTasksSubmitted = DoubleEndedQueue.length(reportsWaitingConfirmation);
-//            uint256 totalTasksSubmitted = reportsWaitingConfirmation.length;
-////            Report memory myReport;
-//
-//            // delete task from doubleEndedQueue
-//            for(uint256 i =0; i < totalTasksSubmitted; ){
-//                if( uint256(DoubleEndedQueue.at(reportsWaitingConfirmation, i))==_taskID){
-//                    bytes32 prevFront = DoubleEndedQueue.popFront(reportsWaitingConfirmation);
-//                    if(i!=0){ // add back on if we weren't meant to remove front
-//                        reportsWaitingConfirmation._data[int128(reportsWaitingConfirmation._begin + int(i))] = prevFront;
-//                    }
-//                }
-//                unchecked{++i;}
-//            }
-//        }
-
     }
 
     //////////////////////
