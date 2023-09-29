@@ -103,11 +103,16 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 verificationTime = 10*60; // 10 minutes // todo -- bigger tasks may want custom verification
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
 
-    /// @notice Emitted when a verification is assigned to a wizard for a task.
+//    /// @notice Emitted when a verification is assigned to a wizard for a task.
+//    /// @param wizardId ID of the wizard to whom the verification is assigned.
+//    /// @param taskId ID of the task for which the verification is assigned.
+//    /// @param reportId The report id associated with the verification assignment.
+//    event VerificationAssigned(uint256 indexed wizardId, uint256 indexed taskId, uint256 reportId);
+
+        /// @notice Emitted when a verification is assigned to a wizard for a task.
     /// @param wizardId ID of the wizard to whom the verification is assigned.
-    /// @param taskId ID of the task for which the verification is assigned.
-    /// @param myReport The report associated with the verification assignment.
-    event VerificationAssigned(uint256 indexed wizardId, uint256 indexed taskId, Report myReport);
+    /// @param reportId The report id associated with the verification assignment.
+    event VerificationAssigned(uint256 indexed wizardId, uint256 reportId);
 
     /// @notice Emitted when the verification process fails.
     /// @param VerifierIdFirst ID of the first verifier.
@@ -429,21 +434,22 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Implement randomness - for simplicity, using blockhash and modulo. In a real-world scenario, consider a more robust method.
         uint256 randomIndex = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), _wizId))) % reportsWaitingConfirmation.length;
-        uint256 taskId = reportsWaitingConfirmation[randomIndex];
+        uint256 reportId = reportsWaitingConfirmation[randomIndex];
 
-        Report memory myReport = reports[taskId];
+        Report memory myReport = reports[reportId];
         require(myReport.reporterID != _wizId && myReport.refuterID != _wizId); // dev: "Wizard is not allowed to verify/refute their own task."
 
         // Update the report's verifierID and move it from one queue to another
         myReport.verifierID = uint16(_wizId);
-        reports[taskId] = myReport;
+        reports[reportId] = myReport;
 
         // place into queue for processing
-        DoubleEndedQueue.pushBack(reportsClaimedForConfirmation, bytes32(taskId));
+        DoubleEndedQueue.pushBack(reportsClaimedForConfirmation, bytes32(reportId));
         // remove from current queue
         removeElement(reportsWaitingConfirmation, randomIndex);
 
-        emit VerificationAssigned(_wizId, taskId, reports[taskId]);
+//        emit VerificationAssigned(_wizId, taskId, reports[taskId]);
+        emit VerificationAssigned(_wizId, reportId);
     }
 
     /**
@@ -536,12 +542,13 @@ contract Governance is ReentrancyGuard, Ownable {
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _taskID, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
+    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
     //todo -- uncomment out requirement (testing)
-//        require(wizardsNFT.ownerOf(_wizId) == msg.sender && reports[_taskID].verifierID==_wizId, "Must be owner of assigned wizard");
-        require(_fields.length > 0);
+//        require(wizardsNFT.ownerOf(_wizId) == msg.sender && reports[_reportId].verifierID==_wizId, "Must be owner of assigned wizard");
+        require(_fields.length > 0, "not enough fields");
+        require(reports[_reportId].reportState == REPORTSTATE.SUBMITTED || reports[_reportId].reportState == REPORTSTATE.REFUTED, "invalid report state");
 
-        Report storage myReport = reports[_taskID];
+        Report storage myReport = reports[_reportId];
         bool deleteTaskFlag = true;
 
         // if refuted, we want to hash the leaves
@@ -557,7 +564,7 @@ contract Governance is ReentrancyGuard, Ownable {
         uint256 hashIsCorrect = myReport.hash == myHash ? 1 : 0;
 
         // consider if this should be one event for success, failure, or state
-        emit VerificationSucceeded(_wizId, myReport.reporterID, _taskID, myHash, hashIsCorrect==1);
+        emit VerificationSucceeded(_wizId, myReport.reporterID, _reportId, myHash, hashIsCorrect==1);
 
         if (hashIsCorrect ==1){
             // todo -- the amount to send is wrong. We want to give the verifier back their funds
@@ -576,13 +583,16 @@ contract Governance is ReentrancyGuard, Ownable {
 
             myReport.reportState = REPORTSTATE.VERIFIED;
 
+            // todo -- adjust for different payment types
+            if(split > 0){
             // send to task submitter
-            (bool sent, bytes memory data) = taskSubmitter.call{value: split}("");
-            require(sent); // dev: "Failed to send Ether"
+                (bool sent, bytes memory data) = taskSubmitter.call{value: split}("");
+                require(sent, "sending failed"); // dev: "Failed to send Ether"
 
-            // send to verifier
-            (sent, data) = msg.sender.call{value: split}("");
-            require(sent); // dev: "Failed to send Ether"
+                // send to verifier
+                (sent, data) = msg.sender.call{value: split}("");
+                require(sent, "sending failed"); // dev: "Failed to send Ether"
+            }
 
         }
         else { // if incorrect Hash
@@ -605,15 +615,18 @@ contract Governance is ReentrancyGuard, Ownable {
                     wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
 
                     // myReport.payment=0; // thwart reentrancy attacks
-                    delete reports[_taskID];
+                    delete reports[_reportId];
 
-                    // send to task submitter
-                    (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
-                    require(sent); // dev: "Failed to send Ether"
+                    if(split > 0 ){
+                        // send to task submitter
+                        (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
+                        require(sent, "sending failed"); // dev: "Failed to send Ether"
 
-                    // send to verifier
-                    (sent, data) = msg.sender.call{value: split}("");
-                    require(sent); // dev: "Failed to send Ether"
+                        // send to verifier
+                        (sent, data) = msg.sender.call{value: split}("");
+                        require(sent, "sending failed"); // dev: "Failed to send Ether"
+                    }
+
                     myReport.reportState = REPORTSTATE.FAILED; // todo -- consider if we have REFUTED or FAILED here -- ie, should we have a third state (?DISPARATE) to ackowlege 0 consensus
                     // todo -- perhaps we can include a bool to say if there is consensus
 
@@ -623,10 +636,11 @@ contract Governance is ReentrancyGuard, Ownable {
                     // no agreement in the 3 submissions
                     // send ETH to DAO
                     uint256 split = tasks[myReport.taskId].coreDetails.payment;
-                    delete reports[_taskID];
-                    (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
-                    require(sent); // dev: "Failed to send Ether"
-
+                    delete reports[_reportId];
+                    if(split > 0){
+                        (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+                        require(sent, "sending failed"); // dev: "Failed to send Ether"
+                    }
 
                     myReport.reportState = REPORTSTATE.FAILED;
 
@@ -660,7 +674,7 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @notice Checks if the message sender is the owner of the token.
     /// @param tokenId ID of the token to check ownership of.
     modifier onlyWizardOwner(uint256 tokenId) {
-        require(wizardsNFT.ownerOf(tokenId) == msg.sender); // dev: "Caller is not the owner of this NFT"
+        require(wizardsNFT.ownerOf(tokenId) == msg.sender, "not owner of wizard"); // dev: "Caller is not the owner of this NFT"
         _;
     }
 

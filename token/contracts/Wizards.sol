@@ -300,8 +300,8 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _timeReward amout of time in seconds to add to current protectedUntilTimestamp
       */
     function increaseProtectedUntilTimestamp(uint256 _wizardId, uint40 _timeReward) external onlyVerifier {
-        require(_wizardId!=0 && _wizardId <= totalSupply()); // dev: "invalid id"
-        require(tokenIdToStats[_wizardId].initiationTimestamp!=0); // dev: "is not initiated"
+        require(_wizardId!=0 && _wizardId <= totalSupply(), "invalid id"); // dev: "invalid id"
+        require(tokenIdToStats[_wizardId].initiationTimestamp!=0, "not initialized"); // dev: "is not initiated"
         tokenIdToStats[_wizardId].protectedUntilTimestamp += _timeReward;
     }
 

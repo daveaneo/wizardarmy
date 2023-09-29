@@ -5,9 +5,25 @@ const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
 
+//async function computeHashes(values) {
+//    // Step 2: Hash each value and map to a new array
+//    const leafHashes = values.map(value => ethers.utils.keccak256(ethers.utils.arrayify(value)));
+//
+//    // Step 3: Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
+//    const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
+//
+//    // Step 4: Produce a final hash of the concatenated string
+//    const finalHash = ethers.utils.keccak256(concatenatedHashes);
+//
+//    return {
+//        leafHashes,
+//        finalHash
+//    };
+//}
+
 async function computeHashes(values) {
     // Step 2: Hash each value and map to a new array
-    const leafHashes = values.map(value => ethers.utils.keccak256(ethers.utils.arrayify(value)));
+    const leafHashes = values.map(value => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(value)));
 
     // Step 3: Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
     const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
@@ -117,7 +133,7 @@ describe('Governance Contract', function() {
 
             const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
-            const event = receipt.events?.find(e => e.event === 'NewTaskCreated'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+            const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             const task = event.args.task;
             const taskId = event.args.taskId;
 
@@ -177,7 +193,7 @@ describe('Governance Contract', function() {
 
             const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
-            const event = receipt.events?.find(e => e.event === 'NewTaskCreated'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+            const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
             taskId = event.args.taskId;
         });
@@ -185,7 +201,7 @@ describe('Governance Contract', function() {
         it('Should decrease available slots when a task is accepted', async function() {
               const tx = await governance.acceptTask(taskId, wizardId);
               const receipt = await tx.wait();
-//              const event = receipt.events?.find(e => e.event === 'TaskAccepted'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+//              const event = receipt.events?.find(e => e.event === 'TaskAccepted');
 //              const taskId = event.args.taskId;
 
               const task = await governance.getTaskById(taskId);
@@ -194,8 +210,13 @@ describe('Governance Contract', function() {
     });
 
     describe('Verification', function() {
-        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, leafHashes, finalHash, values;
+        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, leafHashes, finalHash, leafArray,
+        contractSettings;
+
+
         beforeEach(async () => {
+            contractSettings = await wizards.connect(owner).contractSettings();
+
             // Create a task as a precondition for acceptance tests
             await wizards.connect(owner).mint(0);
             let totalWizards = await wizards.totalSupply();
@@ -204,13 +225,15 @@ describe('Governance Contract', function() {
 
             await wizards.connect(owner).mint(0);
             verifyingWizardId = wizardId + 1;
+            await wizards.initiate(wizardId, {value: contractSettings.initiationCost});
+            await wizards.initiate(verifyingWizardId, {value: contractSettings.initiationCost});
 
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,  // Example value
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("1")  // 1 ETH in Wei
+                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
             };
 
             let timeDetails = {
@@ -235,27 +258,20 @@ describe('Governance Contract', function() {
             // accept task
             tx = await governance.acceptTask(taskId, wizardId);
             receipt = await tx.wait();
-            event = receipt.events?.find(e => e.event === 'TaskAccepted'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+            event = receipt.events?.find(e => e.event === 'TaskAccepted');
             const reportId = event.args.reportId;
 
             // create hash
-            // Example usage:
-            values = [1, 2, 3];
-            const hashes = await computeHashes(values);
+            leafArray = ['1', '2', '3'];
+            const hashes = await computeHashes(leafArray);
             leafHashes = hashes.leafHashes;
             finalHash = hashes.finalHash;
-//            console.log("Leaf Hashes:", leafHashes);
-//            console.log("Final Hash:", finalHash);
 
 
             // complete task
-            console.log("0------");
-//            console.log(reportId, finalHash, wizardId)
             const res = await governance.completeTask(reportId, finalHash, wizardId);
-            console.log("1------");
 
-
-            // set verifier
+            // set verifier of wizards contract
 //            updateVerifier
             tx = await wizards.updateVerifier(governance.address);
             await tx.wait();
@@ -263,63 +279,151 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should succeed with correct values', async function() {
-            console.log("A------");
-            const tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
-            const receipt = await tx.wait();
-            console.log("B------");
-            const tx2 = await governance.submitVerification(verifyingWizardId, taskId, leafHashes);
-            const receipt2 = await tx2.wait();
-            console.log("C------");
-            const event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
-            console.log("event: ");
-            console.log(event);
-            console.log("event.args: ");
-            console.log(event.args);
+            let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+//            console.log(verifyingWizardId);
+//            console.log(taskId)
+//            console.log(leafHashes)
+//            console.log("reportId");
+//            console.log(reportId)
+
+//            const report = await governance.getReportById(reportId);
+//            console.log("report: ");
+//            console.log(report)
+
+            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
 
             const isHashCorrect = event.args.isHashCorrect;
 
             expect(isHashCorrect).to.equal(true);
         });
 
-        it('Verification should fail with correct values', async function() {
-            const tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
-            const receipt = await tx.wait();
+        it('Verification should fail with incorrect values', async function() {
+            console.log("A");
+            let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
 
-            const tx2 = await governance.submitVerification(verifyingWizardId, taskId, [1,2,3]);
-            const receipt2 = await tx2.wait();
-            const event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
+            console.log("reportId: ");
+            console.log(reportId)
+
+//            const report = await governance.getReportById(reportId);
+//            console.log("report: ");
+//            console.log(report)
+
+//            console.log(verifyingWizardId);
+//            console.log(taskId)
+//            console.log(leafHashes)
+            console.log("B");
+
+            console.log("leaf hashes: ");
+            console.log(leafHashes);
+            console.log("leafArray");
+            console.log(leafArray);
+
+            const incorrectHashes = await computeHashes(['3', '2', '1']);
+
+            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            console.log("C");
+
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
+
             const isHashCorrect = event.args.isHashCorrect;
 
-            expect(isHashCorrect).to.equal(true);
+            expect(isHashCorrect).to.equal(false);
         });
 
 
-        it('Should not allow a report to be verified more than once', async function() {
-            const tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
-            const receipt = await tx.wait();
+    it('Should not allow a report to be verified more than once', async function() {
+        let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
+        let receipt = await tx.wait();
+        event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+        reportId = event.args.reportId;
 
-            const tx2 = await governance.submitVerification(verifyingWizardId, taskId, [1,2,3]);
-            const receipt2 = await tx2.wait();
-            const event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
-            const isHashCorrect = event.args.isHashCorrect;
+        tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+        receipt = await tx.wait();
+        event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
+        const isHashCorrect = event.args.isHashCorrect;
 
-            expect(isHashCorrect).to.equal(true);
-        });
+
+        await expect(governance.submitVerification(verifyingWizardId, reportId, leafHashes))
+            .to.be.reverted;
+
+
+    });
+
 
         it('Should update the report state upon successful verification', async function() {
-            await governance.connect(addr1).verifyTask(/* arguments */);
-            const report = await governance.reports(/* reportId */);
-            expect(report.reportState).to.equal(/* VERIFIED state enum value */);
+            let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            receipt = await tx.wait();
+
+            const report = await governance.getReportById(reportId);
+
+            expect(report.reportState).to.equal(3);
         });
     });
 
     describe('Edge Cases and Error Handling', function() {
         it('Should not allow task creation with end timestamp earlier than start timestamp', async function() {
-            await expect(governance.connect(owner).createTask(/* arguments with invalid timestamps */)).to.be.reverted;  // dev: "Invalid timestamps"
+            let coreDetails = {
+                IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
+                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                numFieldsToHash: 3,  // Example value
+                taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
+                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+            };
+
+            let timeDetails = {
+                begTimestamp: Math.floor(Date.now() / 1000) + 604801,  // Current timestamp
+                endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
+                waitTime: 3600,  // 1 hour in seconds
+                timeBonus: 86400  // 1 day in seconds
+            };
+
+            roleDetails = {
+                creatorRole: wizardRole,  // Example role ID
+                restrictedTo: 0,  // Example role ID
+                availableSlots: 10  // Example number of slots
+            };
+
+            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
         it('Should not allow tasks with zero available slots', async function() {
-            await expect(governance.connect(owner).createTask(/* arguments with zero slots */)).to.be.reverted;  // dev: "No available slots"
+            let coreDetails = {
+                IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
+                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                numFieldsToHash: 3,  // Example value
+                taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
+                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+            };
+
+            let timeDetails = {
+                begTimestamp: Math.floor(Date.now() / 1000),  // Current timestamp
+                endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
+                waitTime: 3600,  // 1 hour in seconds
+                timeBonus: 86400  // 1 day in seconds
+            };
+
+            roleDetails = {
+                creatorRole: wizardRole,  // Example role ID
+                restrictedTo: 0,  // Example role ID
+                availableSlots: 0  // Example number of slots
+            };
+
+            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
         it('Should not allow a task to be accepted if no slots are available', async function() {
