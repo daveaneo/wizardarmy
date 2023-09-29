@@ -183,7 +183,11 @@ describe('Governance Contract', function() {
         });
 
         it('Should decrease available slots when a task is accepted', async function() {
-              const reportId = await governance.acceptTask(taskId, wizardId);
+              const tx = await governance.acceptTask(taskId, wizardId);
+              const receipt = await tx.wait();
+//              const event = receipt.events?.find(e => e.event === 'TaskAccepted'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+//              const taskId = event.args.taskId;
+
               const task = await governance.getTaskById(taskId);
               expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots - 1);
         });
@@ -222,15 +226,17 @@ describe('Governance Contract', function() {
                 availableSlots: 10  // Example number of slots
             };
 
-            const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
-            const receipt = await tx.wait();
-            const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
+            let tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            let receipt = await tx.wait();
+            let event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
             taskId = event.args.taskId;
 
             // accept task
-            reportId = await governance.acceptTask(taskId, wizardId);
-//            const task = await governance.getTaskById(taskId);
+            tx = await governance.acceptTask(taskId, wizardId);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'TaskAccepted'); // Replace 'YourEventName' with the actual name of the event emitted by createTask.
+            const reportId = event.args.reportId;
 
             // create hash
             // Example usage:
@@ -238,22 +244,38 @@ describe('Governance Contract', function() {
             const hashes = await computeHashes(values);
             leafHashes = hashes.leafHashes;
             finalHash = hashes.finalHash;
-            console.log("Leaf Hashes:", leafHashes);
-            console.log("Final Hash:", finalHash);
+//            console.log("Leaf Hashes:", leafHashes);
+//            console.log("Final Hash:", finalHash);
 
 
             // complete task
+            console.log("0------");
+//            console.log(reportId, finalHash, wizardId)
             const res = await governance.completeTask(reportId, finalHash, wizardId);
+            console.log("1------");
+
+
+            // set verifier
+//            updateVerifier
+            tx = await wizards.updateVerifier(governance.address);
+            await tx.wait();
 
         });
 
         it('Verification should succeed with correct values', async function() {
+            console.log("A------");
             const tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
             const receipt = await tx.wait();
-
+            console.log("B------");
             const tx2 = await governance.submitVerification(verifyingWizardId, taskId, leafHashes);
             const receipt2 = await tx2.wait();
+            console.log("C------");
             const event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
+            console.log("event: ");
+            console.log(event);
+            console.log("event.args: ");
+            console.log(event.args);
+
             const isHashCorrect = event.args.isHashCorrect;
 
             expect(isHashCorrect).to.equal(true);
