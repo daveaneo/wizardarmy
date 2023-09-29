@@ -162,13 +162,15 @@ describe('Governance Contract', function() {
     });
 
     describe('Task Acceptance', function() {
-        let taskId, task, wizardId, wizardRole, roleDetails;
+        let taskId, task, wizardId, wizardRole, roleDetails, wizardTwoId;
         beforeEach(async () => {
             // Create a task as a precondition for acceptance tests
             await wizards.connect(owner).mint(0);
             let totalWizards = await wizards.totalSupply();
             wizardId = totalWizards.toNumber();  // Assuming the ID is a number
             wizardRole = await wizards.getRole(wizardId);
+            await wizards.mint(0);
+            wizardTwoId = wizardId + 1;
 
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
@@ -188,7 +190,7 @@ describe('Governance Contract', function() {
             roleDetails = {
                 creatorRole: wizardRole,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 10  // Example number of slots
+                availableSlots: 1  // Example number of slots
             };
 
             const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
@@ -207,6 +209,26 @@ describe('Governance Contract', function() {
               const task = await governance.getTaskById(taskId);
               expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots - 1);
         });
+
+        it('Should not allow a task to be accepted if no slots are available', async function() {
+              const tx = await governance.acceptTask(taskId, wizardId);
+              const receipt = await tx.wait();
+
+              // Now try accepting the same task again
+              await expect(governance.acceptTask(taskId, wizardTwoId)).to.be.reverted;
+        });
+
+        it('Should not allow a wizard to accept same task twice before completing it first.', async function() {
+              const tx = await governance.acceptTask(taskId, wizardId);
+              const receipt = await tx.wait();
+
+              // Now try accepting the same task again
+              await expect(governance.acceptTask(taskId, wizardId)).to.be.reverted;
+        });
+
+        // todo -- wizard accepts same task after completing and after timeperiod
+        // todo -- wizard accepts same task after completing and but not after timeperiod -- fail
+
     });
 
     describe('Verification', function() {
@@ -376,6 +398,13 @@ describe('Governance Contract', function() {
     });
 
     describe('Edge Cases and Error Handling', function() {
+        let wizardId;
+        beforeEach(async () => {
+            await wizards.connect(owner).mint(0);
+            let totalWizards = await wizards.totalSupply();
+            wizardId = totalWizards.toNumber();  // Assuming the ID is a number
+        });
+
         it('Should not allow task creation with end timestamp earlier than start timestamp', async function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
@@ -393,7 +422,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: 1,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 10  // Example number of slots
             };
@@ -418,7 +447,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: 1,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 0  // Example number of slots
             };
@@ -426,14 +455,9 @@ describe('Governance Contract', function() {
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
-        it('Should not allow a task to be accepted if no slots are available', async function() {
-            // Create a task with 1 slot and accept it
-            await governance.connect(owner).createTask(/* arguments with 1 slot */);
-            await governance.connect(addr1).acceptTask(/* arguments */);
 
-            // Now try accepting the same task again
-            await expect(governance.connect(addr2).acceptTask(/* same arguments */)).to.be.reverted;  // dev: "No slots left"
-        });
+    // todo -- should not allow task for creatorRole that doesn't exist
+
     });
 
     // ... Further in-depth tests ...

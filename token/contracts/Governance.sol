@@ -26,6 +26,8 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
+    function numRoles() external view returns(uint256);
+
 }
 
 contract Governance is ReentrancyGuard, Ownable {
@@ -306,6 +308,18 @@ contract Governance is ReentrancyGuard, Ownable {
         TimeDetails calldata timeDetails,
         RoleDetails calldata roleDetails
     ) external onlyTaskCreators(_wizardId)  {
+
+//        require(
+//            timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
+//            && roleDetails.creatorRole <= appointerContract.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
+//            && roleDetails.availableSlots != 0 // dev: must have non-zero slots
+//        );
+
+        require(timeDetails.endTimestamp > timeDetails.begTimestamp, 'end after begin'); // dev: must begin before it ends
+//        require(roleDetails.creatorRole <= appointerContract.numRoles(), 'role does not exist'); // dev: must be vaild creatorRole // todo -- role 0?
+        require(roleDetails.availableSlots != 0, 'must have some slots'); // dev: must have non-zero slots
+
+
         tasksCount++;
 
         tasks[tasksCount] = Task({
@@ -330,7 +344,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _taskId The ID of the task to accept.
      * @param _wizId The ID of the wizard accepting the task.
      */
-    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external returns(uint256 reportId) {
+    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external returns(uint256) {
         require(_taskId <= tasksCount && _taskId != 0, "invalid task"); // dev: invalid task
         Task memory myTask = tasks[_taskId];
 
@@ -353,8 +367,7 @@ contract Governance is ReentrancyGuard, Ownable {
         nextEligibleTime[_taskId][_wizId] = uint40(block.timestamp + myTask.timeDetails.waitTime);
 
         // Create a report and emit the event
-        uint256 reportId = createReport(_wizId, _taskId);
-        return reportId;
+        return createReport(_wizId, _taskId);
     }
 
 
