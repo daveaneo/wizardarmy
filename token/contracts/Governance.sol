@@ -35,7 +35,7 @@ contract Governance is ReentrancyGuard, Ownable {
 //    IERC20  ecosystemTokens;
     Wizards wizardsNFT;
     WizardTower wizardTower;
-    IAppointer appointerContract;
+    IAppointer public appointer;
 
     enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
     enum TASKSTATE { ACTIVE, PAUSED, ENDED }
@@ -182,7 +182,7 @@ contract Governance is ReentrancyGuard, Ownable {
      */
     function canCreateTasks(uint256 _wizId) public view returns (bool) {
         uint256 roleId = wizardsNFT.getRole(_wizId);
-        return wizardsNFT.isActive(_wizId) && appointerContract.canRoleCreateTasks(roleId);
+        return wizardsNFT.isActive(_wizId) && appointer.canRoleCreateTasks(roleId);
     }
 
     /**
@@ -252,7 +252,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _addy The address of the Appointer contract.
      */
     function setAppointerAddress(address _addy) external onlyOwner {
-        appointerContract = IAppointer(_addy);
+        appointer = IAppointer(_addy);
     }
 
     /**
@@ -292,10 +292,11 @@ contract Governance is ReentrancyGuard, Ownable {
     /** @dev Constructor for HOADAO
         @param _nft -- contract address for NFTs
       */
-    constructor(address _nft, address _wizardTower){
+    constructor(address _nft, address _wizardTower, address _appointer){
 //        ecosystemTokens = IERC20(_erc20);
         wizardsNFT = Wizards(_nft);
         wizardTower = WizardTower(_wizardTower);
+        appointer = IAppointer(_appointer);
     }
 
     // Required to receive ETH
@@ -309,15 +310,16 @@ contract Governance is ReentrancyGuard, Ownable {
         RoleDetails calldata roleDetails
     ) external onlyTaskCreators(_wizardId)  {
 
-//        require(
-//            timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
-//            && roleDetails.creatorRole <= appointerContract.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
-//            && roleDetails.availableSlots != 0 // dev: must have non-zero slots
-//        );
+        require(
+            timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
+            && roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
+            && roleDetails.availableSlots != 0 // dev: must have non-zero slots
+        );
 
-        require(timeDetails.endTimestamp > timeDetails.begTimestamp, 'end after begin'); // dev: must begin before it ends
-//        require(roleDetails.creatorRole <= appointerContract.numRoles(), 'role does not exist'); // dev: must be vaild creatorRole // todo -- role 0?
-        require(roleDetails.availableSlots != 0, 'must have some slots'); // dev: must have non-zero slots
+
+//        require(timeDetails.endTimestamp > timeDetails.begTimestamp, 'end after begin'); // dev: must begin before it ends
+//        require(roleDetails.creatorRole <= appointer.numRoles(), 'role does not exist'); // dev: must be vaild creatorRole // todo -- role 0?
+//        require(roleDetails.availableSlots != 0, 'must have some slots'); // dev: must have non-zero slots
 
 
         tasksCount++;

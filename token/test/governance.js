@@ -39,8 +39,8 @@ async function computeHashes(values) {
 
 
 describe('Governance Contract', function() {
-  let Wizards, WizardTower, Governance;
-  let wizards, wizardTower, governance;
+  let Wizards, WizardTower, Governance, Appointer;
+  let wizards, wizardTower, governance, appointer;
   let owner, addr1, addr2, otherAddrs;
 
   beforeEach(async () => {
@@ -76,6 +76,7 @@ describe('Governance Contract', function() {
     const Token = await ethers.getContractFactory("Token");
     const token = await Token.deploy("Wizard Gold", "WGLD", 18, ethers.utils.parseEther("1000"));
 
+
     // Deploying the Wizards Contract
     Wizards = await ethers.getContractFactory("Wizards", {
       libraries: {
@@ -84,13 +85,17 @@ describe('Governance Contract', function() {
     });
     wizards = await Wizards.deploy("Wizards", "WZD", token.address, "https://gateway.pinata.cloud/ipfs/");
 
+    // Deploying the Appointer
+    Appointer = await ethers.getContractFactory("Appointer");
+    appointer = await Appointer.deploy(wizards.address);
+
     // Deploying the WizardTower
     WizardTower = await ethers.getContractFactory("WizardTower");
     wizardTower = await WizardTower.deploy(token.address, wizards.address);
 
     // Finally, deploy the Governance contract
     Governance = await ethers.getContractFactory("Governance");
-    governance = await Governance.deploy(wizards.address, wizardTower.address);
+    governance = await Governance.deploy(wizards.address, wizardTower.address, appointer.address);
   });
 
 
@@ -109,6 +114,8 @@ describe('Governance Contract', function() {
             let totalWizards = await wizards.totalSupply();
             let wizardId = totalWizards.toNumber();  // Assuming the ID is a number
             let wizardRole = await wizards.getRole(wizardId);
+
+            let appointerContract = await governance.appointer();
 
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
@@ -306,16 +313,6 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-//            console.log(verifyingWizardId);
-//            console.log(taskId)
-//            console.log(leafHashes)
-//            console.log("reportId");
-//            console.log(reportId)
-
-//            const report = await governance.getReportById(reportId);
-//            console.log("report: ");
-//            console.log(report)
-
             tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
@@ -326,33 +323,14 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should fail with incorrect values', async function() {
-            console.log("A");
             let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            console.log("reportId: ");
-            console.log(reportId)
-
-//            const report = await governance.getReportById(reportId);
-//            console.log("report: ");
-//            console.log(report)
-
-//            console.log(verifyingWizardId);
-//            console.log(taskId)
-//            console.log(leafHashes)
-            console.log("B");
-
-            console.log("leaf hashes: ");
-            console.log(leafHashes);
-            console.log("leafArray");
-            console.log(leafArray);
-
             const incorrectHashes = await computeHashes(['3', '2', '1']);
 
             tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
-            console.log("C");
 
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
