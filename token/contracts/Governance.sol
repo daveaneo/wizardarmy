@@ -22,7 +22,7 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 // todo -- make payments for regular tasks
 // todo -- make tasks verifiable again
 // todo -- restore timeBonus and waitTime
-
+// todo -- restrictedTo tasks are dealt with in a non-straightforward way. Document this
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
@@ -51,7 +51,6 @@ contract Governance is ReentrancyGuard, Ownable {
     struct RoleDetails {
         uint16 creatorRole;
         uint16 restrictedTo; // roles that can do this task. 0 means no restriction
-        // uint16[8] restrictedFrom; // if you choose to include this later
         uint16 availableSlots;
     }
 
@@ -80,13 +79,11 @@ contract Governance is ReentrancyGuard, Ownable {
         uint40 verificationReservedTimestamp; // time when verification period ends
     }
 
-    uint256[] public reportsWaitingConfirmation;
-//    uint256[] public reportsClaimedForConfirmation;
+    uint256[] public reportsWaitingConfirmation; // allows random selection of confirmation
+    DoubleEndedQueue.Bytes32Deque public reportsClaimedForConfirmation; //  time-sorted queue
 
-//    DoubleEndedQueue.Bytes32Deque public reportsWaitingConfirmation;
-    DoubleEndedQueue.Bytes32Deque public reportsClaimedForConfirmation;
-
-    // todo -- do we need to pass more information in the report?
+    // todo -- do we need to pass more information in the report? -- all required information, even info about how task completer can be found, should be in the initial task
+    // example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
 
     // This mapping holds the next active time thresholds for each task.
     // The outer mapping uses the task ID as the key.
@@ -98,20 +95,14 @@ contract Governance is ReentrancyGuard, Ownable {
     mapping (uint256 => Report) public reports;
 
     uint256 public tasksCount;
-    uint256 public reportsCount; // todo what does this do?
+    uint256 public reportsCount;
     uint256 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
 
+    uint256 immutable verificationTime = 30*60; // 30 minutes
     // todo -- Adjustable
-    uint256 verificationTime = 10*60; // 10 minutes // todo -- bigger tasks may want custom verification
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
 
-//    /// @notice Emitted when a verification is assigned to a wizard for a task.
-//    /// @param wizardId ID of the wizard to whom the verification is assigned.
-//    /// @param taskId ID of the task for which the verification is assigned.
-//    /// @param reportId The report id associated with the verification assignment.
-//    event VerificationAssigned(uint256 indexed wizardId, uint256 indexed taskId, uint256 reportId);
-
-        /// @notice Emitted when a verification is assigned to a wizard for a task.
+     /// @notice Emitted when a verification is assigned to a wizard for a task.
     /// @param wizardId ID of the wizard to whom the verification is assigned.
     /// @param reportId The report id associated with the verification assignment.
     event VerificationAssigned(uint256 indexed wizardId, uint256 reportId);
@@ -214,13 +205,13 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-//    /**
-//     * @notice Returns the number of reports currently waiting for confirmation.
-//     * @return The number of reports in the waiting confirmation queue.
-//     */
-//    function reportsWaitingConfirmationLength() external view returns (uint256) {
-//        return DoubleEndedQueue.length(reportsWaitingConfirmation);
-//    }
+    /**
+     * @notice Returns the number of reports currently waiting for confirmation.
+     * @return The number of reports in the waiting confirmation queue.
+     */
+    function reportsWaitingConfirmationLength() external view returns (uint256) {
+        return reportsWaitingConfirmation.length;
+    }
 
 
     //////////////////////////////////////
@@ -317,11 +308,6 @@ contract Governance is ReentrancyGuard, Ownable {
         );
 
 
-//        require(timeDetails.endTimestamp > timeDetails.begTimestamp, 'end after begin'); // dev: must begin before it ends
-//        require(roleDetails.creatorRole <= appointer.numRoles(), 'role does not exist'); // dev: must be vaild creatorRole // todo -- role 0?
-//        require(roleDetails.availableSlots != 0, 'must have some slots'); // dev: must have non-zero slots
-
-
         tasksCount++;
 
         tasks[tasksCount] = Task({
@@ -352,7 +338,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Make sure the wizard is eligible
         uint16 wizRole = uint16(wizardsNFT.getRole(_wizId));
-//        todo include time restrictions with start and stop and pause
         require(((
                 myTask.roleDetails.restrictedTo == 0) || (myTask.roleDetails.restrictedTo == wizRole))
                 && block.timestamp >= nextEligibleTime[_taskId][_wizId]
@@ -387,23 +372,14 @@ contract Governance is ReentrancyGuard, Ownable {
         reports[_reportId].hash = _hash;
         reports[_reportId].reportState = REPORTSTATE.SUBMITTED;
 
-
-        // todo -- determine if we still need this doubleEndedQueue or if we can just get away with a list
-        // Add the report ID to the double-ended queue
-        // Assuming the queue's name is 'reportQueue' and it has an 'enqueue' function
-//        DoubleEndedQueue.pushBack(reportsWaitingConfirmation, bytes32(_reportId));
-//        reportsWaitingConfirmation.push(_reportId);
-
         // if this is restrictedTo -- and can only be approved by one role -- do not put into the confirmation queue
+        // tasks that are restricted are confirmed directly, passing over the selection queue
         if (tasks[reports[_reportId].taskId].roleDetails.restrictedTo == 0){
             reportsWaitingConfirmation.push(_reportId);
         }
 
 
-        // Emit the TaskCompleted event
         emit TaskCompleted(_wizId, _reportId, reports[_reportId].taskId);
-//        we may need to have restrictedTo
-
     }
 
 
@@ -430,10 +406,6 @@ contract Governance is ReentrancyGuard, Ownable {
         return reportsCount;
     }
 
-
-    //    todo -- tasks that are restrictedTo will cause this to be a problem. We need them to go somewhere else.
-    // how about those tasks don't get sent here
-
     /// @notice Allows a wizard to claim a random task for verification.
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
@@ -443,7 +415,7 @@ contract Governance is ReentrancyGuard, Ownable {
         require(tx.origin == msg.sender); // dev: "Contracts are not allowed to claim tasks."
 
         // process reports
-        processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS); // todo -- adjustable variable
+        processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
 
         require(reportsWaitingConfirmation.length > 0); // dev: "No tasks available for verification."
 
@@ -463,7 +435,6 @@ contract Governance is ReentrancyGuard, Ownable {
         // remove from current queue
         removeElement(reportsWaitingConfirmation, randomIndex);
 
-//        emit VerificationAssigned(_wizId, taskId, reports[taskId]);
         emit VerificationAssigned(_wizId, reportId);
     }
 
@@ -558,13 +529,14 @@ contract Governance is ReentrancyGuard, Ownable {
     // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
     function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
-    //todo -- uncomment out requirement (testing)
-//        require(wizardsNFT.ownerOf(_wizId) == msg.sender && reports[_reportId].verifierID==_wizId, "Must be owner of assigned wizard");
-        require(_fields.length > 0, "not enough fields");
-        require(reports[_reportId].reportState == REPORTSTATE.SUBMITTED || reports[_reportId].reportState == REPORTSTATE.REFUTED, "invalid report state");
+//        require(_fields.length > 0, "not enough fields");
+//        require(reports[_reportId].reportState == REPORTSTATE.SUBMITTED || reports[_reportId].reportState == REPORTSTATE.REFUTED, "invalid report state");
 
         Report storage myReport = reports[_reportId];
-        bool deleteTaskFlag = true;
+        require(
+            (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.REFUTED)
+            && tasks[myReport.taskId].coreDetails.numFieldsToHash == _fields.length
+        );
 
         // if refuted, we want to hash the leaves
         if(myReport.reportState == REPORTSTATE.REFUTED){
@@ -612,7 +584,6 @@ contract Governance is ReentrancyGuard, Ownable {
         }
         else { // if incorrect Hash
             // case 2 -- if no match, send to DAO
-
 
             // could also check state
             if(myReport.refuterID==0){ // myReport.reportState == REPORTSTATE.SUBMITTED
@@ -711,9 +682,4 @@ contract Governance is ReentrancyGuard, Ownable {
         );
         _;
     }
-
-
-
-
-
 }

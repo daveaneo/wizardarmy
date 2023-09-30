@@ -341,23 +341,23 @@ describe('Governance Contract', function() {
         });
 
 
-    it('Should not allow a report to be verified more than once', async function() {
-        let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
-        let receipt = await tx.wait();
-        event = receipt.events?.find(e => e.event === 'VerificationAssigned');
-        reportId = event.args.reportId;
+        it('Should not allow a report to be verified more than once', async function() {
+            let tx = await governance.claimRandomTaskForVerification(verifyingWizardId);
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
 
-        tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
-        receipt = await tx.wait();
-        event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
-        const isHashCorrect = event.args.isHashCorrect;
-
-
-        await expect(governance.submitVerification(verifyingWizardId, reportId, leafHashes))
-            .to.be.reverted;
+            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSucceeded');
+            const isHashCorrect = event.args.isHashCorrect;
 
 
-    });
+            await expect(governance.submitVerification(verifyingWizardId, reportId, leafHashes))
+                .to.be.reverted;
+
+
+        });
 
 
         it('Should update the report state upon successful verification', async function() {
@@ -373,6 +373,14 @@ describe('Governance Contract', function() {
 
             expect(report.reportState).to.equal(3);
         });
+
+
+       it('Should be able to fetch number of reports needing verification', async function() {
+            let reports = await governance.reportsWaitingConfirmationLength();
+            expect(reports).to.equal(ethers.BigNumber.from("1"));
+        });
+
+
     });
 
     describe('Edge Cases and Error Handling', function() {
