@@ -380,6 +380,11 @@ describe('Governance Contract', function() {
             expect(reports).to.equal(ethers.BigNumber.from("1"));
         });
 
+       it('Should be able to get correct report number', async function() {
+            let report = await governance.reportsWaitingConfirmation(0);
+            expect(report).to.equal(ethers.BigNumber.from("1"));
+        });
+
 
     });
 
