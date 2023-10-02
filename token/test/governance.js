@@ -4,31 +4,17 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-
-//async function computeHashes(values) {
-//    // Step 2: Hash each value and map to a new array
-//    const leafHashes = values.map(value => ethers.utils.keccak256(ethers.utils.arrayify(value)));
-//
-//    // Step 3: Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
-//    const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
-//
-//    // Step 4: Produce a final hash of the concatenated string
-//    const finalHash = ethers.utils.keccak256(concatenatedHashes);
-//
-//    return {
-//        leafHashes,
-//        finalHash
-//    };
-//}
-
 async function computeHashes(values) {
-    // Step 2: Hash each value and map to a new array
-    const leafHashes = values.map(value => ethers.utils.keccak256(ethers.utils.toUtf8Bytes(value)));
+    // Pad each value to the desired byte length and then hash it
+    const leafHashes = values.map(value => {
+        let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
+        return ethers.utils.keccak256(paddedValue);
+    });
 
-    // Step 3: Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
+    // Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
     const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
 
-    // Step 4: Produce a final hash of the concatenated string
+    // Produce a final hash of the concatenated string
     const finalHash = ethers.utils.keccak256(concatenatedHashes);
 
     return {
@@ -37,10 +23,12 @@ async function computeHashes(values) {
     };
 }
 
-const advanceTime = async (time) => {
-    await ethers.provider.send("evm_increaseTime", [time]);
+
+const advanceTime = async (seconds) => {
+    await network.provider.send("evm_increaseTime", [seconds])
     await ethers.provider.send("evm_mine");
 };
+
 
 describe('Governance Contract', function() {
   let Wizards, WizardTower, Governance, Appointer;
@@ -318,7 +306,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification assignment works with one task.', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -327,7 +315,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should succeed with correct values', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -343,7 +331,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should fail with incorrect values', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -361,34 +349,48 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification with consensus returns correct values', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            const incorrectHashes = await computeHashes(['3', '2', '1']);
+            let incorrectLeaves = ['3', '2', '1'];
+            let hexlifiedLeaves = incorrectLeaves.map(leaf => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(leaf)), 32));
+            const incorrectHashes = await computeHashes(incorrectLeaves);
             tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             let reportState = event.args.reportState;
             expect(reportState).to.equal(2);
 
+            let reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
+            let numClaims = await governance.reportsClaimedForConfirmationLength();
+            let claimInfo = await governance.reportsClaimedForConfirmationValue(0);
+
             // Advance the blockchain by 1 hour (3600 seconds)
-            await advanceTime(3600);
+            await advanceTime(10000);
 
             // Move report from queue
             await governance.processReportsClaimedForConfirmation(1);
 
-            //          expect this to fail
-            await governance.verifyRandomReport(verifyingWizardId);
+            reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
+            numClaims = await governance.reportsClaimedForConfirmationLength();
 
-            tx = await governance.verifyRandomReport(verifyingWizardIdTwo);
+
+            await advanceTime(10000);
+            await governance.processReportsClaimedForConfirmation(1);
+
+            reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
+            numClaims = await governance.reportsClaimedForConfirmationLength();
+
+            //          expect this to fail
+            tx = await governance.claimReportToVerify(verifyingWizardIdTwo);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
             // submit same verification
-            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.submitVerification(verifyingWizardId, reportId, hexlifiedLeaves);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
@@ -397,7 +399,7 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification without consensus returns correct values', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -410,15 +412,12 @@ describe('Governance Contract', function() {
             expect(reportState).to.equal(2);
 
             // Advance the blockchain by 1 hour (3600 seconds)
-            await advanceTime(3600);
+            await advanceTime(10000);
 
             // Move report from queue
             await governance.processReportsClaimedForConfirmation(1);
 
-            //          expect this to fail
-            await governance.verifyRandomReport(verifyingWizardId);
-
-            tx = await governance.verifyRandomReport(verifyingWizardIdTwo);
+            tx = await governance.claimReportToVerify(verifyingWizardIdTwo);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -434,7 +433,7 @@ describe('Governance Contract', function() {
 
 
         it('Should not allow a report to be verified more than once', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -451,7 +450,7 @@ describe('Governance Contract', function() {
 
 
         it('Should update the report state upon successful verification', async function() {
-            let tx = await governance.verifyRandomReport(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
