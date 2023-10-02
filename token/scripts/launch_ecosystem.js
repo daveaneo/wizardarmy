@@ -17,10 +17,7 @@ async function main() {
     console.log("Deploying contracts with the account:", deployer.address);
 
 
-    const myWallet = new Wallet('0x' + process.env.EVM_PRIVATE_KEY);
-    console.log("Polygon account address:", myWallet.address);
-
-    exit(0);
+//    const myWallet = new Wallet('0x' + process.env.EVM_PRIVATE_KEY);
 
     // Deploying the CommonDefinitions Library
     const CommonDefinitions = await ethers.getContractFactory("CommonDefinitions");
@@ -88,13 +85,6 @@ async function main() {
     await wizardTower.deployed();
     console.log("WizardTower deployed to:", wizardTower.address);
 
-    // todo -- fix Governance Cost
-    const governance = {}
-//
-//    const Governance = await ethers.getContractFactory("Governance");
-//    const governance = await Governance.deploy(wizards.address, wizardTower.address);
-//    await governance.deployed();
-//    console.log("Governance deployed to:", governance.address);
 
 
     const Appointer = await ethers.getContractFactory("Appointer");
@@ -102,8 +92,12 @@ async function main() {
     await appointer.deployed();
     console.log("Appointer deployed to:", appointer.address);
 
+    const Governance = await ethers.getContractFactory("Governance");
+    const governance = await Governance.deploy(wizards.address, wizardTower.address, appointer.address);
+    await governance.deployed();
+    console.log("Governance deployed to:", governance.address);
+
     // Save contract addresses
-//    todo -- update with library addresses
     const deployedContracts = {
         token: token.address,
         wizards: wizards.address,
@@ -115,6 +109,10 @@ async function main() {
     fs.writeFileSync(path.join(__dirname, 'deployed_contracts.json'), JSON.stringify(deployedContracts, null, 2));
 
     // Additional deployment logic if necessary...
+
+    // mint wizard
+    await wizards.mint(0); // upline id
+    console.log("Minted a wizard for:", deployer.address);
 
     // mint wizard
     await wizards.mint(0); // upline id
