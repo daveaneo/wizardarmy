@@ -1,5 +1,9 @@
+require('dotenv').config();
+
+const { Wallet } = require('ethers');
 const fs = require('fs');
 const path = require('path');
+
 
 function getRandomUint256() {
   const max = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"); // 2^256 - 1
@@ -11,6 +15,12 @@ function getRandomUint256() {
 async function main() {
     const [deployer, secondary] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
+
+
+    const myWallet = new Wallet('0x' + process.env.EVM_PRIVATE_KEY);
+    console.log("Polygon account address:", myWallet.address);
+
+    exit(0);
 
     // Deploying the CommonDefinitions Library
     const CommonDefinitions = await ethers.getContractFactory("CommonDefinitions");
