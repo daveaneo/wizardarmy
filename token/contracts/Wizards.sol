@@ -310,9 +310,9 @@ contract Wizards is ERC721Enumerable, Ownable {
     ////// Appointer Functions     /////
     ////////////////////////////////////
 
-    function appointRole(uint256 _wizardId, uint16 _role) external onlyAppointer {
-        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
-        tokenIdToStats[_wizardId].role = _role;
+    function appointRole(uint256 _wizardId, uint256 _roleId) external onlyAppointer {
+        require(_isValidWizard(_wizardId), "invalid wizard"); // dev: "invalid wizard"
+        tokenIdToStats[_wizardId].role = uint16(_roleId);
     }
 
 
@@ -341,7 +341,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       * @param _initiationCost cost in ETH to initiate
       */
     function modifyContractSettings(string memory _imageBaseURI, uint256 _phaseDuration, uint256 _protectionTimeExtension, uint256 _mintCost,
-                    uint256 _initiationCost, uint256 _maturityThreshold) external onlyOwner {
+                                    uint256 _initiationCost, uint256 _maturityThreshold) external onlyOwner {
         contractSettings.imageBaseURI = _imageBaseURI;
         contractSettings.phaseDuration = _phaseDuration;
         contractSettings.protectionTimeExtension = _protectionTimeExtension;

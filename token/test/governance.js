@@ -88,6 +88,11 @@ describe('Governance Contract', function() {
     // Finally, deploy the Governance contract
     Governance = await ethers.getContractFactory("Governance");
     governance = await Governance.deploy(wizards.address, wizardTower.address, appointer.address);
+
+
+    // set certain roles
+    await wizards.updateAppointer(appointer.address);
+
   });
 
 
@@ -474,8 +479,152 @@ describe('Governance Contract', function() {
             expect(report).to.equal(ethers.BigNumber.from("1"));
         });
 
+    }); // end describe
 
-    });
+
+    describe('Verification with restrictedTo', function() {
+        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, leafHashes, finalHash, leafArray,
+        contractSettings, taskDoerId, taskDoerRole;
+
+
+        beforeEach(async () => {
+            contractSettings = await wizards.connect(owner).contractSettings();
+
+            console.log("appointer addy: ", appointer.address)
+            let wizAppointer = await wizards.appointer();
+            console.log("wizards appointer: ", wizAppointer)
+
+
+            // Create a task as a precondition for acceptance tests
+            await wizards.connect(owner).mint(0);
+            let totalWizards = await wizards.totalSupply();
+            wizardId = totalWizards.toNumber();  // Assuming the ID is a number
+            wizardRole = await wizards.getRole(wizardId);
+
+            console.log("wizardRole: ", wizardRole)
+
+            await wizards.mint(0);
+            verifyingWizardId = wizardId + 1;
+
+            await wizards.mint(0);
+            taskDoerId = wizardId + 2;
+
+            await wizards.initiate(wizardId, {value: contractSettings.initiationCost});
+            await wizards.initiate(verifyingWizardId, {value: contractSettings.initiationCost});
+            await wizards.initiate(taskDoerId, {value: contractSettings.initiationCost});
+
+            let tx = await appointer.createRole("test_role", false, 1, []);
+            let receipt = await tx.wait();
+            let event = receipt.events?.find(e => e.event === 'RoleCreated');
+            let newRoleId = event.args.roleId;
+//            let roleName = event.args.name;
+
+            console.log('wizardId: ', wizardId);
+
+            let isActive = await wizards.isActive(taskDoerId);
+            console.log("New Role id: ", newRoleId);
+            console.log("taskDoer is active: ", isActive);
+
+            await appointer.appointAsAdmin(taskDoerId, newRoleId);
+            taskDoerRole = await wizards.getRole(taskDoerId);
+            console.log("taskDoerRole: ", taskDoerRole);
+
+            let coreDetails = {
+                IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
+                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                numFieldsToHash: 3,  // Example value
+                taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
+                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+            };
+
+            let timeDetails = {
+                begTimestamp: Math.floor(Date.now() / 1000),  // Current timestamp
+                endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
+                waitTime: 3600,  // 1 hour in seconds
+                timeBonus: 86400  // 1 day in seconds
+            };
+
+            roleDetails = {
+                creatorRole: wizardRole,  // Example role ID
+                restrictedTo: taskDoerRole,  // Example role ID
+                availableSlots: 10  // Example number of slots
+            };
+
+            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'NewTaskCreated');
+            task = event.args.task;
+            taskId = event.args.taskId;
+
+            // accept task
+            tx = await governance.acceptTask(taskId, taskDoerId);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'TaskAccepted');
+            const reportId = event.args.reportId;
+
+            // create hash
+            leafArray = ['1', '2', '3'];
+            const hashes = await computeHashes(leafArray);
+            leafHashes = hashes.leafHashes;
+            finalHash = hashes.finalHash;
+
+
+            // complete task
+            const res = await governance.completeTask(reportId, finalHash, wizardId);
+
+            // set verifier of wizards contract
+//            updateVerifier
+            tx = await wizards.updateVerifier(governance.address);
+            await tx.wait();
+
+        });
+
+        it('Task can not be claimed.', async function() {
+            await expect(governance.claimReportToVerify(verifyingWizardId)).to.be.reverted;
+        });
+
+        it('Verification should succeed with correct values', async function() {
+            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+
+            const reportState = event.args.reportState;
+            expect(reportState).to.equal(5);
+
+
+        });
+
+        it('Verification with true produces expected event', async function() {
+            expect(true).to.equal(false);
+            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, true);
+            let receipt = await tx.wait();
+//            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+//            reportId = event.args.reportId;
+
+            // todo -- create event, processing
+        });
+
+        it('Verification with false produces expected event', async function() {
+            expect(true).to.equal(false);
+            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, true);
+            let receipt = await tx.wait();
+//            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+//            reportId = event.args.reportId;
+
+            // todo -- create event, processing
+        });
+    }); // end describe
+
+
+
+
+
+
 
     describe('Edge Cases and Error Handling', function() {
         let wizardId;

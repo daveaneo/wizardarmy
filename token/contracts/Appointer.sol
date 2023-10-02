@@ -91,15 +91,37 @@ contract Appointer is Ownable {
         canAppointRole(_appointerId, _roleId)
         isActiveWizard(_appointerId) isActiveWizard(_appointeeId)
     {
+        _appoint(_appointeeId, _roleId);
+    }
+
+    /// @notice Allows admin to appoint another wizard to a specified role.
+    /// @param _appointeeId The ID of the wizard being appointed.
+    /// @param _roleId The role to which the _appointeeId wizard is being appointed.
+    function appointAsAdmin(uint256 _appointeeId, uint256 _roleId)
+        external
+        onlyOwner
+        roleExists(_roleId)
+        isActiveWizard(_appointeeId)
+    {
+        _appoint(_appointeeId, _roleId);
+    }
+
+    /// @notice Allows admin to appoint another wizard to a specified role.
+    /// @param _appointeeId The ID of the wizard being appointed.
+    /// @param _roleId The role to which the _appointeeId wizard is being appointed.
+    function _appoint(uint256 _appointeeId, uint256 _roleId)
+        internal
+    {
         //  and have no role (role==0)
         require(wizardContract.getRole(_appointeeId) == 0, "must have no role.");
         require(roles[_roleId].currentHolders < roles[_roleId].maxHolders, "role maxed out.");
 
-
         // appoint role
-        wizardContract.appointRole(_appointeeId, _roleId);
+        wizardContract.appointRole(_appointeeId, _roleId); // todo -- this is causing problems
         roles[_roleId].currentHolders += 1;
     }
+
+
 
     /// @notice Removes the role of a specified wizard.
     /// @dev The calling address must own the appointer wizard and have authority over the appointee's role.
@@ -122,7 +144,6 @@ contract Appointer is Ownable {
         wizardContract.appointRole(_appointeeId, 0);
         roles[appointeeRole].currentHolders -= 1;
         emit RoleRemoved(_appointeeId);
-
     }
 
     /// @notice Sets the ability of a role to appoint another role.
