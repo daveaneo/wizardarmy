@@ -4,6 +4,8 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
+const verificationFee = 10**9;
+
 async function computeHashes(values) {
     // Pad each value to the desired byte length and then hash it
     const leafHashes = values.map(value => {
@@ -103,18 +105,14 @@ describe('Governance Contract', function() {
     });
 
     describe('Task Creation', function() {
-        // ... Previous tests ...
-
-        it('Created task should have correct properties', async function() {
-
+        let wizardId, wizardRole, coreDetails, timeDetails, roleDetails;
+        beforeEach(async () => {
             await wizards.connect(owner).mint(0);
             let totalWizards = await wizards.totalSupply();
-            let wizardId = totalWizards.toNumber();  // Assuming the ID is a number
-            let wizardRole = await wizards.getRole(wizardId);
+            wizardId = totalWizards.toNumber();  // Assuming the ID is a number
+            wizardRole = await wizards.getRole(wizardId);
 
-            let appointerContract = await governance.appointer();
-
-            let coreDetails = {
+            coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,  // Example value
@@ -122,19 +120,26 @@ describe('Governance Contract', function() {
                 payment: ethers.utils.parseEther("1")  // 1 ETH in Wei
             };
 
-            let timeDetails = {
+            timeDetails = {
                 begTimestamp: Math.floor(Date.now() / 1000),  // Current timestamp
                 endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
                 waitTime: 3600,  // 1 hour in seconds
                 timeBonus: 86400  // 1 day in seconds
             };
 
-            let roleDetails = {
+            roleDetails = {
                 creatorRole: wizardRole,  // Example role ID
                 restrictedTo: 2,  // Example role ID
                 availableSlots: 10  // Example number of slots
             };
 
+        }); // end
+
+        it('Task can not be created without token allowance', async function() {
+            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
+        });
+
+        it('Created task should have correct properties', async function() {
             // Approve the allowance
             let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
             await tx.wait();
@@ -164,8 +169,6 @@ describe('Governance Contract', function() {
             expect(task.roleDetails.creatorRole.toString()).to.equal(roleDetails.creatorRole.toString());
             expect(task.roleDetails.restrictedTo).to.equal(roleDetails.restrictedTo);
             expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots);
-
-
         });
     });
 
@@ -323,8 +326,14 @@ describe('Governance Contract', function() {
 
         });
 
+        it('Verification fails with incorrect payment.', async function() {
+            await expect(governance.claimReportToVerify(verifyingWizardId, {value: verificationFee*2})).to.be.reverted;
+            await expect(governance.claimReportToVerify(verifyingWizardId, {value: verificationFee/2})).to.be.reverted;
+            await expect(governance.claimReportToVerify(verifyingWizardId, {value: 0})).to.be.reverted;
+        });
+
         it('Verification assignment works with one task.', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -333,7 +342,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should succeed with correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -349,7 +358,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should fail with incorrect values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -367,7 +376,7 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification with consensus returns correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -402,7 +411,7 @@ describe('Governance Contract', function() {
             numClaims = await governance.reportsClaimedForConfirmationLength();
 
             //          expect this to fail
-            tx = await governance.claimReportToVerify(verifyingWizardIdTwo);
+            tx = await governance.claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -417,7 +426,7 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification without consensus returns correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -435,7 +444,7 @@ describe('Governance Contract', function() {
             // Move report from queue
             await governance.processReportsClaimedForConfirmation(1);
 
-            tx = await governance.claimReportToVerify(verifyingWizardIdTwo);
+            tx = await governance.claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -451,7 +460,7 @@ describe('Governance Contract', function() {
 
 
         it('Should not allow a report to be verified more than once', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -468,7 +477,7 @@ describe('Governance Contract', function() {
 
 
         it('Should update the report state upon successful verification', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
+            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -585,7 +594,7 @@ describe('Governance Contract', function() {
         });
 
         it('Task can not be claimed.', async function() {
-            await expect(governance.claimReportToVerify(verifyingWizardId)).to.be.reverted;
+            await expect(governance.claimReportToVerify(verifyingWizardId, {value: verificationFee})).to.be.reverted;
         });
 
         it('Verification with true produces expected event', async function() {

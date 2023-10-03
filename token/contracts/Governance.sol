@@ -101,7 +101,7 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 immutable verificationTime = 30*60; // 30 minutes
     // todo -- Adjustable
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
-
+    uint256 verificationFee = 10**9; // todo -- adjustable?
 
 //    /// @notice Emitted for testing hash functionality.
 //    /// @param hash The hash being tested.
@@ -418,9 +418,12 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
     /// @param _wizId The ID of the wizard claiming the task for verification.
-    function claimReportToVerify(uint256 _wizId) onlyWizardOwner(_wizId) external {
+    function claimReportToVerify(uint256 _wizId) external payable onlyWizardOwner(_wizId) {
         // Ensure the caller is not a contract
         require(tx.origin == msg.sender,"Contracts are not allowed to claim tasks." ); // dev: "Contracts are not allowed to claim tasks."
+
+        // Ensure that the sent ETH matches the verificationFee
+        require(msg.value == verificationFee, "Incorrect ETH amount sent.");
 
         // process reports
         processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
