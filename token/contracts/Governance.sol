@@ -23,6 +23,7 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 // todo -- make payments for regular tasks
 // todo -- restrictedTo tasks are dealt with in a non-straightforward way. Document this
 // todo --document this: do we need to pass more information in the report? no -- all required information, even info about how task completer can be found, should be in the initial task
+// todo -- create functions for processing reports in order to send payments
 //// example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
 
 
@@ -71,6 +72,7 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails coreDetails;
     }
 
+    // todo -- add eth paid as field
     struct Report {
         REPORTSTATE reportState;
         uint16 reporterID; // wizard ID of reported
@@ -414,6 +416,7 @@ contract Governance is ReentrancyGuard, Ownable {
         return reportsCount;
     }
 
+    // todo -- add info in report to store eth fee paid -- maybe
     /// @notice Allows a wizard to claim a random task for verification.
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
