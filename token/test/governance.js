@@ -31,8 +31,8 @@ const advanceTime = async (seconds) => {
 
 
 describe('Governance Contract', function() {
-  let Wizards, WizardTower, Governance, Appointer;
-  let wizards, wizardTower, governance, appointer;
+  let Wizards, WizardTower, Governance, Appointer, Token;
+  let wizards, wizardTower, governance, appointer, token;
   let owner, addr1, addr2, otherAddrs;
 
   beforeEach(async () => {
@@ -65,8 +65,8 @@ describe('Governance Contract', function() {
     const tokenURILibrary = await TokenURILibrary.deploy();
 
     // Deploying the Token
-    const Token = await ethers.getContractFactory("Token");
-    const token = await Token.deploy("Wizard Gold", "WGLD", 18, ethers.utils.parseEther("1000"));
+    Token = await ethers.getContractFactory("Token");
+    token = await Token.deploy("Wizard Gold", "WGLD", 18, ethers.utils.parseEther("1000"));
 
 
     // Deploying the Wizards Contract
@@ -87,7 +87,7 @@ describe('Governance Contract', function() {
 
     // Finally, deploy the Governance contract
     Governance = await ethers.getContractFactory("Governance");
-    governance = await Governance.deploy(wizards.address, wizardTower.address, appointer.address);
+    governance = await Governance.deploy(token.address, wizards.address, wizardTower.address, appointer.address);
 
 
     // set certain roles
@@ -135,7 +135,11 @@ describe('Governance Contract', function() {
                 availableSlots: 10  // Example number of slots
             };
 
-            const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            // Approve the allowance
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
+
+            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             const task = event.args.task;
@@ -197,7 +201,11 @@ describe('Governance Contract', function() {
                 availableSlots: 1  // Example number of slots
             };
 
-            const tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            // Approve the allowance
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
+
+            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
@@ -281,7 +289,12 @@ describe('Governance Contract', function() {
                 availableSlots: 10  // Example number of slots
             };
 
-            let tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            // Approve the allowance
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
+
+
+            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             let receipt = await tx.wait();
             let event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
@@ -490,18 +503,13 @@ describe('Governance Contract', function() {
         beforeEach(async () => {
             contractSettings = await wizards.connect(owner).contractSettings();
 
-            console.log("appointer addy: ", appointer.address)
             let wizAppointer = await wizards.appointer();
-            console.log("wizards appointer: ", wizAppointer)
-
 
             // Create a task as a precondition for acceptance tests
             await wizards.connect(owner).mint(0);
             let totalWizards = await wizards.totalSupply();
             wizardId = totalWizards.toNumber();  // Assuming the ID is a number
             wizardRole = await wizards.getRole(wizardId);
-
-            console.log("wizardRole: ", wizardRole)
 
             await wizards.mint(0);
             verifyingWizardId = wizardId + 1;
@@ -517,17 +525,11 @@ describe('Governance Contract', function() {
             let receipt = await tx.wait();
             let event = receipt.events?.find(e => e.event === 'RoleCreated');
             let newRoleId = event.args.roleId;
-//            let roleName = event.args.name;
-
-            console.log('wizardId: ', wizardId);
 
             let isActive = await wizards.isActive(taskDoerId);
-            console.log("New Role id: ", newRoleId);
-            console.log("taskDoer is active: ", isActive);
 
             await appointer.appointAsAdmin(taskDoerId, newRoleId);
             taskDoerRole = await wizards.getRole(taskDoerId);
-            console.log("taskDoerRole: ", taskDoerRole);
 
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
@@ -550,6 +552,10 @@ describe('Governance Contract', function() {
                 availableSlots: 10  // Example number of slots
             };
 
+            // Approve the allowance
+            tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
+
             tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'NewTaskCreated');
@@ -560,7 +566,7 @@ describe('Governance Contract', function() {
             tx = await governance.acceptTask(taskId, taskDoerId);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'TaskAccepted');
-            const reportId = event.args.reportId;
+            reportId = event.args.reportId;
 
             // create hash
             leafArray = ['1', '2', '3'];
@@ -568,9 +574,8 @@ describe('Governance Contract', function() {
             leafHashes = hashes.leafHashes;
             finalHash = hashes.finalHash;
 
-
             // complete task
-            const res = await governance.completeTask(reportId, finalHash, wizardId);
+            const res = await governance.completeTask(reportId, finalHash, taskDoerId);
 
             // set verifier of wizards contract
 //            updateVerifier
@@ -583,40 +588,22 @@ describe('Governance Contract', function() {
             await expect(governance.claimReportToVerify(verifyingWizardId)).to.be.reverted;
         });
 
-        it('Verification should succeed with correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId);
-            let receipt = await tx.wait();
-            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
-            reportId = event.args.reportId;
-
-            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
-            receipt = await tx.wait();
-            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
-
-            const reportState = event.args.reportState;
-            expect(reportState).to.equal(5);
-
-
-        });
-
         it('Verification with true produces expected event', async function() {
-            expect(true).to.equal(false);
             let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, true);
             let receipt = await tx.wait();
-//            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
-//            reportId = event.args.reportId;
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            reportState = event.args.reportState;
 
-            // todo -- create event, processing
+            expect(reportState).to.equal(5);
         });
 
         it('Verification with false produces expected event', async function() {
-            expect(true).to.equal(false);
-            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, true);
+            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, false);
             let receipt = await tx.wait();
-//            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
-//            reportId = event.args.reportId;
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            reportState = event.args.reportState;
 
-            // todo -- create event, processing
+            expect(reportState).to.equal(3);
         });
     }); // end describe
 
@@ -656,6 +643,10 @@ describe('Governance Contract', function() {
                 availableSlots: 10  // Example number of slots
             };
 
+            // Approve the allowance
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
+
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
@@ -680,6 +671,10 @@ describe('Governance Contract', function() {
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 0  // Example number of slots
             };
+
+            // Approve the allowance
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            await tx.wait();
 
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });

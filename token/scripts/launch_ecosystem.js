@@ -93,7 +93,7 @@ async function main() {
     console.log("Appointer deployed to:", appointer.address);
 
     const Governance = await ethers.getContractFactory("Governance");
-    const governance = await Governance.deploy(wizards.address, wizardTower.address, appointer.address);
+    const governance = await Governance.deploy(token.address, wizards.address, wizardTower.address, appointer.address);
     await governance.deployed();
     console.log("Governance deployed to:", governance.address);
 

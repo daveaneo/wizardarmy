@@ -20,21 +20,22 @@ import './libraries/Address.sol';
 import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
-// todo -- make adjustable for for task verification
 // todo -- make payments for regular tasks
-// todo -- make tasks verifiable again
-// todo -- restore timeBonus and waitTime
 // todo -- restrictedTo tasks are dealt with in a non-straightforward way. Document this
+// todo --document this: do we need to pass more information in the report? no -- all required information, even info about how task completer can be found, should be in the initial task
+//// example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
+
+
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
     function numRoles() external view returns(uint256);
-
 }
 
 contract Governance is ReentrancyGuard, Ownable {
 
-//    IERC20  ecosystemTokens;
+    /// thoughts wizardGold -> payments, ETH -> task verification
+    IERC20  ecosystemTokens;
     Wizards wizardsNFT;
     WizardTower wizardTower;
     IAppointer public appointer;
@@ -84,9 +85,6 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256[] public reportsWaitingConfirmation; // allows random selection of confirmation
     DoubleEndedQueue.Bytes32Deque public reportsClaimedForConfirmation; //  time-sorted queue
 
-    // todo -- do we need to pass more information in the report? -- all required information, even info about how task completer can be found, should be in the initial task
-    // example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
-
     // This mapping holds the next active time thresholds for each task.
     // The outer mapping uses the task ID as the key.
     // The inner mapping uses a uint40 (presumably a timestamp or similar) as the key,
@@ -104,6 +102,29 @@ contract Governance is ReentrancyGuard, Ownable {
     // todo -- Adjustable
     uint40 taskVerificationTimeBonus = 1 days; // 1 day
 
+
+//    /// @notice Emitted for testing hash functionality.
+//    /// @param hash The hash being tested.
+//    /// @param isHashCorrect Boolean indicating if the hash is correct.
+//    /// @param firstEncoded The encoded version of the hash.
+//    /// @param firstUnencoded The unencoded version of the hash.
+//    event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
+
+    /// @notice Emitted when a new task is created.
+    /// @param task The new task that was created.
+    event NewTaskCreated(uint256 taskId, Task task);
+
+    /// @notice Emitted when a task is accepted by a wizard.
+    /// @param reportId ID of the report associated with the accepted task.
+    /// @param taskId ID of the accepted task.
+    /// @param wizardId ID of the wizard who accepted the task.
+    event TaskAccepted(uint256 indexed reportId, uint256 indexed taskId, uint40 indexed wizardId);
+
+    /// @notice Emitted when a task is completed by a wizard.
+    /// @param wizardId ID of the wizard who completed the task.
+    /// @param reportId ID of the completed task.
+    event TaskCompleted(uint256 indexed wizardId, uint256 indexed reportId, uint256 indexed taskId);
+
      /// @notice Emitted when a verification is assigned to a wizard for a task.
     /// @param wizardId ID of the wizard to whom the verification is assigned.
     /// @param reportId The report id associated with the verification assignment.
@@ -115,46 +136,9 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @param reportState state of the report after verification attempt.
     event VerificationSubmitted(uint256 indexed VerifierId, uint256 indexed reportId, REPORTSTATE reportState);
 
-    /// @notice Emitted for testing hash functionality.
-    /// @param hash The hash being tested.
-    /// @param isHashCorrect Boolean indicating if the hash is correct.
-    /// @param firstEncoded The encoded version of the hash.
-    /// @param firstUnencoded The unencoded version of the hash.
-    event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
-
-    /// @notice Emitted when a new task is created.
-    /// @param task The new task that was created.
-    event NewTaskCreated(uint256 taskId, Task task);
-
-    /// @notice Emitted when a task is completed by a wizard.
-    /// @param wizardId ID of the wizard who completed the task.
-    /// @param reportId ID of the completed task.
-    event TaskCompleted(uint256 indexed wizardId, uint256 indexed reportId, uint256 indexed taskId);
-
-    /// @notice Emitted when a task is accepted by a wizard.
-    /// @param reportId ID of the report associated with the accepted task.
-    /// @param taskId ID of the accepted task.
-    /// @param wizardId ID of the wizard who accepted the task.
-    event TaskAccepted(uint256 indexed reportId, uint256 indexed taskId, uint40 indexed wizardId);
-
-
-
-    /////////////////////////////
-    //////  TEMP Functions ///////
-    /////////////////////////////
-//
-//    function testHashing(bytes32 _givenHash, bytes32[] memory _fields, bool _refuted) external {
-//        bytes memory unencoded = abi.encodePacked(_fields[0]);
-//        if(_refuted) {
-//            for(uint256 i = 0; i < _fields.length;){
-//                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
-//                unchecked{++i;}
-//            }
-//        }
-//        bytes32 myHash = keccak256(abi.encodePacked(_fields));
-//        emit HashTesting(myHash, myHash==_givenHash, _fields[0], unencoded);
-//    }
-
+    /// @notice Emitted when a task is forcibly ended
+    /// @param taskId The id of the task that has ended.
+    event TaskManuallyEnded(uint256 taskId);
 
     /////////////////////////////
     //////  Get Functions ///////
@@ -283,8 +267,8 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // If the task is being ended, perform cleanup
         if (desiredState == TASKSTATE.ENDED) {
-            // todo
-    //        endTaskCleanup(_taskId);
+            // todo endTaskCleanup(_taskId); -- pay task doers?
+            emit TaskManuallyEnded(_taskId);
         }
     }
 
@@ -297,8 +281,8 @@ contract Governance is ReentrancyGuard, Ownable {
     /** @dev Constructor for HOADAO
         @param _nft -- contract address for NFTs
       */
-    constructor(address _nft, address _wizardTower, address _appointer){
-//        ecosystemTokens = IERC20(_erc20);
+    constructor(address _erc20, address _nft, address _wizardTower, address _appointer){
+        ecosystemTokens = IERC20(_erc20);
         wizardsNFT = Wizards(_nft);
         wizardTower = WizardTower(_wizardTower);
         appointer = IAppointer(_appointer);
@@ -313,8 +297,7 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails calldata coreDetails,
         TimeDetails calldata timeDetails,
         RoleDetails calldata roleDetails
-    ) external onlyTaskCreators(_wizardId)  {
-
+    ) external onlyTaskCreators(_wizardId) {
         require(
             timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
             && roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
@@ -322,6 +305,17 @@ contract Governance is ReentrancyGuard, Ownable {
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
 
+        // Ensure that the sender has approved this contract to move the payment amount on their behalf
+        require(
+            IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.payment,
+            "Token allowance not sufficient"
+        );
+
+        // Transfer the payment amount from the sender to this contract (or wherever you intend)
+        require(
+            IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.payment),
+            "Token transfer failed"
+        );
 
         tasksCount++;
 
@@ -393,7 +387,6 @@ contract Governance is ReentrancyGuard, Ownable {
             reportsWaitingConfirmation.push(_reportId);
         }
 
-
         emit TaskCompleted(_wizId, _reportId, reports[_reportId].taskId);
     }
 
@@ -464,9 +457,11 @@ contract Governance is ReentrancyGuard, Ownable {
         require(tasks[reports[_reportId].taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
         if (approve){
             // todo -- handle approval
+            emit VerificationSubmitted(_wizId, _reportId, REPORTSTATE.VERIFIED);
         }
         else{
             // todo -- handle failure
+            emit VerificationSubmitted(_wizId, _reportId, REPORTSTATE.REFUTED_CONSENSUS);
         }
     }
 
