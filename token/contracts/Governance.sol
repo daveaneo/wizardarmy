@@ -21,8 +21,6 @@ import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
 // todo -- make payments for regular tasks
-// todo -- restrictedTo tasks are dealt with in a non-straightforward way. Document this
-// todo --document this: do we need to pass more information in the report? no -- all required information, even info about how task completer can be found, should be in the initial task
 // todo -- create functions for processing reports in order to send payments
 //// example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
 

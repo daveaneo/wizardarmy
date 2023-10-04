@@ -130,7 +130,7 @@ Combines `TimeDetails`, `RoleDetails`, and `CoreDetails` structs.
 
 Tasks can be created by users with appropriate permissions. The flow is as follows:
 
-1. The user calls the `createTask` function, passing in details about the task.
+1. The user calls the `createTask` function, passing in details about the task. Enough information needs to be included in both the IPFS and in the fields so that wizards can fully complete tasks and other wizards can find and verify those tasks. No other information will be given except what is presented here.
 2. The function checks if the user has the appropriate permissions to create the task.
 3. If all conditions are met, the task is created and stored on the blockchain.
 
