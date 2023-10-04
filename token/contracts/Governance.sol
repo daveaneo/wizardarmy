@@ -20,10 +20,9 @@ import './libraries/Address.sol';
 import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
-// todo -- make payments for regular tasks
-// todo -- create functions for processing reports in order to send payments
-//// example: share http://www.wizards.club on twitter with hashtag #WAD and include WIZARD414 (or whatever your ID is).
-
+// todo -- finish erc20 payments
+// todo -- finish ETH payments
+// todo -- consider ERC20, ETH withdrawals; account buildup. withdrawing excess.
 
 
 interface IAppointer {
