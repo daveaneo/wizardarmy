@@ -501,6 +501,36 @@ describe('Governance Contract', function() {
             expect(report).to.equal(ethers.BigNumber.from("1"));
         });
 
+       it('Reporter and Verifier should receive funds back on successful verification', async function() {
+            expect(false).to.equal(true);
+
+//            let report = await governance.reportsWaitingConfirmation(0);
+//            expect(report).to.equal(ethers.BigNumber.from("1"));
+        });
+
+       it('Reporter and second Refuter should receive extra funds on successful verification after challenge', async function() {
+            expect(false).to.equal(true);
+
+//            let report = await governance.reportsWaitingConfirmation(0);
+//            expect(report).to.equal(ethers.BigNumber.from("1"));
+        });
+
+       it('Refuters should receive extra funds after converging/agreeing refuting', async function() {
+            expect(false).to.equal(true);
+
+//            let report = await governance.reportsWaitingConfirmation(0);
+//            expect(report).to.equal(ethers.BigNumber.from("1"));
+        });
+
+       it('DAO should receive funds after diverging refuting', async function() {
+            expect(false).to.equal(true);
+
+//            let report = await governance.reportsWaitingConfirmation(0);
+//            expect(report).to.equal(ethers.BigNumber.from("1"));
+        });
+
+
+
     }); // end describe
 
 

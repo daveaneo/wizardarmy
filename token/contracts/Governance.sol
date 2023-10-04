@@ -24,6 +24,7 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 // todo -- finish ETH payments
 // todo -- consider ERC20, ETH withdrawals; account buildup. withdrawing excess.
 
+// todo -- in order to claim a task to do, they should also send ETH
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
@@ -60,7 +61,8 @@ contract Governance is ReentrancyGuard, Ownable {
         TASKSTATE state;
         uint8 numFieldsToHash;
         TASKTYPE taskType;
-        uint128 payment;
+        uint128 reward;
+        uint128 verificationFee;
     }
 
     struct Task {
@@ -69,7 +71,7 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails coreDetails;
     }
 
-    // todo -- add eth paid as field
+    // todo -- add eth paid as field -- or we can have it saved in the task, which will cause less changes
     struct Report {
         REPORTSTATE reportState;
         uint16 reporterID; // wizard ID of reported
@@ -306,13 +308,13 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Ensure that the sender has approved this contract to move the payment amount on their behalf
         require(
-            IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.payment,
+            IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward,
             "Token allowance not sufficient"
         );
 
         // Transfer the payment amount from the sender to this contract (or wherever you intend)
         require(
-            IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.payment),
+            IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.reward),
             "Token transfer failed"
         );
 
@@ -340,8 +342,11 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _taskId The ID of the task to accept.
      * @param _wizId The ID of the wizard accepting the task.
      */
-    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external returns(uint256) {
+    function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external payable returns(uint256) {
         require(_taskId <= tasksCount && _taskId != 0, "invalid task"); // dev: invalid task
+        // Ensure that the sent ETH matches the verificationFee
+        require(msg.value == tasks[_taskId].coreDetails.verificationFee, "Incorrect ETH amount sent.");
+
         Task memory myTask = tasks[_taskId];
 
         // Make sure the wizard is eligible
@@ -418,7 +423,7 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
     /// @param _wizId The ID of the wizard claiming the task for verification.
-    function claimReportToVerify(uint256 _wizId) external payable onlyWizardOwner(_wizId) {
+    function claimReportToVerify(uint256 _wizId) external payable onlyWizardOwner(_wizId) nonReentrant {
         // Ensure the caller is not a contract
         require(tx.origin == msg.sender,"Contracts are not allowed to claim tasks." ); // dev: "Contracts are not allowed to claim tasks."
 
@@ -456,7 +461,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _reportId The ID of the report being verified.
      * @param approve If `true`, the report is approved; otherwise, it is failed.
      */
-    function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external {
+    function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external nonReentrant {
         require(tasks[reports[_reportId].taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
         if (approve){
             // todo -- handle approval
@@ -476,7 +481,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * It will process up to the smaller of 'n' reports or the total length of reportsClaimedForConfirmation.
      * @param n The maximum number of reports to process from the reportsClaimedForConfirmation array.
      */
-    function processReportsClaimedForConfirmation(uint256 n) public {
+    function processReportsClaimedForConfirmation(uint256 n) public nonReentrant {
         uint256 totalReportsClaimed = DoubleEndedQueue.length(reportsClaimedForConfirmation);
         uint256 toProcess = n < totalReportsClaimed ? n : totalReportsClaimed;
         uint256 processed = 0;
@@ -534,6 +539,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     function handleVerifiedReport(uint256 reportId) internal {
         // Implementation for handling VERIFIED state
+        // release reward
     }
 
     function handleFailedReport(uint256 reportId) internal {
@@ -547,7 +553,7 @@ contract Governance is ReentrancyGuard, Ownable {
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) external {
+    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) nonReentrant external {
         Report storage myReport = reports[_reportId];
         require(
             (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.CHALLENGED)
@@ -567,34 +573,25 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // if verified
         if (hashIsCorrect ==1){
-            // todo -- the amount to send is wrong. We want to give the verifier back their funds
-            // todo -- we want to reward the task submitter with any reward
-            // todo -- we want to reward the task submitter with any fee
-            // todo -- consider eth fee, stablecoin, or wizard gold
-            // todo -- consider set fee or adjustable. If later, we will need to save this info in the report
-
             // if refuterId exists, then refuter gets no refund
-            uint256 split = tasks[myReport.taskId].coreDetails.payment/2;
-            address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.verifierID));
-//            address payable verifier = msg.sender;
+            uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2; // todo -- test
+            address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.reporterID));
 
             wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
             wizardsNFT.increaseProtectedUntilTimestamp(myReport.verifierID, taskVerificationTimeBonus);
-
             myReport.reportState = REPORTSTATE.VERIFIED;
 
-            // todo -- adjust for different payment types
-            if(split > 0){
-            // send to task submitter
-                (bool sent, bytes memory data) = taskSubmitter.call{value: split}("");
+            if(feeSplit > 0){
+                // send to task submitter
+                (bool sent, bytes memory data) = taskSubmitter.call{value: feeSplit}("");
                 require(sent, "sending failed"); // dev: "Failed to send Ether"
 
                 // send to verifier
-                (sent, data) = msg.sender.call{value: split}("");
+                (sent, data) = msg.sender.call{value: feeSplit}("");
                 require(sent, "sending failed"); // dev: "Failed to send Ether"
             }
-
         }
+
         // if not verified
         else {
             // if not challenged already
@@ -608,19 +605,19 @@ contract Governance is ReentrancyGuard, Ownable {
                 processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
             }
 
-            // if report was not already refuted
+            // if report was already challenged and has now been refuted
             else {
                 // case 1 -- if matches hash of refuter (corroboration), split
                 if(myReport.refuterHash==myHash){
-                    uint256 split = tasks[myReport.taskId].coreDetails.payment/2;
-                    address payable taskRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
+                    uint256 split = tasks[myReport.taskId].coreDetails.verificationFee*3/2;
+                    address payable firstRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
 
                     wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
                     wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
 
                     if(split > 0 ){
                         // send to task submitter
-                        (bool sent, bytes memory data) = taskRefuter.call{value: split}("");
+                        (bool sent, bytes memory data) = firstRefuter.call{value: split}("");
                         require(sent, "sending failed"); // dev: "Failed to send Ether"
 
                         // send to verifier
@@ -633,9 +630,8 @@ contract Governance is ReentrancyGuard, Ownable {
                 else{
                     // no agreement in the 3 submissions
                     // send ETH to DAO
-                    // todo -- store ETH until threshold reached
                     // external and internal function to release it
-                    uint256 split = tasks[myReport.taskId].coreDetails.payment;
+                    uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
                     delete reports[_reportId];
                     if(split > 0){
                         (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
