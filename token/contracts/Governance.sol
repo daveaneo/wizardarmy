@@ -480,6 +480,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
 
     // todo -- send back ETH for delinquint submissions to msg.sender. Consider angle shooting of bad actors clogging up the system and redeaming this way.
+    // todo -- reconsider what we do with these. What scenarios are we going to have and how do we deal with them?
     /**
      * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
      * @dev Iterates through reportsClaimedForConfirmation and handles them based on their REPORTSTATE.
@@ -514,14 +515,12 @@ contract Governance is ReentrancyGuard, Ownable {
                 // handleRefutedReport(reportId);
             } else if (report.reportState == REPORTSTATE.VERIFIED) {
                 // Handle the verified state
-                handleVerifiedReport(reportId);
+//                handleVerifiedReport(report.verifierID, reportId); // todo this isn't good
             } else if (report.reportState == REPORTSTATE.REFUTED_CONSENSUS) {
                 // Handle the failed state
-                // todo -- handleFailedReport(reportId, consensus=true);
                 reportsWaitingConfirmation.push(reportId);
             } else if (report.reportState == REPORTSTATE.REFUTED_DISAGREEMENT) {
                 // Handle the failed state
-                // todo -- handleFailedReport(reportId, consensus=true);
                 reportsWaitingConfirmation.push(reportId);
             } else {
                 //this should never happen
@@ -537,22 +536,75 @@ contract Governance is ReentrancyGuard, Ownable {
     // Dummy function handlers for each state. You should replace these with actual implementations.
     function handleReportPastDeadline(uint256 reportId) internal {
         // Implementation for handling SUBMITTED state
+        reportsWaitingConfirmation.push(reportId);
     }
 
-    function handleRefutedReport(uint256 reportId) internal {
-        // Implementation for handling CHALLENGED state
+    function handleVerifiedReport(uint256 _wizId, uint256 _reportId) internal {
+        Report storage myReport = reports[_reportId];
+        // if refuterId exists, then refuter gets no refund
+        uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2; // todo -- test
+        address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.reporterID));
+
+        wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
+        wizardsNFT.increaseProtectedUntilTimestamp(myReport.verifierID, taskVerificationTimeBonus);
+        myReport.reportState = REPORTSTATE.VERIFIED;
+
+        if(feeSplit > 0){
+            // send to task submitter
+            (bool sent, bytes memory data) = taskSubmitter.call{value: feeSplit}("");
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+
+            // send to verifier
+            (sent, data) = msg.sender.call{value: feeSplit}("");
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+        }
+        emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
     }
 
-    function handleVerifiedReport(uint256 reportId) internal {
-        // Implementation for handling VERIFIED state
-        // release reward
+    function handleRefutedConvergenceReport(uint256 secondRefuterId, uint256 _reportId) internal {
+        Report storage myReport = reports[_reportId];
+        uint256 split = tasks[myReport.taskId].coreDetails.verificationFee*3/2;
+        address payable firstRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
+
+        wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
+        wizardsNFT.increaseProtectedUntilTimestamp(secondRefuterId, taskVerificationTimeBonus);
+
+        if(split > 0 ){
+            // send to task submitter
+            (bool sent, bytes memory data) = firstRefuter.call{value: split}("");
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+
+            // send to verifier
+            (sent, data) = msg.sender.call{value: split}("");
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+        }
+        myReport.reportState = REPORTSTATE.REFUTED_CONSENSUS;
+        emit VerificationSubmitted(secondRefuterId, _reportId, myReport.reportState);
     }
 
-    function handleFailedReport(uint256 reportId) internal {
-        // Implementation for handling FAILED state
+    function handleRefutedDisagreementReport(uint256 _wizId, uint256 _reportId) internal {
+            Report storage myReport = reports[_reportId];
+            // send ETH to DAO
+            uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
+            if(split > 0){
+                (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+                require(sent, "sending failed"); // dev: "Failed to send Ether"
+            }
+
+            myReport.reportState = REPORTSTATE.REFUTED_DISAGREEMENT;
+            emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
     }
 
 
+    function handleChallengedReport(uint256 _wizId, uint256 _reportId, bytes32 myHash) internal {
+            Report storage myReport = reports[_reportId];
+            myReport.refuterID=uint16(_wizId);
+            myReport.refuterHash=myHash;
+            myReport.reportState = REPORTSTATE.CHALLENGED;
+            // report is now in the queue and we have to wait until enough time is cleared.
+            // processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
+            emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
+    }
 
 
     // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
@@ -576,78 +628,19 @@ contract Governance is ReentrancyGuard, Ownable {
         bytes32 myHash = keccak256(abi.encodePacked(_fields));
         uint256 hashIsCorrect = myReport.hash == myHash ? 1 : 0;
 
-        // if verified
-        if (hashIsCorrect ==1){
-            // if refuterId exists, then refuter gets no refund
-            uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2; // todo -- test
-            address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.reporterID));
+        bool reportVerified = (hashIsCorrect == 1);
+        bool reportNotChallenged = (myReport.reportState == REPORTSTATE.SUBMITTED);
+        bool hashMatchesRefuter = (myReport.refuterHash == myHash);
 
-            wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
-            wizardsNFT.increaseProtectedUntilTimestamp(myReport.verifierID, taskVerificationTimeBonus);
-            myReport.reportState = REPORTSTATE.VERIFIED;
-
-            if(feeSplit > 0){
-                // send to task submitter
-                (bool sent, bytes memory data) = taskSubmitter.call{value: feeSplit}("");
-                require(sent, "sending failed"); // dev: "Failed to send Ether"
-
-                // send to verifier
-                (sent, data) = msg.sender.call{value: feeSplit}("");
-                require(sent, "sending failed"); // dev: "Failed to send Ether"
-            }
+        if (reportVerified) {
+            handleVerifiedReport(_wizId, _reportId);
+        } else if (reportNotChallenged) {
+            handleChallengedReport(_wizId, _reportId, myHash);
+        } else if (hashMatchesRefuter) {
+            handleRefutedConvergenceReport(_wizId, _reportId);
+        } else {
+            handleRefutedDisagreementReport(_wizId, _reportId);
         }
-
-        // if not verified
-        else {
-            // if not challenged already
-            if(myReport.reportState == REPORTSTATE.SUBMITTED){  // equivalently,  myReport.refuterID==0)
-                myReport.refuterID=uint16(_wizId);
-                myReport.refuterHash=myHash;
-                myReport.reportState = REPORTSTATE.CHALLENGED;
-
-                // report is now in the queue and we have to wait until enough time is cleared.
-                // We can clean out some reports though
-                processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
-            }
-
-            // if report was already challenged and has now been refuted
-            else {
-                // case 1 -- if matches hash of refuter (corroboration), split
-                if(myReport.refuterHash==myHash){
-                    uint256 split = tasks[myReport.taskId].coreDetails.verificationFee*3/2;
-                    address payable firstRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
-
-                    wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
-                    wizardsNFT.increaseProtectedUntilTimestamp(_wizId, taskVerificationTimeBonus);
-
-                    if(split > 0 ){
-                        // send to task submitter
-                        (bool sent, bytes memory data) = firstRefuter.call{value: split}("");
-                        require(sent, "sending failed"); // dev: "Failed to send Ether"
-
-                        // send to verifier
-                        (sent, data) = msg.sender.call{value: split}("");
-                        require(sent, "sending failed"); // dev: "Failed to send Ether"
-                    }
-
-                    myReport.reportState = REPORTSTATE.REFUTED_CONSENSUS;
-                }
-                else{
-                    // no agreement in the 3 submissions
-                    // send ETH to DAO
-                    // external and internal function to release it
-                    uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
-                    delete reports[_reportId];
-                    if(split > 0){
-                        (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
-                        require(sent, "sending failed"); // dev: "Failed to send Ether"
-                    }
-
-                    myReport.reportState = REPORTSTATE.REFUTED_DISAGREEMENT;
-                }
-            }
-        }
-        emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
 
     }
 
