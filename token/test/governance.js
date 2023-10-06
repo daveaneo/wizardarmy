@@ -142,7 +142,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther(".1"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             timeDetails = {
@@ -213,7 +213,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther(".1"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             let timeDetails = {
@@ -317,7 +317,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             let timeDetails = {
@@ -747,7 +747,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             let timeDetails = {
@@ -839,7 +839,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             let timeDetails = {
@@ -869,7 +869,7 @@ describe('Governance Contract', function() {
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
-                verificationFee: 10**9
+                verificationFee: verificationFee
             };
 
             let timeDetails = {

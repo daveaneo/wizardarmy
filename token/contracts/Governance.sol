@@ -557,7 +557,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
     // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
-    // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
     function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) /*nonReentrant*/ external {
         Report storage myReport = reports[_reportId];
