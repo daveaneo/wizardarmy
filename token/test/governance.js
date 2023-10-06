@@ -6,10 +6,33 @@ const { ethers } = require('hardhat');
 
 const verificationFee = ethers.BigNumber.from(10**9);
 
+//async function computeHashes(values) {
+//    // Pad each value to the desired byte length and then hash it
+//    const leafHashes = values.map(value => {
+//        let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
+//        return ethers.utils.keccak256(paddedValue);
+//    });
+//
+//    // Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
+//    const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
+//
+//    // Produce a final hash of the concatenated string
+//    const finalHash = ethers.utils.keccak256(concatenatedHashes);
+//
+//    return {
+//        leafHashes,
+//        finalHash
+//    };
+//}
+
+
 async function computeHashes(values) {
+    let paddedValues = [];  // Array to store the padded values
+
     // Pad each value to the desired byte length and then hash it
     const leafHashes = values.map(value => {
         let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
+        paddedValues.push(paddedValue);  // Add the padded value to the array
         return ethers.utils.keccak256(paddedValue);
     });
 
@@ -20,6 +43,7 @@ async function computeHashes(values) {
     const finalHash = ethers.utils.keccak256(concatenatedHashes);
 
     return {
+        paddedValues,
         leafHashes,
         finalHash
     };
@@ -248,7 +272,7 @@ describe('Governance Contract', function() {
     });
 
     describe('Verification', function() {
-        let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, leafHashes, finalHash, leafArray,
+        let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, paddedValues, leafHashes, finalHash, leafArray,
         contractSettings, verifyingWizardIdTwo;
 
 
@@ -332,6 +356,7 @@ describe('Governance Contract', function() {
             // create hash
             leafArray = ['1', '2', '3'];
             const hashes = await computeHashes(leafArray);
+            paddedValues = hashes.paddedValues;
             leafHashes = hashes.leafHashes;
             finalHash = hashes.finalHash;
 
@@ -397,8 +422,8 @@ describe('Governance Contract', function() {
             reportId = event.args.reportId;
 
             let incorrectLeaves = ['3', '2', '1'];
-            let hexlifiedLeaves = incorrectLeaves.map(leaf => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(leaf)), 32)); // todo -- add this to docs?
             const incorrectHashes = await computeHashes(incorrectLeaves);
+            let hexlifiedLeaves = incorrectHashes.paddedValues;
             tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
@@ -546,40 +571,133 @@ describe('Governance Contract', function() {
             reportId = event.args.reportId;
 
             const initETHReporter = await ethers.provider.getBalance(addr2.address);
-            const initETHVerifier = await ethers.provider.getBalance(addr3.address);
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectLeaves);
+            let incorrectLeaves = ['3', '2', '1'];
+            const incorrectHashes = await computeHashes(incorrectLeaves);
+
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
 
+            await advanceTime(10000);
+            await governance.connect(owner).processReportsClaimedForConfirmation(1);
 
-            tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
             receipt = await tx.wait();
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectLeaves);
-            receipt = await tx.wait();
+            const initETHVerifier = await ethers.provider.getBalance(addr4.address);
 
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, paddedValues);
+            receipt = await tx.wait();
 
             const report = await governance.getReportById(reportId);
             const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
             const finalETHReporter = await ethers.provider.getBalance(addr2.address);
-            const finalETHVerifier = await ethers.provider.getBalance(addr3.address);
+            const finalETHVerifier = await ethers.provider.getBalance(addr4.address);
 
-            expect(finalETHReporter).to.equal(initETHReporter.add(verificationFee));
-            expect(finalETHVerifier).to.equal(initETHVerifier.add(verificationFee).sub(ethSpentOnGas));
+            expect(finalETHReporter).to.equal(initETHReporter.add(verificationFee.mul(3).div(2)));
+            expect(finalETHVerifier).to.equal(initETHVerifier.add(verificationFee.mul(3).div(2)).sub(ethSpentOnGas));
         });
 
        it('Refuters should receive extra funds after converging/agreeing refuting', async function() {
-            expect(false).to.equal(true);
+            // data
+            let incorrectLeaves = ['3', '2', '1'];
+            const incorrectHashes = await computeHashes(incorrectLeaves);
 
-//            let report = await governance.reportsWaitingConfirmation(0);
-//            expect(report).to.equal(ethers.BigNumber.from("1"));
+            // claim report for first verifier
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // get post claim ETH values in wallet
+            const initETHReporter = await ethers.provider.getBalance(addr2.address);
+            const initETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            // submit verification for first verifier
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            receipt = await tx.wait();
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            // advance time and processing claims
+            await advanceTime(10000);
+            await governance.connect(owner).processReportsClaimedForConfirmation(1);
+
+
+            // claim report for second verifier
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            receipt = await tx.wait();
+
+            // get post claim ETH values in wallet
+            const initETHVerifierTwo = await ethers.provider.getBalance(addr4.address);
+
+            // submit verification for second verifier
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.paddedValues);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            const ethSpentOnGasTwo = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            const finalETHVerifierTwo = await ethers.provider.getBalance(addr4.address);
+            const finalETHReporter = await ethers.provider.getBalance(addr2.address);
+            const finalETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            // expect eth balances to be adjusted accordingly
+            expect(finalETHReporter).to.equal(initETHReporter); // no change for reporter
+            expect(finalETHVerifier).to.equal(initETHVerifier.add(verificationFee.mul(3).div(2)).sub(ethSpentOnGas));
+            expect(finalETHVerifierTwo).to.equal(initETHVerifierTwo.add(verificationFee.mul(3).div(2)).sub(ethSpentOnGasTwo));
         });
 
        it('DAO should receive funds after diverging refuting', async function() {
-            expect(false).to.equal(true);
+            // data
+            let incorrectLeaves = ['3', '2', '1'];
+            const incorrectHashes = await computeHashes(incorrectLeaves);
 
-//            let report = await governance.reportsWaitingConfirmation(0);
-//            expect(report).to.equal(ethers.BigNumber.from("1"));
+            let incorrectLeavesTwo = ['333', '222', '111'];
+            const incorrectHashesTwo = await computeHashes(incorrectLeavesTwo);
+
+            // claim report for first verifier
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // get post claim ETH values in wallet
+            const initETHReporter = await ethers.provider.getBalance(addr2.address);
+            const initETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            // submit verification for first verifier
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            receipt = await tx.wait();
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            // advance time and processing claims
+            await advanceTime(10000);
+            await governance.connect(owner).processReportsClaimedForConfirmation(1);
+
+
+            // claim report for second verifier
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            receipt = await tx.wait();
+
+            // get post claim ETH values in wallet
+            const initETHVerifierTwo = await ethers.provider.getBalance(addr4.address);
+
+            // submit verification for second verifier
+            const initETHOwner = await ethers.provider.getBalance(owner.address);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashesTwo.paddedValues);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            const ethSpentOnGasTwo = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            const finalETHVerifierTwo = await ethers.provider.getBalance(addr4.address);
+            const finalETHReporter = await ethers.provider.getBalance(addr2.address);
+            const finalETHVerifier = await ethers.provider.getBalance(addr3.address);
+            const finalETHOwner = await ethers.provider.getBalance(owner.address);
+
+            // expect eth balances to be adjusted accordingly
+            expect(finalETHReporter).to.equal(initETHReporter); // no change for reporter
+            expect(finalETHVerifier).to.equal(initETHVerifier.sub(ethSpentOnGas));
+            expect(finalETHVerifierTwo).to.equal(initETHVerifierTwo.sub(ethSpentOnGasTwo));
+            expect(finalETHOwner).to.equal(initETHOwner.add(verificationFee.mul(3)));
         });
 
 
