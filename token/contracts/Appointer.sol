@@ -70,8 +70,8 @@ contract Appointer is Ownable {
     /// @notice Determines if role can create TaskTypes
     /// @param _roleId The ID of the role to fetch.
     /// @return Returns true if can appoint; false otherwise.
-    function canRoleCreateTaskTypes(uint256 _roleId) external view returns(bool) {
-        require(_roleId <= numRoles && _roleId != 0, "non-existant role");
+    function canRoleCreateTasks(uint256 _roleId) external view returns(bool) {
+        require(_roleId <= numRoles && _roleId != 0, "non-existant role"); // todo -- roleId 0 is default role, general
         return roles[_roleId].canCreateTaskTypes;
     }
 

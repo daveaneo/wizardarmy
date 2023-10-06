@@ -23,8 +23,10 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 // todo -- finish erc20 payments
 // todo -- finish ETH payments
 // todo -- consider ERC20, ETH withdrawals; account buildup. withdrawing excess.
-
 // todo -- in order to claim a task to do, they should also send ETH
+// todo add nonreentrant guard
+// todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
+
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
@@ -153,6 +155,7 @@ contract Governance is ReentrancyGuard, Ownable {
     function canCreateTasks(uint256 _wizId) public view returns (bool) {
         uint256 roleId = wizardsNFT.getRole(_wizId);
         return wizardsNFT.isActive(_wizId) && appointer.canRoleCreateTasks(roleId);
+//        return appointer.canRoleCreateTasks(roleId);
     }
 
     /**
@@ -298,14 +301,13 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails calldata coreDetails,
         TimeDetails calldata timeDetails,
         RoleDetails calldata roleDetails
-    ) external onlyTaskCreators(_wizardId) {
+    ) external  onlyTaskCreators(_wizardId)   {
         require(
             timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
             && roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
             && roleDetails.availableSlots != 0 // dev: must have non-zero slots
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
-
         // Ensure that the sender has approved this contract to move the payment amount on their behalf
         require(
             IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward,
@@ -325,6 +327,9 @@ contract Governance is ReentrancyGuard, Ownable {
             timeDetails: timeDetails,
             roleDetails: roleDetails
         });
+
+
+
 
         // Override specific parameters after copying from arguments
         tasks[tasksCount].coreDetails.state = coreDetails.state == TASKSTATE.PAUSED ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE;
@@ -423,7 +428,7 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
     /// @param _wizId The ID of the wizard claiming the task for verification.
-    function claimReportToVerify(uint256 _wizId) external payable onlyWizardOwner(_wizId) nonReentrant {
+    function claimReportToVerify(uint256 _wizId) external payable onlyWizardOwner(_wizId) /*nonReentrant*/ {
         // Ensure the caller is not a contract
         require(tx.origin == msg.sender,"Contracts are not allowed to claim tasks." ); // dev: "Contracts are not allowed to claim tasks."
 
@@ -461,7 +466,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _reportId The ID of the report being verified.
      * @param approve If `true`, the report is approved; otherwise, it is failed.
      */
-    function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external nonReentrant {
+    function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external /*nonReentrant*/ {
         require(tasks[reports[_reportId].taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
         if (approve){
             // todo -- handle approval
@@ -474,6 +479,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+    // todo -- send back ETH for delinquint submissions to msg.sender. Consider angle shooting of bad actors clogging up the system and redeaming this way.
     /**
      * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
      * @dev Iterates through reportsClaimedForConfirmation and handles them based on their REPORTSTATE.
@@ -481,7 +487,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * It will process up to the smaller of 'n' reports or the total length of reportsClaimedForConfirmation.
      * @param n The maximum number of reports to process from the reportsClaimedForConfirmation array.
      */
-    function processReportsClaimedForConfirmation(uint256 n) public nonReentrant {
+    function processReportsClaimedForConfirmation(uint256 n) public /*nonReentrant*/ {
         uint256 totalReportsClaimed = DoubleEndedQueue.length(reportsClaimedForConfirmation);
         uint256 toProcess = n < totalReportsClaimed ? n : totalReportsClaimed;
         uint256 processed = 0;
@@ -553,7 +559,7 @@ contract Governance is ReentrancyGuard, Ownable {
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // todo -- review
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) nonReentrant external {
+    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) /*nonReentrant*/ external {
         Report storage myReport = reports[_reportId];
         require(
             (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.CHALLENGED)

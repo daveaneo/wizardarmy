@@ -4,7 +4,7 @@
 const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
-const verificationFee = 10**9;
+const verificationFee = ethers.BigNumber.from(10**9);
 
 async function computeHashes(values) {
     // Pad each value to the desired byte length and then hash it
@@ -35,10 +35,10 @@ const advanceTime = async (seconds) => {
 describe('Governance Contract', function() {
   let Wizards, WizardTower, Governance, Appointer, Token;
   let wizards, wizardTower, governance, appointer, token;
-  let owner, addr1, addr2, otherAddrs;
+  let owner, addr1, addr2, addr3, addr4, otherAddrs;
 
   beforeEach(async () => {
-    [owner, addr1, addr2] = await ethers.getSigners();
+    [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
 
     // Deploying the CommonDefinitions Library
@@ -115,9 +115,10 @@ describe('Governance Contract', function() {
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("1")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther(".1"),
+                verificationFee: 10**9
             };
 
             timeDetails = {
@@ -141,23 +142,22 @@ describe('Governance Contract', function() {
 
         it('Created task should have correct properties', async function() {
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            let tx = await token.approve(governance.address, coreDetails.reward);
             await tx.wait();
 
-            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            tx = await token.approve(governance.address, coreDetails.reward);
+            tx = await governance.createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             const task = event.args.task;
             const taskId = event.args.taskId;
-
-//            const task = await governance.getTaskById(taskId);
 
             // Continue checking CoreDetails
             expect(task.coreDetails.IPFSHash).to.equal(coreDetails.IPFSHash);
             expect(task.coreDetails.state).to.equal(coreDetails.state);
             expect(task.coreDetails.numFieldsToHash).to.equal(coreDetails.numFieldsToHash);
             expect(task.coreDetails.taskType).to.equal(coreDetails.taskType);
-            expect(task.coreDetails.payment.toString()).to.equal(coreDetails.payment.toString()); // Convert BigNumber to string for comparison
+            expect(task.coreDetails.reward.toString()).to.equal(coreDetails.reward.toString()); // Convert BigNumber to string for comparison
 
             // Check TimeDetails
             expect(task.timeDetails.begTimestamp).to.equal(timeDetails.begTimestamp); // Convert numbers to string for comparison
@@ -186,9 +186,10 @@ describe('Governance Contract', function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("1")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther(".1"),
+                verificationFee: 10**9
             };
 
             let timeDetails = {
@@ -205,7 +206,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
             tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
@@ -216,7 +217,7 @@ describe('Governance Contract', function() {
         });
 
         it('Should decrease available slots when a task is accepted', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId);
+              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
               const receipt = await tx.wait();
 //              const event = receipt.events?.find(e => e.event === 'TaskAccepted');
 //              const taskId = event.args.taskId;
@@ -226,19 +227,19 @@ describe('Governance Contract', function() {
         });
 
         it('Should not allow a task to be accepted if no slots are available', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId);
+              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
               const receipt = await tx.wait();
 
               // Now try accepting the same task again
-              await expect(governance.acceptTask(taskId, wizardTwoId)).to.be.reverted;
+              await expect(governance.acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
         });
 
         it('Should not allow a wizard to accept same task twice before completing it first.', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId);
+              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
               const receipt = await tx.wait();
 
               // Now try accepting the same task again
-              await expect(governance.acceptTask(taskId, wizardId)).to.be.reverted;
+              await expect(governance.acceptTask(taskId, wizardId, {value: verificationFee})).to.be.reverted;
         });
 
         // todo -- wizard accepts same task after completing and after timeperiod
@@ -247,36 +248,52 @@ describe('Governance Contract', function() {
     });
 
     describe('Verification', function() {
-        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, leafHashes, finalHash, leafArray,
+        let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, leafHashes, finalHash, leafArray,
         contractSettings, verifyingWizardIdTwo;
 
 
         beforeEach(async () => {
             contractSettings = await wizards.connect(owner).contractSettings();
+            //  updateVerifier
+            let tx = await wizards.updateVerifier(governance.address);
+            await tx.wait();
 
             // Create a task as a precondition for acceptance tests
-            await wizards.connect(owner).mint(0);
+            await wizards.connect(addr1).mint(0);
             let totalWizards = await wizards.totalSupply();
-            wizardId = totalWizards.toNumber();  // Assuming the ID is a number
-            wizardRole = await wizards.getRole(wizardId);
+            creatorWizardId = totalWizards.toNumber();  // Assuming the ID is a number
 
-            await wizards.mint(0);
-            verifyingWizardId = wizardId + 1;
+            await wizards.connect(addr2).mint(0);
+            reporterWizardId = creatorWizardId + 1;
 
-            await wizards.mint(0);
-            verifyingWizardIdTwo = wizardId + 2;
+            await wizards.connect(addr3).mint(0);
+            verifyingWizardId = creatorWizardId + 2;
 
-            await wizards.initiate(wizardId, {value: contractSettings.initiationCost});
-            await wizards.initiate(verifyingWizardId, {value: contractSettings.initiationCost});
-            await wizards.initiate(verifyingWizardIdTwo, {value: contractSettings.initiationCost});
+            await wizards.connect(addr4).mint(0);
+            verifyingWizardIdTwo = creatorWizardId + 3;
 
+            await wizards.connect(addr1).initiate(creatorWizardId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr2).initiate(reporterWizardId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr3).initiate(verifyingWizardId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr4).initiate(verifyingWizardIdTwo, {value: contractSettings.initiationCost});
+
+            // assign creatorWizardId to creator Role
+            tx = await appointer.createRole("first_creator", true, 1, []);
+            let receipt = await tx.wait();
+            let event = receipt.events?.find(e => e.event === 'RoleCreated');
+            let creatorRoleId = event.args.roleId;
+
+
+            tx = await appointer.appointAsAdmin(creatorWizardId, creatorRoleId);
+            await tx.wait();
 
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther("0"),
+                verificationFee: 10**9
             };
 
             let timeDetails = {
@@ -287,24 +304,27 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 10  // Example number of slots
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
+            let numRoles = await appointer.numRoles();
+            let creatorWizard = await wizards.getStatsGivenId(creatorWizardId);
 
-            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
-            let receipt = await tx.wait();
-            let event = receipt.events?.find(e => e.event === 'NewTaskCreated');
+            //  create Task
+            tx = await governance.connect(addr1).createTask(creatorWizardId, coreDetails, timeDetails, roleDetails);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
             taskId = event.args.taskId;
 
             // accept task
-            tx = await governance.acceptTask(taskId, wizardId);
+            tx = await governance.connect(addr2).acceptTask(taskId, reporterWizardId, {value: verificationFee}); // todo -- make this a different wizard
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'TaskAccepted');
             const reportId = event.args.reportId;
@@ -315,14 +335,9 @@ describe('Governance Contract', function() {
             leafHashes = hashes.leafHashes;
             finalHash = hashes.finalHash;
 
-
             // complete task
-            const res = await governance.completeTask(reportId, finalHash, wizardId);
+            const res = await governance.connect(addr2).completeTask(reportId, finalHash, reporterWizardId);
 
-            // set verifier of wizards contract
-//            updateVerifier
-            tx = await wizards.updateVerifier(governance.address);
-            await tx.wait();
 
         });
 
@@ -333,7 +348,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification assignment works with one task.', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
@@ -342,12 +357,12 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should succeed with correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
 
@@ -358,14 +373,14 @@ describe('Governance Contract', function() {
         });
 
         it('Verification should fail with incorrect values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
             const incorrectHashes = await computeHashes(['3', '2', '1']);
 
-            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
 
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
@@ -376,15 +391,15 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification with consensus returns correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
             let incorrectLeaves = ['3', '2', '1'];
-            let hexlifiedLeaves = incorrectLeaves.map(leaf => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(leaf)), 32));
+            let hexlifiedLeaves = incorrectLeaves.map(leaf => ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(leaf)), 32)); // todo -- add this to docs?
             const incorrectHashes = await computeHashes(incorrectLeaves);
-            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             let reportState = event.args.reportState;
@@ -411,13 +426,14 @@ describe('Governance Contract', function() {
             numClaims = await governance.reportsClaimedForConfirmationLength();
 
             //          expect this to fail
-            tx = await governance.claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
             // submit same verification
-            tx = await governance.submitVerification(verifyingWizardId, reportId, hexlifiedLeaves);
+            // todo -- this succeded using verifyingWizardId -- need a new test for this to fail
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, hexlifiedLeaves);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
@@ -426,13 +442,13 @@ describe('Governance Contract', function() {
 
 
         it('Refuted Verification without consensus returns correct values', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
             let incorrectHashes = await computeHashes(['3', '2', '1']);
-            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             let reportState = event.args.reportState;
@@ -444,14 +460,15 @@ describe('Governance Contract', function() {
             // Move report from queue
             await governance.processReportsClaimedForConfirmation(1);
 
-            tx = await governance.claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
+            // todo -- test this with verifyingWizardId (original)
             // submit same verification
             incorrectHashes = await computeHashes(['4', '5', '6']);
-            tx = await governance.submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
@@ -460,29 +477,29 @@ describe('Governance Contract', function() {
 
 
         it('Should not allow a report to be verified more than once', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             const isHashCorrect = event.args.isHashCorrect;
 
 
-            await expect(governance.submitVerification(verifyingWizardId, reportId, leafHashes))
+            await expect(governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes))
                 .to.be.reverted;
         });
 
 
         it('Should update the report state upon successful verification', async function() {
-            let tx = await governance.claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
             receipt = await tx.wait();
 
             const report = await governance.getReportById(reportId);
@@ -502,17 +519,53 @@ describe('Governance Contract', function() {
         });
 
        it('Reporter and Verifier should receive funds back on successful verification', async function() {
-            expect(false).to.equal(true);
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
 
-//            let report = await governance.reportsWaitingConfirmation(0);
-//            expect(report).to.equal(ethers.BigNumber.from("1"));
+            const initETHReporter = await ethers.provider.getBalance(addr2.address);
+            const initETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
+            receipt = await tx.wait();
+            const report = await governance.getReportById(reportId);
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            const finalETHReporter = await ethers.provider.getBalance(addr2.address);
+            const finalETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            expect(finalETHReporter).to.equal(initETHReporter.add(verificationFee));
+            expect(finalETHVerifier).to.equal(initETHVerifier.add(verificationFee).sub(ethSpentOnGas));
         });
 
        it('Reporter and second Refuter should receive extra funds on successful verification after challenge', async function() {
-            expect(false).to.equal(true);
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
 
-//            let report = await governance.reportsWaitingConfirmation(0);
-//            expect(report).to.equal(ethers.BigNumber.from("1"));
+            const initETHReporter = await ethers.provider.getBalance(addr2.address);
+            const initETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectLeaves);
+            receipt = await tx.wait();
+
+
+            tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            receipt = await tx.wait();
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectLeaves);
+            receipt = await tx.wait();
+
+
+            const report = await governance.getReportById(reportId);
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+            const finalETHReporter = await ethers.provider.getBalance(addr2.address);
+            const finalETHVerifier = await ethers.provider.getBalance(addr3.address);
+
+            expect(finalETHReporter).to.equal(initETHReporter.add(verificationFee));
+            expect(finalETHVerifier).to.equal(initETHVerifier.add(verificationFee).sub(ethSpentOnGas));
         });
 
        it('Refuters should receive extra funds after converging/agreeing refuting', async function() {
@@ -573,9 +626,10 @@ describe('Governance Contract', function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther("0"),
+                verificationFee: 10**9
             };
 
             let timeDetails = {
@@ -592,7 +646,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
             tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
@@ -602,7 +656,7 @@ describe('Governance Contract', function() {
             taskId = event.args.taskId;
 
             // accept task
-            tx = await governance.acceptTask(taskId, taskDoerId);
+            tx = await governance.acceptTask(taskId, taskDoerId, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'TaskAccepted');
             reportId = event.args.reportId;
@@ -664,9 +718,10 @@ describe('Governance Contract', function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther("0"),
+                verificationFee: 10**9
             };
 
             let timeDetails = {
@@ -683,7 +738,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
@@ -693,9 +748,10 @@ describe('Governance Contract', function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
-                numFieldsToHash: 3,  // Example value
+                numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
-                payment: ethers.utils.parseEther("0")  // 1 ETH in Wei
+                reward: ethers.utils.parseEther("0"),
+                verificationFee: 10**9
             };
 
             let timeDetails = {
@@ -712,7 +768,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.payment);
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
