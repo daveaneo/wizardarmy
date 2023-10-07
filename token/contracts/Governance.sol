@@ -607,6 +607,7 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+    // todo -- consider sending in a packed bytes and hashing that, instead of hashing all the values separately.
     // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
@@ -626,9 +627,8 @@ contract Governance is ReentrancyGuard, Ownable {
         }
 
         bytes32 myHash = keccak256(abi.encodePacked(_fields));
-        uint256 hashIsCorrect = myReport.hash == myHash ? 1 : 0;
 
-        bool reportVerified = (hashIsCorrect == 1);
+        bool reportVerified = (myReport.hash == myHash);
         bool reportNotChallenged = (myReport.reportState == REPORTSTATE.SUBMITTED);
         bool hashMatchesRefuter = (myReport.refuterHash == myHash);
 
