@@ -76,7 +76,8 @@ contract Governance is ReentrancyGuard, Ownable {
         REPORTSTATE reportState;
         uint16 reporterID; // wizard ID of reported
         uint16 verifierID; // wizardId of Verifier
-        uint16 refuterID; // wizardId of Verifier
+        uint16 refuterID; // wizardId of first Refuter
+        uint16 secondRefuterID; // wizardId of second Refuter
         bytes32 hash; // hashed input to be validated
         bytes32 refuterHash; // correct hash according to refuter
         uint128 taskId;
@@ -575,13 +576,16 @@ contract Governance is ReentrancyGuard, Ownable {
         emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
     }
 
-    function handleRefutedConvergenceReport(uint256 secondRefuterId, uint256 _reportId) internal {
+    function handleRefutedConvergenceReport(uint256 _secondRefuterId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
         uint256 split = tasks[myReport.taskId].coreDetails.verificationFee*3/2;
         address payable firstRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
 
+        myReport.verifierID = 0;
+        myReport.secondRefuterID = uint16(_secondRefuterId);
+
         wizardsNFT.increaseProtectedUntilTimestamp(myReport.refuterID, taskVerificationTimeBonus);
-        wizardsNFT.increaseProtectedUntilTimestamp(secondRefuterId, taskVerificationTimeBonus);
+        wizardsNFT.increaseProtectedUntilTimestamp(_secondRefuterId, taskVerificationTimeBonus);
 
         if(split > 0 ){
             // send to task submitter
@@ -593,31 +597,37 @@ contract Governance is ReentrancyGuard, Ownable {
             require(sent, "sending failed"); // dev: "Failed to send Ether"
         }
         myReport.reportState = REPORTSTATE.REFUTED_CONSENSUS;
-        emit VerificationSubmitted(secondRefuterId, _reportId, myReport.reportState);
+        emit VerificationSubmitted(_secondRefuterId, _reportId, myReport.reportState);
     }
 
-    function handleRefutedDisagreementReport(uint256 _wizId, uint256 _reportId) internal {
-            Report storage myReport = reports[_reportId];
-            // send ETH to DAO
-            uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
-            if(split > 0){
-                (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
-                require(sent, "sending failed"); // dev: "Failed to send Ether"
-            }
+    function handleRefutedDisagreementReport(uint256 _secondRefuterId, uint256 _reportId) internal {
+        Report storage myReport = reports[_reportId];
 
-            myReport.reportState = REPORTSTATE.REFUTED_DISAGREEMENT;
-            emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
+        myReport.verifierID = 0;
+        myReport.secondRefuterID = uint16(_secondRefuterId);
+
+        // send ETH to DAO
+        uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
+        if(split > 0){
+            (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+        }
+
+        myReport.reportState = REPORTSTATE.REFUTED_DISAGREEMENT;
+        emit VerificationSubmitted(_secondRefuterId, _reportId, myReport.reportState);
     }
 
 
-    function handleChallengedReport(uint256 _wizId, uint256 _reportId, bytes32 myHash) internal {
-            Report storage myReport = reports[_reportId];
-            myReport.refuterID=uint16(_wizId);
-            myReport.refuterHash=myHash;
-            myReport.reportState = REPORTSTATE.CHALLENGED;
-            // report is now in the queue and we have to wait until enough time is cleared.
-            // processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
-            emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
+    function handleChallengedReport(uint256 _refuterId, uint256 _reportId, bytes32 myHash) internal {
+        Report storage myReport = reports[_reportId];
+        myReport.refuterID=uint16(_refuterId);
+        myReport.refuterHash=myHash;
+        myReport.reportState = REPORTSTATE.CHALLENGED;
+        myReport.verifierID = 0;
+
+        // report is now in the queue and we have to wait until enough time is cleared.
+        // processReportsClaimedForConfirmation(CLAIMED_REPORTS_TO_PROCESS);
+        emit VerificationSubmitted(_refuterId, _reportId, myReport.reportState);
     }
 
 
