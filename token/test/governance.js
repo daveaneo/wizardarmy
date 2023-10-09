@@ -6,10 +6,14 @@ const { ethers } = require('hardhat');
 
 const verificationFee = ethers.BigNumber.from(10**9);
 
+//
 //async function computeHashes(values) {
+//    let paddedValues = [];  // Array to store the padded values
+//
 //    // Pad each value to the desired byte length and then hash it
 //    const leafHashes = values.map(value => {
 //        let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
+//        paddedValues.push(paddedValue);  // Add the padded value to the array
 //        return ethers.utils.keccak256(paddedValue);
 //    });
 //
@@ -20,6 +24,7 @@ const verificationFee = ethers.BigNumber.from(10**9);
 //    const finalHash = ethers.utils.keccak256(concatenatedHashes);
 //
 //    return {
+//        paddedValues,
 //        leafHashes,
 //        finalHash
 //    };
@@ -27,27 +32,32 @@ const verificationFee = ethers.BigNumber.from(10**9);
 
 
 async function computeHashes(values) {
-    let paddedValues = [];  // Array to store the padded values
+    // Convert each value to a hex string and concatenate them together
+    const paddedValues = values.reduce((acc, value) => {
+        return acc + ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32).slice(2);
+    }, "0x");
 
-    // Pad each value to the desired byte length and then hash it
-    const leafHashes = values.map(value => {
-        let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
-        paddedValues.push(paddedValue);  // Add the padded value to the array
-        return ethers.utils.keccak256(paddedValue);
-    });
+    // Generate the first hash from the concatenated hex string
+    const leafHashes = ethers.utils.keccak256(paddedValues);
 
-    // Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
-    const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
-
-    // Produce a final hash of the concatenated string
-    const finalHash = ethers.utils.keccak256(concatenatedHashes);
+    // Generate the second hash from the first hash
+    const finalHash = ethers.utils.keccak256(leafHashes);
 
     return {
         paddedValues,
         leafHashes,
         finalHash
     };
+
+    // todo -- adjust to this naming convention
+    //    return {
+    //        concatenatedHexValues,
+    //        firstHash,
+    //        secondHash
+    //    };
+
 }
+
 
 
 const advanceTime = async (seconds) => {
@@ -362,8 +372,6 @@ describe('Governance Contract', function() {
 
             // complete task
             const res = await governance.connect(addr2).completeTask(reportId, finalHash, reporterWizardId);
-
-
         });
 
         it('Verification fails with incorrect payment.', async function() {

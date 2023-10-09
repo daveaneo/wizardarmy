@@ -607,26 +607,19 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-    // todo -- consider sending in a packed bytes and hashing that, instead of hashing all the values separately.
     // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
     // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
     // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
-    function submitVerification(uint256 _wizId, uint256 _reportId, bytes32[] memory _fields) onlyWizardOwner(_wizId) /*nonReentrant*/ external {
+    function submitVerification(uint256 _wizId, uint256 _reportId, bytes memory _Hash) onlyWizardOwner(_wizId) /*nonReentrant*/ external {
         Report storage myReport = reports[_reportId];
         require(
             (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.CHALLENGED)
-            && tasks[myReport.taskId].coreDetails.numFieldsToHash == _fields.length
         );
 
-        // if refuted, we want to hash the leaves
-        if(myReport.reportState == REPORTSTATE.CHALLENGED){  // equivalently, myReport.refuterID >
-            for(uint256 i = 0; i < _fields.length;){
-                _fields[i] = keccak256(abi.encodePacked(_fields[i]));
-                unchecked{++i;}
-            }
-        }
+        // single hash if not challenged, doublehash otherwise
+        bytes32 myHash = (myReport.reportState == REPORTSTATE.CHALLENGED)
+            ? keccak256(abi.encodePacked(keccak256(abi.encodePacked(_Hash)))) : keccak256(abi.encodePacked(_Hash));
 
-        bytes32 myHash = keccak256(abi.encodePacked(_fields));
 
         bool reportVerified = (myReport.hash == myHash);
         bool reportNotChallenged = (myReport.reportState == REPORTSTATE.SUBMITTED);
