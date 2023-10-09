@@ -518,41 +518,19 @@ contract Governance is ReentrancyGuard, Ownable {
             ){
                 // Remove the front element from reportsClaimedForConfirmation
                 DoubleEndedQueue.popFront(reportsClaimedForConfirmation);
-                continue; // todo -- make sure all processing has been done. Some processing will need to be done when task is closed.
             }
             else if(report.reportState == REPORTSTATE.CHALLENGED && report.verifierID == 0){
                 // Remove the front element from reportsClaimedForConfirmation
                 DoubleEndedQueue.popFront(reportsClaimedForConfirmation);
                 reportsWaitingConfirmation.push(reportId);
-                continue;
             }
-            else if (report.verificationReservedTimestamp > block.timestamp) {
+            else if (block.timestamp >= report.verificationReservedTimestamp) {
+                // Remove the front element from reportsClaimedForConfirmation
+                DoubleEndedQueue.popFront(reportsClaimedForConfirmation);
+                handleReportPastDeadline(reportId);
+            }
+            else {
                 break;
-            }
-
-            // Remove the front element from reportsClaimedForConfirmation
-            DoubleEndedQueue.popFront(reportsClaimedForConfirmation);
-
-            // Check the state of the report
-            if (report.reportState == REPORTSTATE.SUBMITTED) {
-                // Handle the case where the report was submitted but time ran out
-                handleReportPastDeadline(reportId);
-            } else if (report.reportState == REPORTSTATE.CHALLENGED) {
-                // Handle the refuted state
-//                reportsWaitingConfirmation.push(reportId);
-                // handleRefutedReport(reportId);
-                handleReportPastDeadline(reportId);
-            } else if (report.reportState == REPORTSTATE.VERIFIED) {
-                // Handle the verified state
-//                handleVerifiedReport(report.verifierID, reportId); // todo this isn't good
-            } else if (report.reportState == REPORTSTATE.REFUTED_CONSENSUS) {
-                // Handle the failed state
-//                reportsWaitingConfirmation.push(reportId);
-            } else if (report.reportState == REPORTSTATE.REFUTED_DISAGREEMENT) {
-                // Handle the failed state
-//                reportsWaitingConfirmation.push(reportId);
-            } else {
-                //this should never happen
             }
 
             unchecked {
@@ -567,7 +545,7 @@ contract Governance is ReentrancyGuard, Ownable {
         // Implementation for handling SUBMITTED state
         reportsWaitingConfirmation.push(reportId);
         address payable receiver = payable(msg.sender==wizardsNFT.ownerOf(reports[reportId].verifierID) ? owner() : msg.sender);
-        (bool sent, bytes memory data) = receiver.call{value: tasks[reports[reportId].reporterID].coreDetails.verificationFee}("");
+        (bool sent, bytes memory data) = receiver.call{value: tasks[reports[reportId].taskId].coreDetails.verificationFee}("");
         require(sent, "sending failed"); // dev: "Failed to send Ether"
     }
 

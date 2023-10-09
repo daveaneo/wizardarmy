@@ -282,7 +282,7 @@ describe('Governance Contract', function() {
 
     describe('Verification', function() {
         let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, concatenatedHexValues, firstHash, secondHash, leafArray,
-        contractSettings, verifyingWizardIdTwo;
+        contractSettings, verifyingWizardIdTwo, coreDetails;
 
 
         beforeEach(async () => {
@@ -320,7 +320,7 @@ describe('Governance Contract', function() {
             tx = await appointer.appointAsAdmin(creatorWizardId, creatorRoleId);
             await tx.wait();
 
-            let coreDetails = {
+            coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
@@ -530,6 +530,126 @@ describe('Governance Contract', function() {
             const report = await governance.getReportById(reportId);
 
             expect(report.reportState).to.equal(5);
+        });
+
+
+        it('Unfinished, unchalleged report returns funds to DAO/owner when processed by verifier', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+
+            const ownerETHBefore = await ethers.provider.getBalance(owner.address);
+
+            // Move report from queue
+            await governance.connect(addr3).processReportsClaimedForConfirmation(1);
+            const ownerETHAfter = await ethers.provider.getBalance(owner.address);
+
+            expect(ownerETHBefore.add(coreDetails.verificationFee)).to.equal(ownerETHAfter);
+        });
+
+
+        it('Unfinished, challenged report returns funds to DAO/owner when processed by verifier', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            let incorrectHashes = await computeHashes(['3', '2', '1']);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            let reportState = event.args.reportState;
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+
+            // Move report from queue
+            await governance.processReportsClaimedForConfirmation(1);
+
+            // second claim
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+            const ownerETHBefore = await ethers.provider.getBalance(owner.address);
+
+            // Move report from queue
+            await governance.connect(addr4).processReportsClaimedForConfirmation(1);
+            const ownerETHAfter = await ethers.provider.getBalance(owner.address);
+
+            expect(ownerETHBefore.add(coreDetails.verificationFee)).to.equal(ownerETHAfter);
+        });
+
+
+
+        it('Unfinished, unchallenged report returns funds to non-verifier when processed by non-verifier', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+
+            const otherETHBefore = await ethers.provider.getBalance(addr4.address);
+
+            // Move report from queue
+            tx = await governance.connect(addr4).processReportsClaimedForConfirmation(1);
+            receipt = await tx.wait();
+            const report = await governance.getReportById(reportId);
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            const otherETHAfter = await ethers.provider.getBalance(addr4.address);
+
+            expect(otherETHBefore.add(coreDetails.verificationFee).sub(ethSpentOnGas)).to.equal(otherETHAfter);
+
+        });
+
+        it('Unfinished, challenged report returns funds to sender when processed by non-verifier', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            let incorrectHashes = await computeHashes(['3', '2', '1']);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            let reportState = event.args.reportState;
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+
+            // Move report from queue
+            await governance.processReportsClaimedForConfirmation(1);
+
+            // second claim
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+            const addrThreeETHBefore = await ethers.provider.getBalance(addr3.address);
+
+            // Move report from queue
+            tx = await governance.connect(addr3).processReportsClaimedForConfirmation(1);
+            receipt = await tx.wait();
+            const report = await governance.getReportById(reportId);
+            const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+            const addrThreeETHAfter = await ethers.provider.getBalance(addr3.address);
+
+            expect(addrThreeETHBefore.add(coreDetails.verificationFee).sub(ethSpentOnGas)).to.equal(addrThreeETHAfter);
+
         });
 
 
