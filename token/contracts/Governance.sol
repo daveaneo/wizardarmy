@@ -20,11 +20,9 @@ import './libraries/Address.sol';
 import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
-// todo -- finish erc20 payments
-// todo -- finish ETH payments
+// todo -- finish erc20 payments -- this involves playing w/ TASKTYPEs
 // todo add nonreentrant guard
 // todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
-
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
@@ -71,7 +69,6 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails coreDetails;
     }
 
-    // todo -- add eth paid as field -- or we can have it saved in the task, which will cause less changes
     struct Report {
         REPORTSTATE reportState;
         uint16 reporterID; // wizard ID of reported
@@ -101,9 +98,10 @@ contract Governance is ReentrancyGuard, Ownable {
     uint256 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
 
     uint256 immutable verificationTime = 30*60; // 30 minutes
-    // todo -- Adjustable
-    uint40 taskVerificationTimeBonus = 1 days; // 1 day
+    uint40 taskVerificationTimeBonus = 1 days; // 1 day     // todo -- Adjustable ?
     uint256 verificationFee = 10**9; // todo -- adjustable?
+    // todo -- todo -- currently, there is a problem because we are storing verification fee in tasks while also expecting users to send the fee before they know the task. The verification fee seems to need to be universal.
+    // todo -- if it is adjustable on a contract level, there will be issues
 
 //    /// @notice Emitted for testing hash functionality.
 //    /// @param hash The hash being tested.
