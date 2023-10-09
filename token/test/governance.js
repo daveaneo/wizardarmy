@@ -5,6 +5,15 @@ const { expect } = require('chai');
 const { ethers } = require('hardhat');
 
 const verificationFee = ethers.BigNumber.from(10**9);
+const REPORTSTATE = {
+    ACTIVE: 0,
+    SUBMITTED: 1,
+    CHALLENGED: 2,
+    REFUTED_CONSENSUS: 3,
+    REFUTED_DISAGREEMENT: 4,
+    VERIFIED: 5
+};
+
 
 //
 //async function computeHashes(values) {
@@ -33,32 +42,22 @@ const verificationFee = ethers.BigNumber.from(10**9);
 
 async function computeHashes(values) {
     // Convert each value to a hex string and concatenate them together
-    const paddedValues = values.reduce((acc, value) => {
+    const concatenatedHexValues = values.reduce((acc, value) => {
         return acc + ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32).slice(2);
     }, "0x");
 
     // Generate the first hash from the concatenated hex string
-    const leafHashes = ethers.utils.keccak256(paddedValues);
+    const firstHash = ethers.utils.keccak256(concatenatedHexValues);
 
     // Generate the second hash from the first hash
-    const finalHash = ethers.utils.keccak256(leafHashes);
+    const secondHash = ethers.utils.keccak256(firstHash);
 
     return {
-        paddedValues,
-        leafHashes,
-        finalHash
+        concatenatedHexValues,
+        firstHash,
+        secondHash
     };
-
-    // todo -- adjust to this naming convention
-    //    return {
-    //        concatenatedHexValues,
-    //        firstHash,
-    //        secondHash
-    //    };
-
 }
-
-
 
 const advanceTime = async (seconds) => {
     await network.provider.send("evm_increaseTime", [seconds])
@@ -282,7 +281,7 @@ describe('Governance Contract', function() {
     });
 
     describe('Verification', function() {
-        let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, paddedValues, leafHashes, finalHash, leafArray,
+        let taskId, task, creatorWizardId, reporterWizardId, verifyingWizardId, roleDetails, reportId, concatenatedHexValues, firstHash, secondHash, leafArray,
         contractSettings, verifyingWizardIdTwo;
 
 
@@ -366,12 +365,12 @@ describe('Governance Contract', function() {
             // create hash
             leafArray = ['1', '2', '3'];
             const hashes = await computeHashes(leafArray);
-            paddedValues = hashes.paddedValues;
-            leafHashes = hashes.leafHashes;
-            finalHash = hashes.finalHash;
+            concatenatedHexValues = hashes.concatenatedHexValues;
+            firstHash = hashes.firstHash;
+            secondHash = hashes.secondHash;
 
             // complete task
-            const res = await governance.connect(addr2).completeTask(reportId, finalHash, reporterWizardId);
+            const res = await governance.connect(addr2).completeTask(reportId, secondHash, reporterWizardId);
         });
 
         it('Verification fails with incorrect payment.', async function() {
@@ -395,12 +394,12 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
 
             const reportState = event.args.reportState;
-            expect(reportState).to.equal(5);
+            expect(reportState).to.equal(REPORTSTATE.VERIFIED);
 
 
         });
@@ -413,13 +412,13 @@ describe('Governance Contract', function() {
 
             const incorrectHashes = await computeHashes(['3', '2', '1']);
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
 
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
 
             const reportState = event.args.reportState;
-            expect(reportState).to.equal(2);
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
         });
 
 
@@ -431,12 +430,12 @@ describe('Governance Contract', function() {
 
             let incorrectLeaves = ['3', '2', '1'];
             const incorrectHashes = await computeHashes(incorrectLeaves);
-            let hexlifiedLeaves = incorrectHashes.paddedValues;
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            let hexlifiedLeaves = incorrectHashes.concatenatedHexValues;
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             let reportState = event.args.reportState;
-            expect(reportState).to.equal(2);
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
 
             let reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
             let numClaims = await governance.reportsClaimedForConfirmationLength();
@@ -470,7 +469,7 @@ describe('Governance Contract', function() {
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
-            expect(reportState).to.equal(3);
+            expect(reportState).to.equal(REPORTSTATE.REFUTED_CONSENSUS);
         });
 
 
@@ -481,11 +480,11 @@ describe('Governance Contract', function() {
             reportId = event.args.reportId;
 
             let incorrectHashes = await computeHashes(['3', '2', '1']);
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             let reportState = event.args.reportState;
-            expect(reportState).to.equal(2);
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
 
             // Advance the blockchain by 1 hour (3600 seconds)
             await advanceTime(10000);
@@ -501,11 +500,11 @@ describe('Governance Contract', function() {
             // todo -- test this with verifyingWizardId (original)
             // submit same verification
             incorrectHashes = await computeHashes(['4', '5', '6']);
-            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
-            expect(reportState).to.equal(4);
+            expect(reportState).to.equal(REPORTSTATE.REFUTED_DISAGREEMENT);
         });
 
 
@@ -515,13 +514,13 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             const isHashCorrect = event.args.isHashCorrect;
 
 
-            await expect(governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes))
+            await expect(governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash))
                 .to.be.reverted;
         });
 
@@ -532,7 +531,7 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash);
             receipt = await tx.wait();
 
             const report = await governance.getReportById(reportId);
@@ -560,7 +559,7 @@ describe('Governance Contract', function() {
             const initETHReporter = await ethers.provider.getBalance(addr2.address);
             const initETHVerifier = await ethers.provider.getBalance(addr3.address);
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash);
             receipt = await tx.wait();
             const report = await governance.getReportById(reportId);
             const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -583,7 +582,7 @@ describe('Governance Contract', function() {
             let incorrectLeaves = ['3', '2', '1'];
             const incorrectHashes = await computeHashes(incorrectLeaves);
 
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
 
             await advanceTime(10000);
@@ -593,7 +592,7 @@ describe('Governance Contract', function() {
             receipt = await tx.wait();
             const initETHVerifier = await ethers.provider.getBalance(addr4.address);
 
-            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, paddedValues);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, concatenatedHexValues);
             receipt = await tx.wait();
 
             const report = await governance.getReportById(reportId);
@@ -622,7 +621,7 @@ describe('Governance Contract', function() {
             const initETHVerifier = await ethers.provider.getBalance(addr3.address);
 
             // submit verification for first verifier
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
             const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
@@ -639,7 +638,7 @@ describe('Governance Contract', function() {
             const initETHVerifierTwo = await ethers.provider.getBalance(addr4.address);
 
             // submit verification for second verifier
-            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.paddedValues);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.concatenatedHexValues);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             const ethSpentOnGasTwo = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -673,7 +672,7 @@ describe('Governance Contract', function() {
             const initETHVerifier = await ethers.provider.getBalance(addr3.address);
 
             // submit verification for first verifier
-            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.leafHashes);
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
             receipt = await tx.wait();
             const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
 
@@ -691,7 +690,7 @@ describe('Governance Contract', function() {
 
             // submit verification for second verifier
             const initETHOwner = await ethers.provider.getBalance(owner.address);
-            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashesTwo.paddedValues);
+            tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashesTwo.concatenatedHexValues);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             const ethSpentOnGasTwo = receipt.gasUsed.mul(receipt.effectiveGasPrice);
@@ -714,7 +713,7 @@ describe('Governance Contract', function() {
 
 
     describe('Verification with restrictedTo', function() {
-        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, leafHashes, finalHash, leafArray,
+        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, firstHash, secondHash, leafArray,
         contractSettings, taskDoerId, taskDoerRole;
 
 
@@ -790,11 +789,11 @@ describe('Governance Contract', function() {
             // create hash
             leafArray = ['1', '2', '3'];
             const hashes = await computeHashes(leafArray);
-            leafHashes = hashes.leafHashes;
-            finalHash = hashes.finalHash;
+            firstHash = hashes.firstHash;
+            secondHash = hashes.secondHash;
 
             // complete task
-            const res = await governance.completeTask(reportId, finalHash, taskDoerId);
+            const res = await governance.completeTask(reportId, secondHash, taskDoerId);
 
             // set verifier of wizards contract
 //            updateVerifier
@@ -813,7 +812,7 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
 
-            expect(reportState).to.equal(5);
+            expect(reportState).to.equal(REPORTSTATE.VERIFIED);
         });
 
         it('Verification with false produces expected event', async function() {
@@ -822,7 +821,7 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
 
-            expect(reportState).to.equal(3);
+            expect(reportState).to.equal(REPORTSTATE.REFUTED_CONSENSUS);
         });
     }); // end describe
 

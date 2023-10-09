@@ -22,8 +22,6 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 
 // todo -- finish erc20 payments
 // todo -- finish ETH payments
-// todo -- consider ERC20, ETH withdrawals; account buildup. withdrawing excess.
-// todo -- in order to claim a task to do, they should also send ETH
 // todo add nonreentrant guard
 // todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
 
@@ -328,9 +326,6 @@ contract Governance is ReentrancyGuard, Ownable {
             roleDetails: roleDetails
         });
 
-
-
-
         // Override specific parameters after copying from arguments
         tasks[tasksCount].coreDetails.state = coreDetails.state == TASKSTATE.PAUSED ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE;
         tasks[tasksCount].roleDetails.creatorRole = uint16(wizardsNFT.getRole(_wizardId));
@@ -479,6 +474,24 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+
+
+
+    /*
+     Brainstorm.
+     What goes into the deque? Only report numbers that are for general verifying. They get there either by
+        claiming ( and not doing anything) -- needs to be removed and ETH sent back to caller (if not verifier).
+        challenging ( needs to be moved over)
+        verifying (needs to be removed)
+        Refuted (needs to be removed)
+
+    We also have to have clear states so we know if reports are past deadline or not.
+
+     */
+
+//    enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
+
+
     // todo -- send back ETH for delinquint submissions to msg.sender. Consider angle shooting of bad actors clogging up the system and redeaming this way.
     // todo -- reconsider what we do with these. What scenarios are we going to have and how do we deal with them?
     /**
@@ -498,6 +511,7 @@ contract Governance is ReentrancyGuard, Ownable {
             Report storage report = reports[reportId];
 
             // If the report's verification timestamp hasn't passed yet, break out of the loop
+//            if (report.reportState != REPORTSTATE.)
             if (report.verificationReservedTimestamp > block.timestamp) {
                 break;
             }
@@ -614,6 +628,7 @@ contract Governance is ReentrancyGuard, Ownable {
         Report storage myReport = reports[_reportId];
         require(
             (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.CHALLENGED)
+            && myReport.verificationReservedTimestamp > block.timestamp
         );
 
         // single hash if not challenged, doublehash otherwise

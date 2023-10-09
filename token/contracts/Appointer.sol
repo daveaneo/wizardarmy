@@ -61,8 +61,8 @@ contract Appointer is Ownable {
     /// @param _appointeeRoleId The ID of the role that is delegated.
     /// @return Returns true if can delegate given role; false otherwise.
     function canDelegateRole(uint256 _appointerRoleId, uint256 _appointeeRoleId) external view returns(bool) {
-        require(_appointerRoleId <= numRoles && _appointerRoleId != 0); // dev: "non-existant role"
-        require(_appointeeRoleId <= numRoles && _appointeeRoleId != 0); // dev: "non-existant role"
+        require(_appointerRoleId <= numRoles); // dev: "non-existant role"
+        require(_appointeeRoleId <= numRoles); // dev: "non-existant role"
         return roles[_appointerRoleId].canCreateTaskTypes && canAppoint[_appointerRoleId][_appointeeRoleId];
     }
 
@@ -71,7 +71,7 @@ contract Appointer is Ownable {
     /// @param _roleId The ID of the role to fetch.
     /// @return Returns true if can appoint; false otherwise.
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool) {
-        require(_roleId <= numRoles && _roleId != 0, "non-existant role"); // todo -- roleId 0 is default role, general
+        require(_roleId <= numRoles);
         return roles[_roleId].canCreateTaskTypes;
     }
 
