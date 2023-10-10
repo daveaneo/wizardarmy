@@ -232,7 +232,6 @@ describe('Governance Contract', function() {
             await wizards.connect(addr1).mint(0);
             let totalWizards = await wizards.totalSupply();
             wizardId = totalWizards.toNumber();  // Assuming the ID is a number
-            wizardRole = await wizards.getRole(wizardId);
             await wizards.connect(addr2).mint(0);
             wizardTwoId = wizardId + 1;
 
@@ -266,7 +265,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 1  // Example number of slots
             };
@@ -878,7 +877,7 @@ describe('Governance Contract', function() {
 
 
     describe('Verification with restrictedTo', function() {
-        let taskId, task, wizardId, verifyingWizardId, wizardRole, roleDetails, reportId, firstHash, secondHash, leafArray,
+        let taskId, task, creatorWizardId, verifyingWizardId, wizardRole, roleDetails, reportId, firstHash, secondHash, leafArray,
         contractSettings, taskDoerId, taskDoerRole;
 
 
@@ -888,29 +887,37 @@ describe('Governance Contract', function() {
             let wizAppointer = await wizards.appointer();
 
             // Create a task as a precondition for acceptance tests
-            await wizards.connect(owner).mint(0);
+            await wizards.connect(addr1).mint(0);
             let totalWizards = await wizards.totalSupply();
-            wizardId = totalWizards.toNumber();  // Assuming the ID is a number
-            wizardRole = await wizards.getRole(wizardId);
+            creatorWizardId = totalWizards.toNumber();  // Assuming the ID is a number
+            wizardRole = await wizards.getRole(creatorWizardId);
 
-            await wizards.mint(0);
-            verifyingWizardId = wizardId + 1;
+            await wizards.connect(addr2).mint(0);
+            taskDoerId = creatorWizardId + 1;
 
-            await wizards.mint(0);
-            taskDoerId = wizardId + 2;
+            await wizards.connect(addr3).mint(0);
+            verifyingWizardId = creatorWizardId + 2;
 
-            await wizards.initiate(wizardId, {value: contractSettings.initiationCost});
-            await wizards.initiate(verifyingWizardId, {value: contractSettings.initiationCost});
-            await wizards.initiate(taskDoerId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr1).initiate(creatorWizardId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr2).initiate(taskDoerId, {value: contractSettings.initiationCost});
+            await wizards.connect(addr3).initiate(verifyingWizardId, {value: contractSettings.initiationCost});
 
-            let tx = await appointer.createRole("test_role", false, 1, []);
+            let tx = await appointer.connect(owner).createRole("creator_role", true, 2, []);
             let receipt = await tx.wait();
             let event = receipt.events?.find(e => e.event === 'RoleCreated');
+            let creatorRoleId = event.args.roleId;
+
+
+            tx = await appointer.connect(owner).createRole("test_role", false, 1, []);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'RoleCreated');
             let newRoleId = event.args.roleId;
 
             let isActive = await wizards.isActive(taskDoerId);
 
-            await appointer.appointAsAdmin(taskDoerId, newRoleId);
+            await appointer.connect(owner).appointAsAdmin(taskDoerId, newRoleId);
+            await appointer.connect(owner).appointAsAdmin(creatorWizardId, creatorRoleId);
+            await appointer.connect(owner).appointAsAdmin(verifyingWizardId, creatorRoleId);
             taskDoerRole = await wizards.getRole(taskDoerId);
 
             let coreDetails = {
@@ -930,23 +937,23 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: taskDoerRole,  // Example role ID
                 availableSlots: 10  // Example number of slots
             };
 
             // Approve the allowance
-            tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
-            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            tx = await governance.connect(addr1).createTask(creatorWizardId, coreDetails, timeDetails, roleDetails);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
             taskId = event.args.taskId;
 
             // accept task
-            tx = await governance.acceptTask(taskId, taskDoerId, {value: verificationFee});
+            tx = await governance.connect(addr2).acceptTask(taskId, taskDoerId, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'TaskAccepted');
             reportId = event.args.reportId;
@@ -958,21 +965,21 @@ describe('Governance Contract', function() {
             secondHash = hashes.secondHash;
 
             // complete task
-            const res = await governance.completeTask(reportId, secondHash, taskDoerId);
+            const res = await governance.connect(addr2).completeTask(reportId, secondHash, taskDoerId);
 
             // set verifier of wizards contract
 //            updateVerifier
-            tx = await wizards.updateVerifier(governance.address);
+            tx = await wizards.connect(owner).updateVerifier(governance.address);
             await tx.wait();
 
         });
 
         it('Task can not be claimed.', async function() {
-            await expect(governance.claimReportToVerify(verifyingWizardId, {value: verificationFee})).to.be.reverted;
+            await expect(governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee})).to.be.reverted;
         });
 
         it('Verification with true produces expected event', async function() {
-            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, true);
+            let tx = await governance.connect(addr3).verifyRestrictedTask(verifyingWizardId, reportId, true);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;
@@ -981,7 +988,7 @@ describe('Governance Contract', function() {
         });
 
         it('Verification with false produces expected event', async function() {
-            let tx = await governance.verifyRestrictedTask(verifyingWizardId, reportId, false);
+            let tx = await governance.connect(addr3).verifyRestrictedTask(verifyingWizardId, reportId, false);
             let receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
             reportState = event.args.reportState;

@@ -36,6 +36,7 @@ contract Governance is ReentrancyGuard, Ownable {
     Wizards wizardsNFT;
     WizardTower wizardTower;
     IAppointer public appointer;
+    address public DAOAddres;
 
     enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
     enum TASKSTATE { ACTIVE, PAUSED, ENDED }
@@ -98,8 +99,8 @@ contract Governance is ReentrancyGuard, Ownable {
 
     uint256 immutable verificationTime = 30*60; // 30 minutes
 
-    uint16 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
-    uint40 taskVerificationTimeBonus = 1 days; // 1 day     // todo -- Adjustable ?
+    uint16 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process
+    uint40 taskVerificationTimeBonus = 1 days; // 1 day
     uint128 verificationFee = 10**9;
 
 
@@ -271,6 +272,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _value The new value for CLAIMED_REPORTS_TO_PROCESS.
      */
     function setClaimedReportsToProcess(uint16 _value) external onlyOwner {
+        require(CLAIMED_REPORTS_TO_PROCESS != _value);
         CLAIMED_REPORTS_TO_PROCESS = _value;
     }
 
@@ -279,6 +281,7 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _value The new value for taskVerificationTimeBonus in seconds.
      */
     function setTaskVerificationTimeBonus(uint40 _value) external onlyOwner {
+        require(taskVerificationTimeBonus != _value);
         taskVerificationTimeBonus = _value;
     }
 
@@ -287,7 +290,18 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param _value The new value for verificationFee.
      */
     function setVerificationFee(uint128 _value) external onlyOwner {
+        require(verificationFee != _value);
         verificationFee = _value;
+    }
+
+
+    /**
+     * @notice Set the value for the DAO address.
+     * @param _DAOAddress The new DAO Address for verificationFee.
+     */
+    function setDAOAddress(address _DAOAddress) external onlyOwner {
+        require(_DAOAddress != DAOAddres);
+        DAOAddres = payable(_DAOAddress);
     }
 
 
@@ -303,6 +317,7 @@ contract Governance is ReentrancyGuard, Ownable {
         wizardsNFT = Wizards(_nft);
         wizardTower = WizardTower(_wizardTower);
         appointer = IAppointer(_appointer);
+        DAOAddres = payable(msg.sender);
     }
 
     // Required to receive ETH
@@ -317,7 +332,7 @@ contract Governance is ReentrancyGuard, Ownable {
     ) external  onlyTaskCreators(_wizardId)   {
         require(
             timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
-            && roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole // todo -- role 0?
+            && roleDetails.creatorRole !=0 &&  roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole
             && roleDetails.availableSlots != 0 // dev: must have non-zero slots
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
@@ -441,7 +456,6 @@ contract Governance is ReentrancyGuard, Ownable {
         return reportsCount;
     }
 
-    // todo -- add info in report to store eth fee paid -- maybe
     /// @notice Allows a wizard to claim a random task for verification.
     /// @dev The function ensures the caller is not a contract, randomly selects a report for verification,
     /// moves the report from reportsWaitingConfirmation to reportsClaimed, and updates the verifierID of the report.
@@ -572,7 +586,7 @@ contract Governance is ReentrancyGuard, Ownable {
     function handleVerifiedReport(uint256 _wizId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
         // if refuterId exists, then refuter gets no refund
-        uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2; // todo -- test
+        uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2;
         address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.reporterID));
 
         wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
@@ -624,7 +638,7 @@ contract Governance is ReentrancyGuard, Ownable {
         // send ETH to DAO
         uint256 split = tasks[myReport.taskId].coreDetails.verificationFee *3;
         if(split > 0){
-            (bool sent, bytes memory data) = owner().call{value: split}(""); // todo -- decide on how to structure DAO address
+            (bool sent, bytes memory data) = DAOAddres.call{value: split}("");
             require(sent, "sending failed"); // dev: "Failed to send Ether"
         }
 
