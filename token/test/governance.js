@@ -417,7 +417,7 @@ describe('Governance Contract', function() {
             taskId = event.args.taskId;
 
             // accept task
-            tx = await governance.connect(addr2).acceptTask(taskId, reporterWizardId, {value: verificationFee}); // todo -- make this a different wizard
+            tx = await governance.connect(addr2).acceptTask(taskId, reporterWizardId, {value: verificationFee});
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'TaskAccepted');
             const reportId = event.args.reportId;
@@ -482,6 +482,56 @@ describe('Governance Contract', function() {
         });
 
 
+        it('Verification should fail when wrong wizard tries to submit report values', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            const incorrectHashes = await computeHashes(['3', '2', '1']);
+
+            await expect(governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, firstHash)).to.be.reverted;
+        });
+
+        it('Refuted Verification with consensus fails with correct values from initial verifier', async function() {
+            //  claim report
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+
+            // attempt to verify with incorrect report
+            let incorrectLeaves = ['3', '2', '1'];
+            const incorrectHashes = await computeHashes(incorrectLeaves);
+            let hexlifiedLeaves = incorrectHashes.concatenatedHexValues;
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, incorrectHashes.firstHash);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationSubmitted');
+            let reportState = event.args.reportState;
+            expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
+
+            let reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
+            let numClaims = await governance.reportsClaimedForConfirmationLength();
+            let claimInfo = await governance.reportsClaimedForConfirmationValue(0);
+
+
+            // Advance the blockchain by 1 hour (3600 seconds)
+            await advanceTime(10000);
+            // Move report from queue
+            await governance.processReportsClaimedForConfirmation(1);
+
+            // claim report
+            tx = await governance.connect(addr4).claimReportToVerify(verifyingWizardIdTwo, {value: verificationFee});
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            // submit verification
+            await expect(governance.connect(addr3).submitVerification(verifyingWizardId, reportId, hexlifiedLeaves)).to.be.reverted;
+        });
+
+
         it('Refuted Verification with consensus returns correct values', async function() {
             //  claim report
             let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
@@ -517,7 +567,6 @@ describe('Governance Contract', function() {
             reportId = event.args.reportId;
 
             // submit same verification
-            // todo -- this succeded using verifyingWizardId -- need a new test for this to fail
             tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, hexlifiedLeaves);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'VerificationSubmitted');

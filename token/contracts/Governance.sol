@@ -511,24 +511,6 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-
-
-
-    /*
-     Brainstorm.
-     What goes into the deque? Only report numbers that are for general verifying. They get there either by
-        claiming ( and not doing anything) -- needs to be removed and ETH sent back to caller (if not verifier).
-        challenging ( needs to be moved over)
-        verifying (needs to be removed)
-        Refuted (needs to be removed)
-
-    We also have to have clear states so we know if reports are past deadline or not.
-
-     */
-
-//    enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
-
-
     /**
      * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
      * @dev Iterates through reportsClaimedForConfirmation and handles them based on their REPORTSTATE.
@@ -668,7 +650,10 @@ contract Governance is ReentrancyGuard, Ownable {
         require(
             (myReport.reportState == REPORTSTATE.SUBMITTED || myReport.reportState == REPORTSTATE.CHALLENGED)
             && myReport.verificationReservedTimestamp > block.timestamp
+            && myReport.verifierID == _wizId
         );
+
+        // we need to make sure the right wizard is verifying it
 
         // single hash if not challenged, doublehash otherwise
         bytes32 myHash = (myReport.reportState == REPORTSTATE.CHALLENGED)
