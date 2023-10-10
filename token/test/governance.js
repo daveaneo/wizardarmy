@@ -267,7 +267,7 @@ describe('Governance Contract', function() {
             roleDetails = {
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 1  // Example number of slots
+                availableSlots: 2  // Example number of slots
             };
 
             // Approve the allowance
@@ -290,8 +290,11 @@ describe('Governance Contract', function() {
         });
 
         it('Should not allow a task to be accepted if no slots are available', async function() {
-              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
-              const receipt = await tx.wait();
+              let tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
+              let receipt = await tx.wait();
+
+              tx = await governance.connect(addr1).acceptTask(taskId, wizardId, {value: verificationFee});
+              receipt = await tx.wait();
 
               // Now try accepting the same task again
               await expect(governance.acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
@@ -313,7 +316,6 @@ describe('Governance Contract', function() {
               await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
         });
 
-
         it('Should not allow a wizard to accept a task without the full verificationFee.', async function() {
               await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: coreDetails.verificationFee-1})).to.be.reverted;
         });
@@ -324,11 +326,18 @@ describe('Governance Contract', function() {
               const receipt = await tx.wait();
         });
 
+        it('Should be able to accept task again after wait time', async function() {
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
+              tx.wait();
+              advanceTime(timeDetails.waitTime*2);
+              await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
+        });
 
-
-
-        // todo -- wizard accepts same task after completing and after timeperiod
-        // todo -- wizard accepts same task after completing and but not after timeperiod -- fail
+        it('Should not be able to accept task again before wait time', async function() {
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
+              tx.wait();
+              await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
+        });
 
     });
 
