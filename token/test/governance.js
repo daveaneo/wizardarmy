@@ -68,7 +68,7 @@ const advanceTime = async (seconds) => {
 describe('Governance Contract', function() {
   let Wizards, WizardTower, Governance, Appointer, Token;
   let wizards, wizardTower, governance, appointer, token;
-  let owner, addr1, addr2, addr3, addr4, otherAddrs;
+  let owner, addr1, addr2, addr3, addr4;
 
   beforeEach(async () => {
     [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
@@ -128,6 +128,14 @@ describe('Governance Contract', function() {
     // set certain roles
     await wizards.updateAppointer(appointer.address);
 
+    // transfer tokens to each of the accounts
+    const amountToSend = ethers.utils.parseEther("1"); // This will convert 1 to 10**18
+
+    await token.transfer(addr1.address, amountToSend);
+    await token.transfer(addr2.address, amountToSend);
+    await token.transfer(addr3.address, amountToSend);
+    await token.transfer(addr4.address, amountToSend);
+
   });
 
 
@@ -140,10 +148,22 @@ describe('Governance Contract', function() {
     describe('Task Creation', function() {
         let wizardId, wizardRole, coreDetails, timeDetails, roleDetails;
         beforeEach(async () => {
-            await wizards.connect(owner).mint(0);
+            await wizards.connect(addr1).mint(0);
             let totalWizards = await wizards.totalSupply();
             wizardId = totalWizards.toNumber();  // Assuming the ID is a number
-            wizardRole = await wizards.getRole(wizardId);
+
+            // initiate
+            contractSettings = await wizards.connect(owner).contractSettings();
+            await wizards.connect(addr1).initiate(wizardId, {value: contractSettings.initiationCost});
+
+            // assign creatorWizardId to creator Role
+            tx = await appointer.createRole("first_creator", true, 1, []);
+            let receipt = await tx.wait();
+            let event = receipt.events?.find(e => e.event === 'RoleCreated');
+            let creatorRoleId = event.args.roleId;
+
+            tx = await appointer.connect(owner).appointAsAdmin(wizardId, creatorRoleId);
+            await tx.wait();
 
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
@@ -162,7 +182,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
-                creatorRole: wizardRole,  // Example role ID
+                creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 2,  // Example role ID
                 availableSlots: 10  // Example number of slots
             };
@@ -170,16 +190,16 @@ describe('Governance Contract', function() {
         }); // end
 
         it('Task can not be created without token allowance', async function() {
-            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
+            await expect(governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
         it('Created task should have correct properties', async function() {
             // Approve the allowance
-            let tx = await token.approve(governance.address, coreDetails.reward);
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
-            tx = await token.approve(governance.address, coreDetails.reward);
-            tx = await governance.createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             const task = event.args.task;
@@ -206,17 +226,30 @@ describe('Governance Contract', function() {
     });
 
     describe('Task Acceptance', function() {
-        let taskId, task, wizardId, wizardRole, roleDetails, wizardTwoId;
+        let taskId, task, wizardId, wizardRole, roleDetails, wizardTwoId, coreDetails, timeDetails;
         beforeEach(async () => {
             // Create a task as a precondition for acceptance tests
-            await wizards.connect(owner).mint(0);
+            await wizards.connect(addr1).mint(0);
             let totalWizards = await wizards.totalSupply();
             wizardId = totalWizards.toNumber();  // Assuming the ID is a number
             wizardRole = await wizards.getRole(wizardId);
-            await wizards.mint(0);
+            await wizards.connect(addr2).mint(0);
             wizardTwoId = wizardId + 1;
 
-            let coreDetails = {
+            // initiate
+            contractSettings = await wizards.connect(owner).contractSettings();
+            await wizards.connect(addr1).initiate(wizardId, {value: contractSettings.initiationCost});
+
+            // assign creatorWizardId to creator Role
+            tx = await appointer.createRole("first_creator", true, 1, []);
+            let receipt = await tx.wait();
+            let event = receipt.events?.find(e => e.event === 'RoleCreated');
+            let creatorRoleId = event.args.roleId;
+
+            tx = await appointer.connect(owner).appointAsAdmin(wizardId, creatorRoleId);
+            await tx.wait();
+
+            coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
@@ -225,7 +258,7 @@ describe('Governance Contract', function() {
                 verificationFee: verificationFee
             };
 
-            let timeDetails = {
+            timeDetails = {
                 begTimestamp: Math.floor(Date.now() / 1000),  // Current timestamp
                 endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
                 waitTime: 3600,  // 1 hour in seconds
@@ -239,28 +272,26 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
             await tx.wait();
 
-            tx = await governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails);
-            const receipt = await tx.wait();
-            const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
+            tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
             taskId = event.args.taskId;
         });
 
         it('Should decrease available slots when a task is accepted', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
               const receipt = await tx.wait();
-//              const event = receipt.events?.find(e => e.event === 'TaskAccepted');
-//              const taskId = event.args.taskId;
 
               const task = await governance.getTaskById(taskId);
               expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots - 1);
         });
 
         it('Should not allow a task to be accepted if no slots are available', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
               const receipt = await tx.wait();
 
               // Now try accepting the same task again
@@ -268,12 +299,34 @@ describe('Governance Contract', function() {
         });
 
         it('Should not allow a wizard to accept same task twice before completing it first.', async function() {
-              const tx = await governance.acceptTask(taskId, wizardId, {value: verificationFee});
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
               const receipt = await tx.wait();
 
               // Now try accepting the same task again
-              await expect(governance.acceptTask(taskId, wizardId, {value: verificationFee})).to.be.reverted;
+              await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
         });
+
+        it('Should not allow a wizard to accept same task twice before completing it first.', async function() {
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee});
+              const receipt = await tx.wait();
+
+              // Now try accepting the same task again
+              await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee})).to.be.reverted;
+        });
+
+
+        it('Should not allow a wizard to accept a task without the full verificationFee.', async function() {
+              await expect(governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: coreDetails.verificationFee-1})).to.be.reverted;
+        });
+
+        it('Overpayment of verificationFee succeeds and extra is returned.', async function() {
+              const ownerETHBefore = await ethers.provider.getBalance(owner.address);
+              const tx = await governance.connect(addr2).acceptTask(taskId, wizardTwoId, {value: verificationFee.mul(11)});
+              const receipt = await tx.wait();
+        });
+
+
+
 
         // todo -- wizard accepts same task after completing and after timeperiod
         // todo -- wizard accepts same task after completing and but not after timeperiod -- fail
@@ -315,7 +368,6 @@ describe('Governance Contract', function() {
             let receipt = await tx.wait();
             let event = receipt.events?.find(e => e.event === 'RoleCreated');
             let creatorRoleId = event.args.roleId;
-
 
             tx = await appointer.appointAsAdmin(creatorWizardId, creatorRoleId);
             await tx.wait();

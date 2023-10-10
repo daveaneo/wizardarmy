@@ -95,20 +95,13 @@ contract Governance is ReentrancyGuard, Ownable {
 
     uint256 public tasksCount;
     uint256 public reportsCount;
-    uint256 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
 
     uint256 immutable verificationTime = 30*60; // 30 minutes
-    uint40 taskVerificationTimeBonus = 1 days; // 1 day     // todo -- Adjustable ?
-    uint256 verificationFee = 10**9; // todo -- adjustable?
-    // todo -- todo -- currently, there is a problem because we are storing verification fee in tasks while also expecting users to send the fee before they know the task. The verification fee seems to need to be universal.
-    // todo -- if it is adjustable on a contract level, there will be issues
 
-//    /// @notice Emitted for testing hash functionality.
-//    /// @param hash The hash being tested.
-//    /// @param isHashCorrect Boolean indicating if the hash is correct.
-//    /// @param firstEncoded The encoded version of the hash.
-//    /// @param firstUnencoded The unencoded version of the hash.
-//    event HashTesting(bytes32 hash, bool isHashCorrect, bytes32 firstEncoded, bytes firstUnencoded);
+    uint16 CLAIMED_REPORTS_TO_PROCESS = 5; // max claimed reports/iterations to process // todo -- updateable
+    uint40 taskVerificationTimeBonus = 1 days; // 1 day     // todo -- Adjustable ?
+    uint128 verificationFee = 10**9;
+
 
     /// @notice Emitted when a new task is created.
     /// @param task The new task that was created.
@@ -152,7 +145,6 @@ contract Governance is ReentrancyGuard, Ownable {
     function canCreateTasks(uint256 _wizId) public view returns (bool) {
         uint256 roleId = wizardsNFT.getRole(_wizId);
         return wizardsNFT.isActive(_wizId) && appointer.canRoleCreateTasks(roleId);
-//        return appointer.canRoleCreateTasks(roleId);
     }
 
     /**
@@ -274,6 +266,30 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
+    /**
+     * @notice Set the value for CLAIMED_REPORTS_TO_PROCESS.
+     * @param _value The new value for CLAIMED_REPORTS_TO_PROCESS.
+     */
+    function setClaimedReportsToProcess(uint16 _value) external onlyOwner {
+        CLAIMED_REPORTS_TO_PROCESS = _value;
+    }
+
+    /**
+     * @notice Set the value for taskVerificationTimeBonus.
+     * @param _value The new value for taskVerificationTimeBonus in seconds.
+     */
+    function setTaskVerificationTimeBonus(uint40 _value) external onlyOwner {
+        taskVerificationTimeBonus = _value;
+    }
+
+    /**
+     * @notice Set the value for verificationFee.
+     * @param _value The new value for verificationFee.
+     */
+    function setVerificationFee(uint128 _value) external onlyOwner {
+        verificationFee = _value;
+    }
+
 
     //////////////////////////////
     //////  Main Functions ///////
@@ -327,6 +343,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Override specific parameters after copying from arguments
         tasks[tasksCount].coreDetails.state = coreDetails.state == TASKSTATE.PAUSED ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE;
+        tasks[tasksCount].coreDetails.verificationFee = verificationFee;
         tasks[tasksCount].roleDetails.creatorRole = uint16(wizardsNFT.getRole(_wizardId));
 
         emit NewTaskCreated(tasksCount, tasks[tasksCount]);
@@ -344,7 +361,7 @@ contract Governance is ReentrancyGuard, Ownable {
     function acceptTask(uint256 _taskId, uint16 _wizId) onlyWizardOwner(_wizId) external payable returns(uint256) {
         require(_taskId <= tasksCount && _taskId != 0, "invalid task"); // dev: invalid task
         // Ensure that the sent ETH matches the verificationFee
-        require(msg.value == tasks[_taskId].coreDetails.verificationFee, "Incorrect ETH amount sent.");
+        require(msg.value >= tasks[_taskId].coreDetails.verificationFee, "Incorrect ETH amount sent.");
 
         Task memory myTask = tasks[_taskId];
 
@@ -364,6 +381,13 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // Update the nextEligibleTime for the wizard
         nextEligibleTime[_taskId][_wizId] = uint40(block.timestamp + myTask.timeDetails.waitTime);
+
+        // reimburse extra ETH -- this is because vericationFee will change and we won't know how much to send.
+
+        if (msg.value > tasks[_taskId].coreDetails.verificationFee){
+            (bool sent, bytes memory data) = msg.sender.call{value: msg.value - tasks[_taskId].coreDetails.verificationFee}("");
+            require(sent, "sending failed"); // dev: "Failed to send Ether"
+        }
 
         // Create a report and emit the event
         return createReport(_wizId, _taskId);
@@ -491,8 +515,6 @@ contract Governance is ReentrancyGuard, Ownable {
 //    enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
 
 
-    // todo -- send back ETH for delinquint submissions to msg.sender. Consider angle shooting of bad actors clogging up the system and redeaming this way.
-    // todo -- reconsider what we do with these. What scenarios are we going to have and how do we deal with them?
     /**
      * @notice Processes reports that have been claimed for confirmation, up to a maximum number.
      * @dev Iterates through reportsClaimedForConfirmation and handles them based on their REPORTSTATE.
