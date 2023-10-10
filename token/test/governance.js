@@ -193,6 +193,18 @@ describe('Governance Contract', function() {
             await expect(governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
+        it('Should not allow task for creatorRole that does not exist', async function() {
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            await tx.wait();
+
+            let newRoleDetails = roleDetails;
+            newRoleDetails.creatorRole = 99;
+
+            await expect(governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, newRoleDetails)).to.be.reverted;
+        });
+
+
+
         it('Created task should have correct properties', async function() {
             // Approve the allowance
             let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
@@ -599,7 +611,6 @@ describe('Governance Contract', function() {
             event = receipt.events?.find(e => e.event === 'VerificationAssigned');
             reportId = event.args.reportId;
 
-            // todo -- test this with verifyingWizardId (original)
             // submit same verification
             incorrectHashes = await computeHashes(['4', '5', '6']);
             tx = await governance.connect(addr4).submitVerification(verifyingWizardIdTwo, reportId, incorrectHashes.firstHash);
@@ -1130,7 +1141,6 @@ describe('Governance Contract', function() {
         });
 
 
-    // todo -- should not allow task for creatorRole that doesn't exist
 
     });
 
