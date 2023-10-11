@@ -20,7 +20,6 @@ import './libraries/Address.sol';
 import './WizardTower.sol';
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
 
-// todo -- finish erc20 payments -- this involves playing w/ TASKTYPEs
 // todo add nonreentrant guard
 // todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
 
@@ -39,7 +38,7 @@ contract Governance is ReentrancyGuard, Ownable {
     address public DAOAddres;
 
     // todo -- implement these types.
-    enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
+//    enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
     enum TASKSTATE { ACTIVE, PAUSED, ENDED }
     enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
 
@@ -60,7 +59,7 @@ contract Governance is ReentrancyGuard, Ownable {
         string IPFSHash; // holds description
         TASKSTATE state;
         uint8 numFieldsToHash;
-        TASKTYPE taskType;
+//        TASKTYPE taskType; // removed for simplicity
         uint128 reward;
         uint128 verificationFee;
     }

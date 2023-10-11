@@ -221,7 +221,7 @@ describe('Governance Contract', function() {
             expect(task.coreDetails.IPFSHash).to.equal(coreDetails.IPFSHash);
             expect(task.coreDetails.state).to.equal(coreDetails.state);
             expect(task.coreDetails.numFieldsToHash).to.equal(coreDetails.numFieldsToHash);
-            expect(task.coreDetails.taskType).to.equal(coreDetails.taskType);
+//            expect(task.coreDetails.taskType).to.equal(coreDetails.taskType);
             expect(task.coreDetails.reward.toString()).to.equal(coreDetails.reward.toString()); // Convert BigNumber to string for comparison
 
             // Check TimeDetails
