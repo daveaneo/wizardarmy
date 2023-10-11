@@ -15,6 +15,9 @@ import "./libraries/TokenURILibrary.sol";
 //import "OpenZeppelin/openzeppelin-contracts@4.6.0/contracts/token/ERC721/ERC721.sol";
 //import "estarriolvetch/ERC721Psi/contracts/ERC721Psi.sol";
 
+// todo -- create seizable or forever ban for bad actors?
+// the idea is that the wizard will be worth enough -- collateral -- so that bad action won't be worth it
+
 /// @title Interface for Reputation Contract
 /// @dev This interface describes the functions that the reputation contract should implement.
 interface IReputationContract {

@@ -342,17 +342,20 @@ contract Governance is ReentrancyGuard, Ownable {
             && roleDetails.availableSlots != 0 // dev: must have non-zero slots
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
-        // Ensure that the sender has approved this contract to move the payment amount on their behalf
-        require(
-            IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward,
-            "Token allowance not sufficient"
-        );
 
-        // Transfer the payment amount from the sender to this contract (or wherever you intend)
-        require(
-            IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.reward),
-            "Token transfer failed"
-        );
+        if(coreDetails.reward != 0){
+            // Ensure that the sender has approved this contract to move the payment amount on their behalf
+            require(
+                IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward * roleDetails.availableSlots,
+                "Token allowance not sufficient"
+            );
+
+            // Transfer the payment amount from the sender to this contract (or wherever you intend)
+            require(
+                IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.reward * roleDetails.availableSlots),
+                "Token transfer failed"
+            );
+        }
 
         tasksCount++;
 
@@ -505,13 +508,22 @@ contract Governance is ReentrancyGuard, Ownable {
      * @param approve If `true`, the report is approved; otherwise, it is failed.
      */
     function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external /*nonReentrant*/ {
-        require(tasks[reports[_reportId].taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
+        Report storage myReport = reports[_reportId];
+        require(tasks[myReport.taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
+        uint256 reward = tasks[myReport.taskId].coreDetails.reward;
         if (approve){
-            // todo -- handle approval
+            myReport.reportState = REPORTSTATE.VERIFIED;
+            // send ecosystem tokens
+            if (reward > 0 ){
+                require(
+                    IERC20(ecosystemTokens).transfer(wizardsNFT.ownerOf(myReport.reporterID), reward),
+                    "Token transfer failed"
+                );
+            }
             emit VerificationSubmitted(_wizId, _reportId, REPORTSTATE.VERIFIED);
         }
         else{
-            // todo -- handle failure
+            myReport.reportState = REPORTSTATE.REFUTED_CONSENSUS;
             emit VerificationSubmitted(_wizId, _reportId, REPORTSTATE.REFUTED_CONSENSUS);
         }
     }
@@ -580,6 +592,7 @@ contract Governance is ReentrancyGuard, Ownable {
         wizardsNFT.increaseProtectedUntilTimestamp(myReport.reporterID, tasks[myReport.taskId].timeDetails.timeBonus);
         wizardsNFT.increaseProtectedUntilTimestamp(myReport.verifierID, taskVerificationTimeBonus);
         myReport.reportState = REPORTSTATE.VERIFIED;
+        uint256 reward = tasks[myReport.taskId].coreDetails.reward;
 
         if(feeSplit > 0){
             // send to task submitter
@@ -590,6 +603,15 @@ contract Governance is ReentrancyGuard, Ownable {
             (sent, data) = msg.sender.call{value: feeSplit}("");
             require(sent, "sending failed"); // dev: "Failed to send Ether"
         }
+
+        // send ecosystem tokens
+        if (reward > 0 ){
+            require(
+                IERC20(ecosystemTokens).transfer(wizardsNFT.ownerOf(myReport.reporterID), reward),
+                "Token transfer failed"
+            );
+        }
+
         emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
     }
 

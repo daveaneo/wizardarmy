@@ -15,6 +15,10 @@ const REPORTSTATE = {
 };
 
 
+// todo -- update docs
+// todo -- test erc20 tokens received correctly for restricted non-restricted
+// todo -- test with non-reentrant
+
 //
 //async function computeHashes(values) {
 //    let paddedValues = [];  // Array to store the padded values
@@ -194,7 +198,7 @@ describe('Governance Contract', function() {
         });
 
         it('Should not allow task for creatorRole that does not exist', async function() {
-            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             let newRoleDetails = roleDetails;
@@ -207,10 +211,10 @@ describe('Governance Contract', function() {
 
         it('Created task should have correct properties', async function() {
             // Approve the allowance
-            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
@@ -283,7 +287,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
@@ -415,7 +419,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             let numRoles = await appointer.numRoles();
@@ -1006,7 +1010,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward);
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             tx = await governance.connect(addr1).createTask(creatorWizardId, coreDetails, timeDetails, roleDetails);
@@ -1098,7 +1102,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
@@ -1128,7 +1132,7 @@ describe('Governance Contract', function() {
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward);
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
             await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
