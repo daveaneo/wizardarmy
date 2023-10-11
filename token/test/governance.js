@@ -16,7 +16,6 @@ const REPORTSTATE = {
 
 
 // todo -- update docs
-// todo -- test erc20 tokens received correctly for restricted non-restricted
 // todo -- test with non-reentrant
 
 //
@@ -476,9 +475,22 @@ describe('Governance Contract', function() {
 
             const reportState = event.args.reportState;
             expect(reportState).to.equal(REPORTSTATE.VERIFIED);
-
-
         });
+
+        it('Verification succeeding sends ecosystemTokens to reporter', async function() {
+            let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
+            let receipt = await tx.wait();
+            event = receipt.events?.find(e => e.event === 'VerificationAssigned');
+            reportId = event.args.reportId;
+
+            const initBalance = await token.balanceOf(addr2.address);
+
+            tx = await governance.connect(addr3).submitVerification(verifyingWizardId, reportId, firstHash);
+            const finalBalance = await token.balanceOf(addr2.address);
+
+            expect(finalBalance).to.equal(initBalance.add(coreDetails.reward));
+        });
+
 
         it('Verification should fail with incorrect values', async function() {
             let tx = await governance.connect(addr3).claimReportToVerify(verifyingWizardId, {value: verificationFee});
@@ -944,8 +956,8 @@ describe('Governance Contract', function() {
 
 
     describe('Verification with restrictedTo', function() {
-        let taskId, task, creatorWizardId, verifyingWizardId, wizardRole, roleDetails, reportId, firstHash, secondHash, leafArray,
-        contractSettings, taskDoerId, taskDoerRole;
+        let taskId, task, creatorWizardId, verifyingWizardId, wizardRole, coreDetails, timeDetails, roleDetails,
+            reportId, firstHash, secondHash, leafArray, contractSettings, taskDoerId, taskDoerRole;
 
 
         beforeEach(async () => {
@@ -987,7 +999,7 @@ describe('Governance Contract', function() {
             await appointer.connect(owner).appointAsAdmin(verifyingWizardId, creatorRoleId);
             taskDoerRole = await wizards.getRole(taskDoerId);
 
-            let coreDetails = {
+            coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
                 state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
@@ -996,7 +1008,7 @@ describe('Governance Contract', function() {
                 verificationFee: verificationFee
             };
 
-            let timeDetails = {
+            timeDetails = {
                 begTimestamp: Math.floor(Date.now() / 1000),  // Current timestamp
                 endTimestamp: Math.floor(Date.now() / 1000) + 604800,  // One week from now
                 waitTime: 3600,  // 1 hour in seconds
@@ -1053,6 +1065,16 @@ describe('Governance Contract', function() {
 
             expect(reportState).to.equal(REPORTSTATE.VERIFIED);
         });
+
+
+        it('Verification with true yields tokens for task doer', async function() {
+            const initBalance = await token.balanceOf(addr2.address);
+            let tx = await governance.connect(addr3).verifyRestrictedTask(verifyingWizardId, reportId, true);
+            const finalBalance = await token.balanceOf(addr2.address);
+
+            expect(finalBalance).to.equal(initBalance.add(coreDetails.reward));
+        });
+
 
         it('Verification with false produces expected event', async function() {
             let tx = await governance.connect(addr3).verifyRestrictedTask(verifyingWizardId, reportId, false);
