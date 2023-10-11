@@ -31,13 +31,21 @@ The Governance contract is an advanced EVM smart contract that forms the backbon
 
 ## Enums
 
-### TASKTYPE
+[//]: # (REMOVED)
 
-- **BASIC**: Basic task type. Not repeatable. This may be removed because there's no difference with equal split.
-- **RECURRING**: Task that allows user to repeat the task after some time period.
-- **SINGLE_WINNER**: Task with a single winner. Many can claim the task, but only one will be rewarded.
-- **EQUAL_SPLIT**: Task where the payment is split equally among participants. The amount per participant per verified completion is the same regardless of participants.
-- **SHARED_SPLIT**: Task where the reward is shared based on contribution. The more verified completions, the less each contributor gets.
+[//]: # (### TASKTYPE)
+
+[//]: # ()
+[//]: # (- **BASIC**: Basic task type. Not repeatable. This may be removed because there's no difference with equal split.)
+
+[//]: # (- **RECURRING**: Task that allows user to repeat the task after some time period.)
+
+[//]: # (- **SINGLE_WINNER**: Task with a single winner. Many can claim the task, but only one will be rewarded.)
+
+[//]: # (- **EQUAL_SPLIT**: Task where the payment is split equally among participants. The amount per participant per verified completion is the same regardless of participants.)
+
+[//]: # (- **SHARED_SPLIT**: Task where the reward is shared based on contribution. The more verified completions, the less each contributor gets.)
+
 
 ### TASKSTATE
 
@@ -192,9 +200,18 @@ The contract owner can adjust various parameters of the system to ensure the smo
 
 The hashing mechanism ensures data integrity and confidentiality:
 
+### Overview 
+Data is hashed to conceal its content so that it can be verified later. The data has four stages:
+
+        dataArray, -- the data
+        concatenatedHexValues, -- hexlified, padded, and combined version of the dataArray, resulting in a single string
+        firstHash, -- a keccack256 hash of concatenatedHexValues
+        secondHash -- a keccack256 hash of firstHash
+
+### Processes
 1. **Task Creation**: Store task details on IPFS. The address hash is then stored in the task. The task also specifies the number of fields required for submission and verification.
-2. **Task Submission**: Off-chain, pad and hash the leaves/fields. Then hash the array of values. This resulting hash is sent to the blockchain for storage and future verification.
-3. **Task Verification**: During verification, submit the hashed leaves. These are hashed on-chain and compared to the original stored hash to determine if the verification is correct.
-4. **Task Refutation**: If refuted, unhashed leaves are sent to the blockchain, hashed twice, and compared to other hashes to determine if either is correct.
+2. **Task Submission**: Off-chain, pad and hash the leaves/fields into a single bytes string. Then hash the string twice. This resulting hash (secondHash) is sent to the blockchain for storage and future verification.
+3. **Task Verification**: During verification, submit the hashed leaves (firstHash). These are hashed on-chain and compared to the original stored hash to determine if the verification is correct.
+4. **Task Refutation**: If refuted, unhashed leaves (concatenatedHexValues) are sent to the blockchain where they are hashed twice, and compared to other hashes to determine if either is correct.
 
 Hashing ensures that task details remain confidential, while still allowing verification and refutation operations to be transparent.
