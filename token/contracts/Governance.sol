@@ -37,7 +37,6 @@ contract Governance is ReentrancyGuard, Ownable {
     IAppointer public appointer;
     address public DAOAddres;
 
-    // todo -- implement these types.
 //    enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
     enum TASKSTATE { ACTIVE, PAUSED, ENDED }
     enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
@@ -134,6 +133,33 @@ contract Governance is ReentrancyGuard, Ownable {
     /// @param taskId The id of the task that has ended.
     event TaskManuallyEnded(uint256 taskId);
 
+
+
+
+    /////////////////////////////
+    //////  Temp Functions ///////
+    /////////////////////////////
+
+//    /**
+//     * @notice Returns the number of reports currently in the claimed dequeue.
+//     * @return The number of reports in the claimed for confirmation queue.
+//     */
+//    function reportsClaimedForConfirmationLength() external view returns (uint256) {
+//        return DoubleEndedQueue.length(reportsClaimedForConfirmation);
+//    }
+//
+//
+//    /**
+//     * @notice Returns the number of at position n in the claimed dequeue.
+//     * @return The value of the queue at position n.
+//     */
+//    function reportsClaimedForConfirmationValue(uint256 n) external view returns (uint256) {
+//        require(n < DoubleEndedQueue.length(reportsClaimedForConfirmation), "invalid pos in deque.");
+//        return uint256(DoubleEndedQueue.at(reportsClaimedForConfirmation, n));
+//    }
+
+
+
     /////////////////////////////
     //////  Get Functions ///////
     /////////////////////////////
@@ -183,26 +209,6 @@ contract Governance is ReentrancyGuard, Ownable {
      */
     function reportsWaitingConfirmationLength() external view returns (uint256) {
         return reportsWaitingConfirmation.length;
-    }
-
-
-    // todo -- temp functions
-    /**
-     * @notice Returns the number of reports currently in the claimed dequeue.
-     * @return The number of reports in the claimed for confirmation queue.
-     */
-    function reportsClaimedForConfirmationLength() external view returns (uint256) {
-        return DoubleEndedQueue.length(reportsClaimedForConfirmation);
-    }
-
-
-    /**
-     * @notice Returns the number of at position n in the claimed dequeue.
-     * @return The value of the queue at position n.
-     */
-    function reportsClaimedForConfirmationValue(uint256 n) external view returns (uint256) {
-        require(n < DoubleEndedQueue.length(reportsClaimedForConfirmation), "invalid pos in deque.");
-        return uint256(DoubleEndedQueue.at(reportsClaimedForConfirmation, n));
     }
 
 

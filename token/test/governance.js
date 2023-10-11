@@ -524,9 +524,6 @@ describe('Governance Contract', function() {
             expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
 
             let reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
-            let numClaims = await governance.reportsClaimedForConfirmationLength();
-            let claimInfo = await governance.reportsClaimedForConfirmationValue(0);
-
 
             // Advance the blockchain by 1 hour (3600 seconds)
             await advanceTime(10000);
@@ -563,9 +560,6 @@ describe('Governance Contract', function() {
             expect(reportState).to.equal(REPORTSTATE.CHALLENGED);
 
             let reportsWaitingConf = await governance.reportsWaitingConfirmationLength();
-            let numClaims = await governance.reportsClaimedForConfirmationLength();
-            let claimInfo = await governance.reportsClaimedForConfirmationValue(0);
-
 
             // Advance the blockchain by 1 hour (3600 seconds)
             await advanceTime(10000);
