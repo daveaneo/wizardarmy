@@ -268,6 +268,8 @@ contract Governance is ReentrancyGuard, Ownable {
         // If the task is being ended, perform cleanup
         if (desiredState == TASKSTATE.ENDED) {
             // todo endTaskCleanup(_taskId); -- pay task doers?
+            // todo -- how to deal with tasks that are submitted once task state is finished?
+            // todo -- how to refund-- it should be here -- extra ecosystemTokens to creator
             emit TaskManuallyEnded(_taskId);
         }
     }
