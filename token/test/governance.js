@@ -15,32 +15,7 @@ const REPORTSTATE = {
 };
 
 
-// todo -- update docs
 // todo -- test with non-reentrant
-
-//
-//async function computeHashes(values) {
-//    let paddedValues = [];  // Array to store the padded values
-//
-//    // Pad each value to the desired byte length and then hash it
-//    const leafHashes = values.map(value => {
-//        let paddedValue = ethers.utils.hexZeroPad(ethers.utils.hexlify(ethers.BigNumber.from(value)), 32);
-//        paddedValues.push(paddedValue);  // Add the padded value to the array
-//        return ethers.utils.keccak256(paddedValue);
-//    });
-//
-//    // Concatenate all of the hashes together (remove the "0x" from subsequent hashes)
-//    const concatenatedHashes = leafHashes.reduce((acc, hash) => acc + hash.slice(2), "0x");
-//
-//    // Produce a final hash of the concatenated string
-//    const finalHash = ethers.utils.keccak256(concatenatedHashes);
-//
-//    return {
-//        paddedValues,
-//        leafHashes,
-//        finalHash
-//    };
-//}
 
 
 async function computeHashes(values) {
