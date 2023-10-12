@@ -211,8 +211,8 @@ Data is hashed to conceal its content so that it can be verified later. The data
 ### Processes
 1. **Task Creation**: Store task details on IPFS. The address hash is then stored in the task. The task also specifies the number of fields required for submission and verification.
 2. **Task Accepted**:  No hashing needed.
-3. **Task Submission**: Off-chain, pad and hash the leaves/fields into a single bytes string. Then hash the string twice. This resulting hash (secondHash) is sent to the blockchain for storage and future verification.
-4. **Task Verification**: During verification, submit the hashed leaves (firstHash). These are hashed on-chain and compared to the original stored hash to determine if the verification is correct.
-5. **Task Refutation**: If refuted, unhashed leaves (concatenatedHexValues) are sent to the blockchain where they are hashed twice, and compared to other hashes to determine if either is correct.
+3. **Report Submission**: Off-chain, pad and hash the leaves/fields into a single bytes string. Then hash the string twice. This resulting hash (secondHash) is sent to the blockchain for storage and future verification.
+4. **Report Verification**: During verification, submit the hashed leaves (firstHash). These are hashed on-chain and compared to the original stored hash to determine if the verification is correct.
+5. **Report Refutation**: If refuted, unhashed leaves (concatenatedHexValues) are sent to the blockchain where they are hashed twice, and compared to other hashes to determine if either is correct.
 
 Hashing ensures that task details remain confidential, while still allowing verification and refutation operations to be transparent.
