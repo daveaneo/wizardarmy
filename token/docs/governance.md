@@ -23,11 +23,11 @@ The Governance contract is an advanced EVM smart contract that forms the backbon
   - [Report Verification](#report-verification)
     - [Unrestricted](#unrestricted-verification)
     - [With RestrictedTo](#restricted-verification)
-- [Hashing Mechanism](#hashing-mechanism)
-- [Admin Settings](#admin-settings)
 - [Workflow](#workflow)
   - [Creating Tasks](#creating-tasks)
   - [Admin/Owner Settings](#adminowner-settings)
+- [Admin Settings](#admin-settings)
+- [Hashing Mechanism](#hashing-mechanism)
 
 ## Enums
 
