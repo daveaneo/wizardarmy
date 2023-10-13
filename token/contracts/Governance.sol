@@ -49,9 +49,10 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
     struct RoleDetails {
-        uint16 creatorRole;
-        uint16 restrictedTo; // roles that can do this task. 0 means no restriction
-        uint16 availableSlots;
+        uint16 creatorId;
+        uint128 creatorRole;
+        uint128 restrictedTo; // roles that can do this task. 0 means no restriction
+        uint16 availableSlots; // todo -- slots claimed, slots payed, total slots. make sure these are adjusted when reports fail, succeed.
     }
 
     struct CoreDetails {
@@ -254,7 +255,9 @@ contract Governance is ReentrancyGuard, Ownable {
      */
     function setTaskState(uint256 _taskId, uint256 _wizId, TASKSTATE desiredState) external {
         // Ensure that the task is not in the ENDED state or already in the desired state
-        require(tasks[_taskId].coreDetails.state != TASKSTATE.ENDED && tasks[_taskId].coreDetails.state != desiredState); // dev: "Task is ended and cannot change state or already in desired state."
+        require(tasks[_taskId].coreDetails.state != TASKSTATE.ENDED
+                && tasks[_taskId].coreDetails.state != desiredState
+                && desiredState != TASKSTATE.INACTIVE); // dev: "Task is ended and cannot change state or already in desired state."
 
         // Check if the caller is either the contract owner or has the appropriate role
         if (msg.sender != owner()) {
@@ -268,18 +271,13 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // If the task is being ended, perform cleanup
         if (desiredState == TASKSTATE.ENDED) {
-            // todo endTaskCleanup(_taskId); -- pay task doers?
-            // todo -- how to deal with tasks that are submitted once task state is finished?
-            // todo -- how to refund-- it should be here -- extra ecosystemTokens to creator
-            // todo -- update initial state of tasks/reports
-             /* todo --
-               If ended, a task can not be claimed
-                       , a report can not be further processed --- really? yes, because the money is being taken out.
-                       , perhaps the first step is to pause it and then give time before it is ended
+            // return wizardTokens to creator -- we should have creator in tasks as well as creatorRole
+            // adjust availableSlots (or whatever).
+            // refund funds
 
-
-
-            */
+            // todo -- how to deal with tasks that are submitted once task state is finished? -- verificationFee goes to DAO
+            // todo --  adjust submitVerification and verifyRestrictedTask() and processReportsClaimedForConfirmation()
+            // todo -- write tests
             emit TaskManuallyEnded(_taskId);
         }
     }
