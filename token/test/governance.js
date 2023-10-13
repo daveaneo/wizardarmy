@@ -6,12 +6,14 @@ const { ethers } = require('hardhat');
 
 const verificationFee = ethers.BigNumber.from(10**9);
 const REPORTSTATE = {
-    ACTIVE: 0,
-    SUBMITTED: 1,
-    CHALLENGED: 2,
-    REFUTED_CONSENSUS: 3,
-    REFUTED_DISAGREEMENT: 4,
-    VERIFIED: 5
+
+    INACTIVE: 0,
+    ACTIVE: 1,
+    SUBMITTED: 2,
+    CHALLENGED: 3,
+    REFUTED_CONSENSUS: 4,
+    REFUTED_DISAGREEMENT: 5,
+    VERIFIED:6
 };
 
 
@@ -145,7 +147,7 @@ describe('Governance Contract', function() {
 
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther(".1"),
@@ -240,7 +242,7 @@ describe('Governance Contract', function() {
 
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther(".1"),
@@ -372,7 +374,7 @@ describe('Governance Contract', function() {
 
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
@@ -634,7 +636,7 @@ describe('Governance Contract', function() {
 
             const report = await governance.getReportById(reportId);
 
-            expect(report.reportState).to.equal(5);
+            expect(report.reportState).to.equal(REPORTSTATE.VERIFIED);
         });
 
 
@@ -976,7 +978,7 @@ describe('Governance Contract', function() {
 
             coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
@@ -1078,7 +1080,7 @@ describe('Governance Contract', function() {
         it('Should not allow task creation with end timestamp earlier than start timestamp', async function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),
@@ -1108,7 +1110,7 @@ describe('Governance Contract', function() {
         it('Should not allow tasks with zero available slots', async function() {
             let coreDetails = {
                 IPFSHash: "QmT78zSuBmuS4z925WZfrqQ1qHaJ56DQaTfyMUF7F8ff5o",  // Example IPFS hash
-                state: 0,  // Assuming 0 is the initial state for your TASKSTATE enum
+                state: 1,  // Assuming 0 is the initial state for your TASKSTATE enum
                 numFieldsToHash: 3,
                 taskType: 1,  // Assuming 1 is a valid value for your TASKTYPE enum
                 reward: ethers.utils.parseEther("0"),

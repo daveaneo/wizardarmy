@@ -38,8 +38,8 @@ contract Governance is ReentrancyGuard, Ownable {
     address public DAOAddres;
 
 //    enum TASKTYPE {BASIC, RECURRING, SINGLE_WINNER, EQUAL_SPLIT, SHARED_SPLIT}
-    enum TASKSTATE { ACTIVE, PAUSED, ENDED }
-    enum REPORTSTATE { ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
+    enum TASKSTATE { INACTIVE, ACTIVE, PAUSED, ENDED }
+    enum REPORTSTATE { INACTIVE, ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
 
     struct TimeDetails {
         uint40 begTimestamp;
@@ -69,6 +69,7 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails coreDetails;
     }
 
+    // todo -- ideally keep this under 256
     struct Report {
         REPORTSTATE reportState;
         uint16 reporterID; // wizard ID of reported
@@ -270,6 +271,15 @@ contract Governance is ReentrancyGuard, Ownable {
             // todo endTaskCleanup(_taskId); -- pay task doers?
             // todo -- how to deal with tasks that are submitted once task state is finished?
             // todo -- how to refund-- it should be here -- extra ecosystemTokens to creator
+            // todo -- update initial state of tasks/reports
+             /* todo --
+               If ended, a task can not be claimed
+                       , a report can not be further processed --- really? yes, because the money is being taken out.
+                       , perhaps the first step is to pause it and then give time before it is ended
+
+
+
+            */
             emit TaskManuallyEnded(_taskId);
         }
     }

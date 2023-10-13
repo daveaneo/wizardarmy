@@ -49,12 +49,14 @@ The Governance contract is an advanced EVM smart contract that forms the backbon
 
 ### TASKSTATE
 
+- **INACTIVE**: Task is currently active.
 - **ACTIVE**: Task is currently active.
 - **PAUSED**: Task has been paused.
 - **ENDED**: Task has manually ended. Once ended, it cannot be restarted.
 
 ### REPORTSTATE
 
+- **INACTIVE**: Task is currently active.
 - **ACTIVE**: Report is currently active.
 - **SUBMITTED**: Report has been submitted.
 - **CHALLENGED**: Report has been challenged.
