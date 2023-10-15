@@ -165,7 +165,9 @@ describe('Governance Contract', function() {
                 creatorId: wizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 2,  // Example role ID
-                availableSlots: 10  // Example number of slots
+                maxSlots: 10,
+                claimedSlots: 0,
+                completedSlots: 0
             };
 
         }); // end
@@ -176,7 +178,7 @@ describe('Governance Contract', function() {
         });
 
         it('Should not allow task for creatorRole that does not exist', async function() {
-            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             let newRoleDetails = roleDetails;
@@ -190,10 +192,10 @@ describe('Governance Contract', function() {
 
         it('Created task should have correct properties', async function() {
             // Approve the allowance
-            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            let tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
 
             roleDetails.creatorId = wizardId;
             tx = await governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails);
@@ -218,7 +220,7 @@ describe('Governance Contract', function() {
             // Check RoleDetails
             expect(task.roleDetails.creatorRole.toString()).to.equal(roleDetails.creatorRole.toString());
             expect(task.roleDetails.restrictedTo).to.equal(roleDetails.restrictedTo);
-            expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots);
+            expect(task.roleDetails.maxSlots).to.equal(roleDetails.maxSlots);
         });
     });
 
@@ -265,11 +267,14 @@ describe('Governance Contract', function() {
                 creatorId: wizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 2  // Example number of slots
+                maxSlots: 2,
+                claimedSlots: 0,
+                completedSlots: 0
+
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             roleDetails.creatorId = wizardId;
@@ -285,7 +290,7 @@ describe('Governance Contract', function() {
               const receipt = await tx.wait();
 
               const task = await governance.getTaskById(taskId);
-              expect(task.roleDetails.availableSlots).to.equal(roleDetails.availableSlots - 1);
+              expect(task.roleDetails.claimedSlots).to.equal(roleDetails.maxSlots - 1);
         });
 
         it('Should not allow a task to be accepted if no slots are available', async function() {
@@ -399,11 +404,13 @@ describe('Governance Contract', function() {
                 creatorId: creatorWizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 10  // Example number of slots
+                maxSlots: 10,
+                claimedSlots: 0,
+                completedSlots: 0
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             let numRoles = await appointer.numRoles();
@@ -1004,11 +1011,13 @@ describe('Governance Contract', function() {
                 creatorId: creatorWizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: taskDoerRole,  // Example role ID
-                availableSlots: 10  // Example number of slots
+                maxSlots: 10,
+                claimedSlots: 0,
+                completedSlots: 0
             };
 
             // Approve the allowance
-            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             roleDetails.creatorId = creatorWizardId;
@@ -1106,11 +1115,13 @@ describe('Governance Contract', function() {
             roleDetails = {
                 creatorRole: 1,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 10  // Example number of slots
+                maxSlots: 10,
+                claimedSlots: 0,
+                completedSlots: 0
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             roleDetails.creatorId = wizardId;
@@ -1137,11 +1148,11 @@ describe('Governance Contract', function() {
             roleDetails = {
                 creatorRole: 1,  // Example role ID
                 restrictedTo: 0,  // Example role ID
-                availableSlots: 0  // Example number of slots
+                maxSlots: 0  // Example number of slots
             };
 
             // Approve the allowance
-            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
+            let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.maxSlots));
             await tx.wait();
 
             roleDetails.creatorId = wizardId;

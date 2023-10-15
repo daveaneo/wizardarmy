@@ -52,7 +52,9 @@ contract Governance is ReentrancyGuard, Ownable {
         uint16 creatorId;
         uint64 creatorRole;
         uint64 restrictedTo; // roles that can do this task. 0 means no restriction
-        uint16 availableSlots; // todo -- slots claimed, slots payed, total slots. make sure these are adjusted when reports fail, succeed.
+        uint16 maxSlots;
+        uint16 claimedSlots;
+        uint16 completedSlots;
     }
 
     struct CoreDetails {
@@ -348,20 +350,22 @@ contract Governance is ReentrancyGuard, Ownable {
         require(
             timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
             && roleDetails.creatorRole != 0 &&  roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole
-            && roleDetails.availableSlots != 0 // dev: must have non-zero slots
+            && roleDetails.maxSlots != 0 // dev: must have non-zero slots
+            && roleDetails.claimedSlots == 0 // dev: must have non-zero slots
+            && roleDetails.completedSlots == 0 // dev: must have non-zero slots
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
 
         if(coreDetails.reward != 0){
             // Ensure that the sender has approved this contract to move the payment amount on their behalf
             require(
-                IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward * roleDetails.availableSlots,
+                IERC20(ecosystemTokens).allowance(msg.sender, address(this)) >= coreDetails.reward * roleDetails.maxSlots,
                 "Token allowance not sufficient"
             );
 
             // Transfer the payment amount from the sender to this contract (or wherever you intend)
             require(
-                IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.reward * roleDetails.availableSlots),
+                IERC20(ecosystemTokens).transferFrom(msg.sender, address(this), coreDetails.reward * roleDetails.maxSlots),
                 "Token transfer failed"
             );
         }
@@ -406,12 +410,13 @@ contract Governance is ReentrancyGuard, Ownable {
                 && block.timestamp >= nextEligibleTime[_taskId][_wizId]
                 && block.timestamp >= myTask.timeDetails.begTimestamp && block.timestamp < myTask.timeDetails.endTimestamp
                 && myTask.coreDetails.state == TASKSTATE.ACTIVE
-                && myTask.roleDetails.availableSlots > 0
+                && myTask.roleDetails.maxSlots > myTask.roleDetails.claimedSlots
         , "wizard not elible"); // dev: "Wizard not eligible"
 
 
         // Decrease the available slots
-        tasks[_taskId].roleDetails.availableSlots--;
+        // todo -- consider potential overflow
+        tasks[_taskId].roleDetails.claimedSlots++;
 
         // Update the nextEligibleTime for the wizard
         nextEligibleTime[_taskId][_wizId] = uint40(block.timestamp + myTask.timeDetails.waitTime);
@@ -588,6 +593,8 @@ contract Governance is ReentrancyGuard, Ownable {
     function handleReportPastDeadline(uint256 reportId) internal {
         // Implementation for handling SUBMITTED state
         reportsWaitingConfirmation.push(reportId);
+        tasks[reports[reportId].taskId].roleDetails.claimedSlots--;
+
         address payable receiver = payable(msg.sender==wizardsNFT.ownerOf(reports[reportId].verifierID) ? owner() : msg.sender);
         (bool sent, bytes memory data) = receiver.call{value: tasks[reports[reportId].taskId].coreDetails.verificationFee}("");
         require(sent, "sending failed"); // dev: "Failed to send Ether"
@@ -595,6 +602,8 @@ contract Governance is ReentrancyGuard, Ownable {
 
     function handleVerifiedReport(uint256 _wizId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
+        tasks[myReport.taskId].roleDetails.completedSlots++;
+
         // if refuterId exists, then refuter gets no refund
         uint256 feeSplit = myReport.refuterID == 0 ? tasks[myReport.taskId].coreDetails.verificationFee : tasks[myReport.taskId].coreDetails.verificationFee * 3 /2;
         address payable taskSubmitter = payable(wizardsNFT.ownerOf(myReport.reporterID));
@@ -627,6 +636,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     function handleRefutedConvergenceReport(uint256 _secondRefuterId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
+        tasks[myReport.taskId].roleDetails.claimedSlots--;
         uint256 split = tasks[myReport.taskId].coreDetails.verificationFee*3/2;
         address payable firstRefuter = payable(wizardsNFT.ownerOf(myReport.refuterID));
 
@@ -651,6 +661,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     function handleRefutedDisagreementReport(uint256 _secondRefuterId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
+        tasks[myReport.taskId].roleDetails.claimedSlots--;
 
         myReport.verifierID = 0;
         myReport.secondRefuterID = uint16(_secondRefuterId);
