@@ -135,7 +135,7 @@ contract Governance is ReentrancyGuard, Ownable {
 
     /// @notice Emitted when a task is forcibly ended
     /// @param taskId The id of the task that has ended.
-    event TaskManuallyEnded(uint256 taskId);
+    event TaskManuallyEnded(uint256 taskId, uint256 refund);
 
 
 
@@ -248,6 +248,8 @@ contract Governance is ReentrancyGuard, Ownable {
         appointer = IAppointer(_addy);
     }
 
+
+    //todo -- consider making endTask function
     /**
      * @notice Updates the state of a specific task.
      * @dev Can only be called by the contract owner or a wizard with the appropriate role.
@@ -273,14 +275,16 @@ contract Governance is ReentrancyGuard, Ownable {
 
         // If the task is being ended, perform cleanup
         if (desiredState == TASKSTATE.ENDED) {
-            // return wizardTokens to creator -- we should have creator in tasks as well as creatorRole
-            // adjust availableSlots (or whatever).
-            // refund funds
-
-            // todo -- how to deal with tasks that are submitted once task state is finished? -- verificationFee goes to DAO
-            // todo --  adjust submitVerification and verifyRestrictedTask() and processReportsClaimedForConfirmation()
-            // todo -- write tests
-            emit TaskManuallyEnded(_taskId);
+            // return wizardTokens to creator
+            uint256 refund = (tasks[_taskId].roleDetails.maxSlots - tasks[_taskId].roleDetails.completedSlots)
+                              * tasks[_taskId].coreDetails.reward;
+            if (refund > 0){
+                require(
+                    IERC20(ecosystemTokens).transfer(wizardsNFT.ownerOf(tasks[_taskId].roleDetails.creatorId), refund),
+                    "Token transfer failed"
+                );
+            }
+            emit TaskManuallyEnded(_taskId, refund);
         }
     }
 
@@ -515,6 +519,7 @@ contract Governance is ReentrancyGuard, Ownable {
         emit VerificationAssigned(_wizId, reportId);
     }
 
+
     /**
      * @notice Allows a wizard with a specific role to verify a report for a restricted task.
      * @dev Only the owner of the specified wizard can call this function, and the wizard must have the same role as the creator of the task.
@@ -524,10 +529,15 @@ contract Governance is ReentrancyGuard, Ownable {
      */
     function verifyRestrictedTask(uint256 _wizId, uint256 _reportId, bool approve) onlyWizardOwner(_wizId) external /*nonReentrant*/ {
         Report storage myReport = reports[_reportId];
-        require(tasks[myReport.taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)); // dev: wizard must have role of assigned task
+        require((tasks[myReport.taskId].coreDetails.state == TASKSTATE.ACTIVE || tasks[myReport.taskId].coreDetails.state == TASKSTATE.PAUSED )
+                && myReport.reportState == REPORTSTATE.SUBMITTED
+                && tasks[myReport.taskId].roleDetails.creatorRole == wizardsNFT.getRole(_wizId)
+        );
+
         uint256 reward = tasks[myReport.taskId].coreDetails.reward;
         if (approve){
             myReport.reportState = REPORTSTATE.VERIFIED;
+            tasks[myReport.taskId].roleDetails.completedSlots++;
             // send ecosystem tokens
             if (reward > 0 ){
                 require(
@@ -539,6 +549,8 @@ contract Governance is ReentrancyGuard, Ownable {
         }
         else{
             myReport.reportState = REPORTSTATE.REFUTED_CONSENSUS;
+            tasks[myReport.taskId].roleDetails.claimedSlots--;
+
             emit VerificationSubmitted(_wizId, _reportId, REPORTSTATE.REFUTED_CONSENSUS);
         }
     }
