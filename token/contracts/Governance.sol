@@ -50,8 +50,8 @@ contract Governance is ReentrancyGuard, Ownable {
 
     struct RoleDetails {
         uint16 creatorId;
-        uint128 creatorRole;
-        uint128 restrictedTo; // roles that can do this task. 0 means no restriction
+        uint64 creatorRole;
+        uint64 restrictedTo; // roles that can do this task. 0 means no restriction
         uint16 availableSlots; // todo -- slots claimed, slots payed, total slots. make sure these are adjusted when reports fail, succeed.
     }
 
@@ -341,14 +341,13 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
     function createTask(
-        uint256 _wizardId,
         CoreDetails calldata coreDetails,
         TimeDetails calldata timeDetails,
         RoleDetails calldata roleDetails
-    ) external  onlyTaskCreators(_wizardId)   {
+    ) external  onlyTaskCreators(roleDetails.creatorId)   {
         require(
             timeDetails.endTimestamp > timeDetails.begTimestamp // dev: must begin before it ends
-            && roleDetails.creatorRole !=0 &&  roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole
+            && roleDetails.creatorRole != 0 &&  roleDetails.creatorRole <= appointer.numRoles() // dev: must be vaild creatorRole
             && roleDetails.availableSlots != 0 // dev: must have non-zero slots
             && coreDetails.numFieldsToHash < 9 // We need to keep this small because of for loops for confirming refuter
         );
@@ -378,7 +377,8 @@ contract Governance is ReentrancyGuard, Ownable {
         // Override specific parameters after copying from arguments
         tasks[tasksCount].coreDetails.state = coreDetails.state == TASKSTATE.PAUSED ? TASKSTATE.PAUSED : TASKSTATE.ACTIVE;
         tasks[tasksCount].coreDetails.verificationFee = verificationFee;
-        tasks[tasksCount].roleDetails.creatorRole = uint16(wizardsNFT.getRole(_wizardId));
+        tasks[tasksCount].roleDetails.creatorRole = uint16(wizardsNFT.getRole(roleDetails.creatorId));
+        tasks[tasksCount].roleDetails.creatorId = uint16(roleDetails.creatorId);
 
         emit NewTaskCreated(tasksCount, tasks[tasksCount]);
     }

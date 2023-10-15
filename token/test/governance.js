@@ -162,6 +162,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
+                creatorId: wizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 2,  // Example role ID
                 availableSlots: 10  // Example number of slots
@@ -170,7 +171,8 @@ describe('Governance Contract', function() {
         }); // end
 
         it('Task can not be created without token allowance', async function() {
-            await expect(governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
+            roleDetails.creatorId = wizardId;
+            await expect(governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
         it('Should not allow task for creatorRole that does not exist', async function() {
@@ -180,7 +182,8 @@ describe('Governance Contract', function() {
             let newRoleDetails = roleDetails;
             newRoleDetails.creatorRole = 99;
 
-            await expect(governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, newRoleDetails)).to.be.reverted;
+            roleDetails.creatorId = wizardId;
+            await expect(governance.connect(addr1).createTask(coreDetails, timeDetails, newRoleDetails)).to.be.reverted;
         });
 
 
@@ -191,7 +194,9 @@ describe('Governance Contract', function() {
             await tx.wait();
 
             tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
-            tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+
+            roleDetails.creatorId = wizardId;
+            tx = await governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails);
             const receipt = await tx.wait();
             const event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             const task = event.args.task;
@@ -257,6 +262,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
+                creatorId: wizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 2  // Example number of slots
@@ -266,7 +272,8 @@ describe('Governance Contract', function() {
             tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
-            tx = await governance.connect(addr1).createTask(wizardId, coreDetails, timeDetails, roleDetails);
+            roleDetails.creatorId = wizardId;
+            tx = await governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
@@ -389,6 +396,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
+                creatorId: creatorWizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: 0,  // Example role ID
                 availableSlots: 10  // Example number of slots
@@ -402,7 +410,8 @@ describe('Governance Contract', function() {
             let creatorWizard = await wizards.getStatsGivenId(creatorWizardId);
 
             //  create Task
-            tx = await governance.connect(addr1).createTask(creatorWizardId, coreDetails, timeDetails, roleDetails);
+            roleDetails.creatorId = creatorWizardId;
+            tx = await governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
@@ -963,7 +972,6 @@ describe('Governance Contract', function() {
             let event = receipt.events?.find(e => e.event === 'RoleCreated');
             let creatorRoleId = event.args.roleId;
 
-
             tx = await appointer.connect(owner).createRole("test_role", false, 1, []);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'RoleCreated');
@@ -993,6 +1001,7 @@ describe('Governance Contract', function() {
             };
 
             roleDetails = {
+                creatorId: creatorWizardId,  // Example role ID
                 creatorRole: creatorRoleId,  // Example role ID
                 restrictedTo: taskDoerRole,  // Example role ID
                 availableSlots: 10  // Example number of slots
@@ -1002,7 +1011,8 @@ describe('Governance Contract', function() {
             tx = await token.connect(addr1).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
-            tx = await governance.connect(addr1).createTask(creatorWizardId, coreDetails, timeDetails, roleDetails);
+            roleDetails.creatorId = creatorWizardId;
+            tx = await governance.connect(addr1).createTask(coreDetails, timeDetails, roleDetails);
             receipt = await tx.wait();
             event = receipt.events?.find(e => e.event === 'NewTaskCreated');
             task = event.args.task;
@@ -1024,7 +1034,6 @@ describe('Governance Contract', function() {
             const res = await governance.connect(addr2).completeTask(reportId, secondHash, taskDoerId);
 
             // set verifier of wizards contract
-//            updateVerifier
             tx = await wizards.connect(owner).updateVerifier(governance.address);
             await tx.wait();
 
@@ -1104,7 +1113,8 @@ describe('Governance Contract', function() {
             let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
-            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
+            roleDetails.creatorId = wizardId;
+            await expect(governance.connect(owner).createTask(coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
         it('Should not allow tasks with zero available slots', async function() {
@@ -1134,7 +1144,8 @@ describe('Governance Contract', function() {
             let tx = await token.connect(owner).approve(governance.address, coreDetails.reward.mul(roleDetails.availableSlots));
             await tx.wait();
 
-            await expect(governance.connect(owner).createTask(wizardId, coreDetails, timeDetails, roleDetails)).to.be.reverted;
+            roleDetails.creatorId = wizardId;
+            await expect(governance.connect(owner).createTask(coreDetails, timeDetails, roleDetails)).to.be.reverted;
         });
 
 
