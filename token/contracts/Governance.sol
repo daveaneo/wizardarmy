@@ -42,34 +42,36 @@ contract Governance is ReentrancyGuard, Ownable {
     enum REPORTSTATE { INACTIVE, ACTIVE, SUBMITTED, CHALLENGED, REFUTED_CONSENSUS, REFUTED_DISAGREEMENT, VERIFIED }
 
     struct TimeDetails {
-        uint40 begTimestamp;
-        uint40 endTimestamp;
-        uint24 waitTime;
-        uint24 timeBonus;
+        uint40 begTimestamp; // Start timestamp for the task
+        uint40 endTimestamp; // End timestamp for the task
+        uint24 waitTime;     // Duration to wait before the task can begin
+        uint24 timeBonus;    // Bonus time for early task completion
     }
 
     struct RoleDetails {
-        uint16 creatorId;
-        uint64 creatorRole;
-        uint64 restrictedTo; // roles that can do this task. 0 means no restriction
-        uint16 maxSlots;
-        uint16 claimedSlots;
-        uint16 completedSlots;
+        uint64 creatorRole;       // Role associated with the task's creator at time of creation
+        uint64 restrictedTo;      // Roles that can do this task (0 means no restriction)
+        uint16 creatorId;         // Identifier for the task's creator
+        uint16 maxSlots;          // Maximum number of slots for the task
+        uint16 claimedSlots;      // Number of slots that have been claimed
+        uint16 completedSlots;    // Number of slots that have been completed
     }
 
     struct CoreDetails {
-        string IPFSHash; // holds description
-        TASKSTATE state;
-        uint8 numFieldsToHash;
-//        TASKTYPE taskType; // removed for simplicity
-        uint128 reward;
-        uint128 verificationFee;
+        // Storing IPFS hash as string for simplicity. Consider converting to bytes32
+        // for gas efficiency and handle conversion off-chain.
+        // Reference: https://ethereum.stackexchange.com/questions/17094/how-to-store-ipfs-hash-using-bytes32
+        string IPFSHash;          // IPFS hash holding the task description
+        TASKSTATE state;          // Current state of the task
+        uint8 numFieldsToHash;    // Number of fields to be hashed for the task
+        uint128 reward;           // Reward for completing the task
+        uint128 verificationFee;  // Fee for verifying the task
     }
 
     struct Task {
-        TimeDetails timeDetails;
-        RoleDetails roleDetails;
-        CoreDetails coreDetails;
+        TimeDetails timeDetails;  // Details related to timing of the task
+        RoleDetails roleDetails;  // Details related to roles associated with the task
+        CoreDetails coreDetails;  // Core details of the task
     }
 
     struct Report {
