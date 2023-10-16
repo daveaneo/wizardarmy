@@ -72,17 +72,16 @@ contract Governance is ReentrancyGuard, Ownable {
         CoreDetails coreDetails;
     }
 
-    // todo -- ideally keep this under 256
     struct Report {
-        REPORTSTATE reportState;
-        uint16 reporterID; // wizard ID of reported
-        uint16 verifierID; // wizardId of Verifier
-        uint16 refuterID; // wizardId of first Refuter
-        uint16 secondRefuterID; // wizardId of second Refuter
-        bytes32 hash; // hashed input to be validated
-        bytes32 refuterHash; // correct hash according to refuter
-        uint128 taskId;
-        uint40 verificationReservedTimestamp; // time when verification period ends
+        bytes32 hash;  // 32 bytes - hashed input to be validated
+        bytes32 refuterHash;  // 32 bytes - correct hash according to refuter
+        uint128 taskId;  // 16 bytes
+        uint40 verificationReservedTimestamp;  // 5 bytes - time when verification period ends
+        uint16 reporterID;  // 2 bytes - wizard ID of reported
+        uint16 verifierID;  // 2 bytes - wizardId of Verifier
+        uint16 refuterID;  // 2 bytes - wizardId of first Refuter
+        uint16 secondRefuterID;  // 2 bytes - wizardId of second Refuter
+        REPORTSTATE reportState;  // 1 byte (represented as uint8 internally)
     }
 
     uint256[] public reportsWaitingConfirmation; // allows random selection of confirmation
@@ -93,7 +92,7 @@ contract Governance is ReentrancyGuard, Ownable {
     // The inner mapping uses a uint40 (presumably a timestamp or similar) as the key,
     // mapping to a uint256 value that represents the threshold.
     // task -> wizard -> timestamp
-    mapping (uint256 => mapping(uint256 => uint256)) internal nextEligibleTime; // todo -- compare performance if change mapping uint256 to less
+    mapping (uint256 => mapping(uint256 => uint256)) internal nextEligibleTime;
     mapping(uint256 => Task) public tasks;
     mapping (uint256 => Report) public reports;
 
@@ -419,7 +418,6 @@ contract Governance is ReentrancyGuard, Ownable {
 
 
         // Decrease the available slots
-        // todo -- consider potential overflow
         tasks[_taskId].roleDetails.claimedSlots++;
 
         // Update the nextEligibleTime for the wizard

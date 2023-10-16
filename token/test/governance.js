@@ -25,7 +25,6 @@ const TASKSTATE = {
 
 // todo -- test with non-reentrant
 
-
 async function computeHashes(values) {
     // Convert each value to a hex string and concatenate them together
     const concatenatedHexValues = values.reduce((acc, value) => {
