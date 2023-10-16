@@ -80,7 +80,7 @@ async function main() {
     });
 
     // Now deploy the Wizards contract as before:
-    const wizards = await WizardsArtifact.deploy("Wizards", "WZD", token.address, "https://gateway.pinata.cloud/ipfs/QmZomLuSbeCcwpypM6DzRXWLFj98bAoE97zhHL5b5PJCkk");
+    const wizards = await WizardsArtifact.deploy("Wizards", "WZD", token.address, "https://raw.githubusercontent.com/daveaneo/wizardarmy/master/token/wizard_army_pinata"); // todo -- add '/' or not documentation
     await wizards.deployed();
     console.log("Wizards deployed to:", wizards.address);
 
