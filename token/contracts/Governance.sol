@@ -347,6 +347,25 @@ contract Governance is ReentrancyGuard, Ownable {
     receive() external payable {
     }
 
+
+
+    /**
+     * @notice Creates a new task with the provided details.
+     * @dev This function has several checks to ensure that valid details are provided for task creation. It requires the caller to have sufficient token allowance if the task has a reward.
+     * @param coreDetails Core details required for the task including IPFSHash, task state, number of fields to hash, reward, and verification fee.
+     * @param timeDetails Time-related details for the task, including beginning and ending timestamps, wait time, and time bonus.
+     * @param roleDetails Role-related details for the task, such as creator's ID, creator's role, role restrictions, and slot details.
+     *
+     * Emits a {NewTaskCreated} event with the new task's ID and its details.
+     *
+     * Requirements:
+     * - `timeDetails.endTimestamp` must be greater than `timeDetails.begTimestamp`.
+     * - `roleDetails.creatorRole` must be valid.
+     * - `roleDetails.maxSlots` must not be zero.
+     * - `roleDetails.claimedSlots` and `roleDetails.completedSlots` must be zero.
+     * - `coreDetails.numFieldsToHash` must be less than 9 for efficient computation.
+     * - If the task has a reward (`coreDetails.reward` is not zero), the caller must have approved this contract to transfer the required amount of tokens.
+     */
     function createTask(
         CoreDetails calldata coreDetails,
         TimeDetails calldata timeDetails,
@@ -426,7 +445,6 @@ contract Governance is ReentrancyGuard, Ownable {
         nextEligibleTime[_taskId][_wizId] = uint40(block.timestamp + myTask.timeDetails.waitTime);
 
         // reimburse extra ETH -- this is because vericationFee will change and we won't know how much to send.
-
         if (msg.value > tasks[_taskId].coreDetails.verificationFee){
             (bool sent, bytes memory data) = msg.sender.call{value: msg.value - tasks[_taskId].coreDetails.verificationFee}("");
             require(sent, "sending failed"); // dev: "Failed to send Ether"
@@ -600,8 +618,14 @@ contract Governance is ReentrancyGuard, Ownable {
         }
     }
 
-
-    // Dummy function handlers for each state. You should replace these with actual implementations.
+    /**
+     * @notice Handles a report that has passed its deadline.
+     * @dev This function processes reports in the SUBMITTED state that are past their deadlines. The verification fee is sent to the appropriate party, either the contract's owner or the message sender, based on certain conditions.
+     * @param reportId The unique identifier of the report to be processed.
+     *
+     * Requirements:
+     * - Ether transfer to the recipient (either the contract's owner or the message sender) must be successful.
+     */
     function handleReportPastDeadline(uint256 reportId) internal {
         // Implementation for handling SUBMITTED state
         reportsWaitingConfirmation.push(reportId);
@@ -612,6 +636,18 @@ contract Governance is ReentrancyGuard, Ownable {
         require(sent, "sending failed"); // dev: "Failed to send Ether"
     }
 
+    /**
+     * @notice Processes a verified report, adjusting slots, handling fees, and sending out rewards.
+     * @dev This function handles the processing of reports that have been verified. It takes care of updating the completed slots count for the task, managing the verification fee split, updating protection timestamps, and sending out the appropriate rewards. The function ensures all transfers (Ether or token) are successful.
+     * @param _wizId The wizard ID involved in the verification.
+     * @param _reportId The unique identifier of the report to be processed.
+     *
+     * Emits a {VerificationSubmitted} event with the wizard's ID, the report's ID, and the report's new state.
+     *
+     * Requirements:
+     * - All Ether transfers to the task submitter and verifier must be successful.
+     * - Token transfer to the report submitter must be successful if there's a reward.
+     */
     function handleVerifiedReport(uint256 _wizId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
         tasks[myReport.taskId].roleDetails.completedSlots++;
@@ -646,6 +682,17 @@ contract Governance is ReentrancyGuard, Ownable {
         emit VerificationSubmitted(_wizId, _reportId, myReport.reportState);
     }
 
+    /**
+     * @notice Processes a report that has reached refuted consensus by both the refuters.
+     * @dev This function handles the processing of reports that have been refuted by both the initial refuter and a second refuter. The task's claimed slots count is decremented, and the verification fee is split between the two refuters. Protection timestamps for both refuters are updated. The function ensures that all Ether transfers to the refuters are successful.
+     * @param _secondRefuterId The wizard ID of the second refuter.
+     * @param _reportId The unique identifier of the report to be processed.
+     *
+     * Emits a {VerificationSubmitted} event with the second refuter's ID, the report's ID, and the report's new state.
+     *
+     * Requirements:
+     * - All Ether transfers to both refuters must be successful.
+     */
     function handleRefutedConvergenceReport(uint256 _secondRefuterId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
         tasks[myReport.taskId].roleDetails.claimedSlots--;
@@ -671,6 +718,17 @@ contract Governance is ReentrancyGuard, Ownable {
         emit VerificationSubmitted(_secondRefuterId, _reportId, myReport.reportState);
     }
 
+    /**
+     * @notice Processes a report that has been refuted by two refuters, but they disagreed on the refutation.
+     * @dev This function manages the scenario where both refuters disagree on the refutation of a report. In such cases, the claimed slots count for the task is decremented, and the entire verification fee is sent to a DAO. The function ensures that the Ether transfer to the DAO is successful.
+     * @param _secondRefuterId The wizard ID of the second refuter.
+     * @param _reportId The unique identifier of the report to be processed.
+     *
+     * Emits a {VerificationSubmitted} event with the second refuter's ID, the report's ID, and the report's new state.
+     *
+     * Requirements:
+     * - The Ether transfer to the DAO must be successful.
+     */
     function handleRefutedDisagreementReport(uint256 _secondRefuterId, uint256 _reportId) internal {
         Report storage myReport = reports[_reportId];
         tasks[myReport.taskId].roleDetails.claimedSlots--;
@@ -689,7 +747,15 @@ contract Governance is ReentrancyGuard, Ownable {
         emit VerificationSubmitted(_secondRefuterId, _reportId, myReport.reportState);
     }
 
-
+    /**
+     * @notice Handles reports that have been challenged by refuters.
+     * @dev This function updates the state of a report that has been challenged by a refuter. It sets the refuter's ID, the refutation hash, updates the report's state to CHALLENGED, and clears the verifier's ID. After processing, it emits a {VerificationSubmitted} event.
+     * @param _refuterId The wizard ID of the refuter challenging the report.
+     * @param _reportId The unique identifier of the report to be processed.
+     * @param myHash The hash value provided by the refuter for the report.
+     *
+     * Emits a {VerificationSubmitted} event with the refuter's ID, the report's ID, and the report's new state.
+     */
     function handleChallengedReport(uint256 _refuterId, uint256 _reportId, bytes32 myHash) internal {
         Report storage myReport = reports[_reportId];
         myReport.refuterID=uint16(_refuterId);
@@ -703,9 +769,29 @@ contract Governance is ReentrancyGuard, Ownable {
     }
 
 
-    // If submitted, we send in hashed leaves. The result is that it is either verified or refuted
-    // if refuted, we send in NON-hashed leaves. The result is that it is either verified, or failed. Failed has two possibilities, two refuters agree (they split funds) or all disagree
-    // @dev -- hash structure: leaves of merkle tree are hashed. Unrefuted reports must send in hashed leafs. Refuted, unhashed.
+    /**
+     * @notice Submits the verification for a given report using the provided wizard.
+     * @dev This function allows a wizard owner to submit verification for a report. Depending on the current state of the report and the provided hash, the report can be marked as verified, challenged, refuted with consensus, or refuted with disagreement.
+     *
+     * Hashing Mechanism:
+     * The function employs a two-step hashing mechanism to ensure data integrity and confidentiality. At the report submission stage, data leaves are hashed into a single bytes string off-chain. This string is then hashed twice, producing `secondHash`. When verifying a report, the hashed leaves (equivalent to `firstHash`) are provided, which are hashed again on-chain and compared to the stored hash (`secondHash`) for verification.
+     *
+     * - Data Process:
+     *   1. **dataArray**: The original data.
+     *   2. **concatenatedHexValues**: Hexlified, padded, and combined version of the dataArray, resulting in a single string.
+     *   3. **firstHash**: A keccack256 hash of `concatenatedHexValues`.
+     *   4. **secondHash**: A keccack256 hash of `firstHash`.
+     *
+     * The function ensures that:
+     * - Only the owner of the verifying wizard can call it.
+     * - The report is either in a SUBMITTED or CHALLENGED state.
+     * - The verification reserved timestamp of the report is still valid.
+     * - The verifying wizard's ID matches the report's verifier ID.
+     *
+     * @param _wizId The ID of the wizard submitting the verification.
+     * @param _reportId The ID of the report being verified.
+     * @param _Hash The verification hash (either `firstHash` or `secondHash`, depending on the report state) provided by the wizard owner.
+     */
     function submitVerification(uint256 _wizId, uint256 _reportId, bytes memory _Hash) onlyWizardOwner(_wizId) /*nonReentrant*/ external {
         Report storage myReport = reports[_reportId];
         require(
@@ -713,13 +799,9 @@ contract Governance is ReentrancyGuard, Ownable {
             && myReport.verificationReservedTimestamp > block.timestamp
             && myReport.verifierID == _wizId
         );
-
-        // we need to make sure the right wizard is verifying it
-
         // single hash if not challenged, doublehash otherwise
         bytes32 myHash = (myReport.reportState == REPORTSTATE.CHALLENGED)
             ? keccak256(abi.encodePacked(keccak256(abi.encodePacked(_Hash)))) : keccak256(abi.encodePacked(_Hash));
-
 
         bool reportVerified = (myReport.hash == myHash);
         bool reportNotChallenged = (myReport.reportState == REPORTSTATE.SUBMITTED);
@@ -734,13 +816,22 @@ contract Governance is ReentrancyGuard, Ownable {
         } else {
             handleRefutedDisagreementReport(_wizId, _reportId);
         }
-
     }
 
     //////////////////////
-    ////// Util /////
+    ////////  Util   /////
     //////////////////////
 
+    /**
+     * @notice Removes an element from an array at a specified index.
+     * @dev Efficiently removes an element by swapping it with the last element in the array, then popping the last element. This avoids the need to shift all elements, but does not preserve the original order of the array.
+     *
+     * Requirements:
+     * - The provided index must be valid and within the bounds of the array.
+     *
+     * @param arr The storage array from which the element will be removed.
+     * @param index The index of the element to be removed.
+     */
     function removeElement(uint[] storage arr, uint index) internal {
         require(index < arr.length); // dev: "Index out of bounds"
 
