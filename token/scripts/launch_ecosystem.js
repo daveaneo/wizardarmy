@@ -12,6 +12,12 @@ function getRandomUint256() {
 }
 
 
+const advanceTime = async (seconds) => {
+    await network.provider.send("evm_increaseTime", [seconds])
+    await ethers.provider.send("evm_mine");
+};
+
+
 async function main() {
     const [deployer, secondary] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
@@ -74,7 +80,7 @@ async function main() {
     });
 
     // Now deploy the Wizards contract as before:
-    const wizards = await WizardsArtifact.deploy("Wizards", "WZD", token.address, "https://gateway.pinata.cloud/ipfs/");
+    const wizards = await WizardsArtifact.deploy("Wizards", "WZD", token.address, "https://gateway.pinata.cloud/ipfs/QmZomLuSbeCcwpypM6DzRXWLFj98bAoE97zhHL5b5PJCkk");
     await wizards.deployed();
     console.log("Wizards deployed to:", wizards.address);
 
@@ -108,7 +114,8 @@ async function main() {
 
     fs.writeFileSync(path.join(__dirname, 'deployed_contracts.json'), JSON.stringify(deployedContracts, null, 2));
 
-    // Additional deployment logic if necessary...
+    // Get contract settings
+    contractSettings = await wizards.contractSettings();
 
     // mint wizard
     await wizards.mint(0); // upline id
@@ -117,6 +124,18 @@ async function main() {
     // mint wizard
     await wizards.mint(0); // upline id
     console.log("Minted a wizard for:", deployer.address);
+
+    // initiate wizard 1
+    await wizards.initiate(1, {value: contractSettings.initiationCost});
+
+    // todo -- for testing only
+    advanceTime(100000);
+
+//    let wizardStats = await wizards.getStatsGivenId(1);
+//    console.log(wizardStats)
+
+
+
 
     // Set Salt
 

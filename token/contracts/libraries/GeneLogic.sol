@@ -14,19 +14,12 @@ library GeneLogic {
      * @param wizardSalt The salt used for randomization.
      * @return result An array of four ELEMENT values representing the magic genes.
      */
-    function getMagicGenes(uint256 _wizardId, uint256 wizardSalt) public pure returns(CommonDefinitions.ELEMENT[4] memory) {
-        uint256 myRandNum = uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt)));
-
-        CommonDefinitions.ELEMENT[4] memory result;
-
-        for (uint i = 0; i < 4; i++) {
-            uint256 value = (myRandNum >> (i * 64)) % 4; // Shift by 64 bits for each number
-            result[i] = CommonDefinitions.ELEMENT(value);
-        }
-
-        return result;
+    function getMagicGenes(uint256 _wizardId, uint256 wizardSalt) public pure returns(CommonDefinitions.ELEMENT) {
+        return CommonDefinitions.ELEMENT(uint256(keccak256(abi.encodePacked(_wizardId, 'm', wizardSalt))) % 4);
     }
 
+
+    // todo -- potentially add dimensions of happiness for facial expressions
     /**
      * @notice Generates the basic genes for a given Wizard.
      * @dev Uses the keccak256 hash of the Wizard's ID and salt to generate genes.
@@ -41,7 +34,7 @@ library GeneLogic {
 
         for (uint i = 0; i < 13;) {
             unchecked {
-                genes[i] = uint8((pseudoRandNum >> (i * 19)) % 9);
+                genes[i] = uint8((pseudoRandNum >> (i * 19)) % 4);
                 ++i;
             }
         }
@@ -57,16 +50,10 @@ library GeneLogic {
      * @return result A string representing the magic genes.
      */
     function getMagicGenesString(uint256 _wizardId, uint256 wizardSalt) public pure returns(string memory) {
-        CommonDefinitions.ELEMENT[4] memory genes = getMagicGenes(_wizardId, wizardSalt);
+        CommonDefinitions.ELEMENT magicGene = getMagicGenes(_wizardId, wizardSalt);
 
         string[4] memory elements = ["F", "W", "E", "A"];
-        string memory result = "";
-
-        for (uint i = 0; i < 4; i++) {
-            result = string(abi.encodePacked(result, elements[uint(genes[i])]));
-        }
-
-        return result;
+        return string(elements[uint(magicGene)]);
     }
 
 

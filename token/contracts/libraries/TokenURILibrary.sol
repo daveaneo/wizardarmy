@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
+
+import "../helpers/console.sol";
+
+
 import "./SVGGenerator.sol";
 import "./Strings.sol";
 import "./CommonDefinitions.sol";
@@ -32,7 +36,6 @@ library TokenURILibrary {
         bool _isActive
     ) external pure returns (string memory imageURI) {
         string memory linkExtension="";
-
         // Non-SVG images
         if (wizardSalt==0 || uninitiated || _isExiled || _isActive || _myPhase < _maturityThreshold){
             if (wizardSalt == 0) {
@@ -44,7 +47,7 @@ library TokenURILibrary {
             else if (_isExiled) {
                 linkExtension = "exiled";
             }
-            else if (_isActive) {
+            else if (!_isActive) {
                 linkExtension = "inactive";
             }
 //            else if (_myPhase < _maturityThreshold) {
@@ -52,7 +55,7 @@ library TokenURILibrary {
                 linkExtension = Strings.toString(_myPhase); // todo -- add complexity to this linkExtension?
             }
 
-            imageURI = string(abi.encodePacked(_imageBaseURI, linkExtension, '.jpg'));
+            imageURI = string(abi.encodePacked(_imageBaseURI, "/", linkExtension, '.jpg'));
         }
         else {
             imageURI = SVGGenerator.getAdultWizardImage(_wizardId, wizardSalt, _myPhase, _totalPhases,

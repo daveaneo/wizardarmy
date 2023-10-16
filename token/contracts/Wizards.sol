@@ -17,6 +17,7 @@ import "./libraries/TokenURILibrary.sol";
 
 // todo -- create seizable or forever ban for bad actors?
 // the idea is that the wizard will be worth enough -- collateral -- so that bad action won't be worth it
+// todo -- consider updating times exiled
 
 /// @title Interface for Reputation Contract
 /// @dev This interface describes the functions that the reputation contract should implement.
@@ -38,7 +39,7 @@ contract Wizards is ERC721Enumerable, Ownable {
         uint256 initiationCost; // Cost in ETH to initiate NFT (after minting)
         // cull the herd and reduce to 1000... 400, and so forth? total or per role?
         uint256 maxSupply; // Max supply of NFTs
-        uint256 maxActiveWizards; // Max supply of NFTs that can be active
+        uint256 maxActiveWizards; // Max supply of NFTs that can be active. This will prevent initation.
         uint256 protectionTimeExtension; //
         uint256 exileTimePenalty; // time to wait before able to reactivate
         address ecosystemTokenAddress; // address of ecoystem token
@@ -433,6 +434,4 @@ contract Wizards is ERC721Enumerable, Ownable {
         address payable recipient = payable(owner());
         recipient.transfer(address(this).balance);
     }
-
-
 }
