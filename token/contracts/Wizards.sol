@@ -139,7 +139,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     function getStatsGivenId(uint256 _wizardId) external view returns(CommonDefinitions.WizardStats memory) {
         require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
         return tokenIdToStats[_wizardId];
-        //todo -- extended stats
+        //todo -- extended stats -- if we want to grab additional stats from other contracts, like reputation
     }
 
 
@@ -278,7 +278,6 @@ contract Wizards is ERC721Enumerable, Ownable {
       */
     function tokenURI(uint256 _wizardId) public view virtual override returns (string memory) {
         require(_exists(_wizardId)); // dev: "ERC721Metadata: URI query for nonexistent token"
-        // todo -- update image
         string memory imageURI =  TokenURILibrary.getImageURI(_wizardId, wizardSalt, getPhaseOf(_wizardId), contractSettings.totalPhases,
                                            contractSettings.maturityThreshold, contractSettings.imageBaseURI,
                                            tokenIdToStats[_wizardId].initiationTimestamp==0,  isExiled(_wizardId), isActive(_wizardId));
@@ -288,7 +287,7 @@ contract Wizards is ERC721Enumerable, Ownable {
 
     }
 
-    //    todo -- make an actual random number generator with chainlink
+    //    todo -- make an actual random number generator with chainlink -- maybe
     function setRandomNumber(uint256 _wizardSalt) external saltNotSet onlyOwner {
         wizardSalt = _wizardSalt;
         contractSettings.wizardSaltSet = true;
@@ -341,7 +340,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     /** @dev modify contract settings. Only available to owner
       * @param _imageBaseURI baseURI for images
       * @param _phaseDuration period in seconds for phases
-      * @param _protectionTimeExtension problby remove this // todo -- delete
+      * @param _protectionTimeExtension problby remove this
       * @param _initiationCost cost in ETH to initiate
       */
     function modifyContractSettings(string memory _imageBaseURI, uint256 _phaseDuration, uint256 _protectionTimeExtension, uint256 _mintCost,
