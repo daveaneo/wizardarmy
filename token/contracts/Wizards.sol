@@ -91,7 +91,7 @@ contract Wizards is ERC721Enumerable, Ownable {
       */
     function hasDeserted(uint256 _wizardId) public view returns(bool) {
         require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
-        return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp ==0;
+        return tokenIdToStats[_wizardId].protectedUntilTimestamp < block.timestamp && tokenIdToStats[_wizardId].initiationTimestamp !=0;
     }
 
 
@@ -149,10 +149,17 @@ contract Wizards is ERC721Enumerable, Ownable {
       */
     function getPhaseOf(uint256 _wizardId) public view returns(uint256) {
         require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
-        uint256 phase =
-          (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
-          > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
-          ;
+        uint256 phase;
+
+        if (tokenIdToStats[_wizardId].initiationTimestamp == 0){
+            phase = 0;
+        }
+        else{
+            phase =
+              (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration
+              > (contractSettings.totalPhases - 1) ? (contractSettings.totalPhases - 1) : (block.timestamp - tokenIdToStats[_wizardId].initiationTimestamp) / contractSettings.phaseDuration;
+        }
+
         return phase;
     }
 
@@ -192,7 +199,7 @@ contract Wizards is ERC721Enumerable, Ownable {
             ecosystemTokenAddress: _ERC20Address,
             phaseDuration: 60*60,
             totalPhases: 8,
-            maturityThreshold: 0,
+            maturityThreshold: 4,
             imageBaseURI: _imageBaseURI,
             wizardSaltSet : false
         });
