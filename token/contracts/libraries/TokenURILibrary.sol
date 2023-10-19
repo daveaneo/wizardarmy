@@ -37,15 +37,15 @@ library TokenURILibrary {
     ) external pure returns (string memory imageURI) {
         string memory linkExtension="";
         // Non-SVG images
-        if (wizardSalt==0 || uninitiated || _isExiled || _isActive || _myPhase < _maturityThreshold){
+        if (wizardSalt==0 || uninitiated || _isExiled || !_isActive || _myPhase < _maturityThreshold){
             if (wizardSalt == 0) {
                 linkExtension = "placeholder";
             }
-            else if (uninitiated) {
-                linkExtension = "uninitiated";
-            }
             else if (_isExiled) {
                 linkExtension = "exiled";
+            }
+            else if (uninitiated) {
+                linkExtension = "uninitiated";
             }
             else if (!_isActive) {
                 linkExtension = "inactive";

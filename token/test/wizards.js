@@ -1,6 +1,23 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+const advanceTime = async (seconds) => {
+    await network.provider.send("evm_increaseTime", [seconds])
+    await ethers.provider.send("evm_mine");
+};
+
+
+async function getBlockTimestamp() {
+    // Get the latest block number
+    const blockNumber = await ethers.provider.getBlockNumber();
+
+    // Get the block details using the block number
+    const block = await ethers.provider.getBlock(blockNumber);
+
+    // Return the timestamp of the latest block
+    return block.timestamp;
+}
+
 describe("Wizards - State Variables & Initialization", function() {
 
   let Wizards, WizardTower, Governance, Appointer, Token;
@@ -70,15 +87,17 @@ describe("Wizards - State Variables & Initialization", function() {
     await tokenURILibrary.deployTransaction.wait();
 
     // Deploying the Token
-    Token = await ethers.getContractFactory("Token", {
-    });
-    token = await TokenURILibrary.deploy();
+    Token = await ethers.getContractFactory("Token");
+    token = await Token.deploy("Wizard Gold", "WGLD", 18, ethers.utils.parseEther("1000"));
     await token.deployed();
+
+
 
     // Wait for the transaction to be confirmed
     await token.deployTransaction.wait();
 
     initialContractSettings.ecosystemTokenAddress = token.address;
+
 
     Wizards = await ethers.getContractFactory("Wizards", {
       libraries: {
@@ -92,6 +111,11 @@ describe("Wizards - State Variables & Initialization", function() {
     // Wait for the transaction to be confirmed
     await wizards.deployTransaction.wait();
 
+    // Deploying the Appointer
+    Appointer = await ethers.getContractFactory("Appointer");
+    appointer = await Appointer.deploy(wizards.address);
+
+
     [owner, addr1, addr2, addr3, addr4,  ...addrs] = await ethers.getSigners();
 
     // mint 3 wizards, initatiate first 2
@@ -103,6 +127,19 @@ describe("Wizards - State Variables & Initialization", function() {
 
     await wizards.connect(addr3).mint(2);
 
+
+    // set certain roles
+    await wizards.updateAppointer(appointer.address);
+
+    // transfer tokens to each of the accounts
+    const amountToSend = ethers.utils.parseEther("1"); // This will convert 1 to 10**18
+
+    await token.transfer(addr1.address, amountToSend);
+    await token.transfer(addr2.address, amountToSend);
+    await token.transfer(addr3.address, amountToSend);
+    await token.transfer(addr4.address, amountToSend);
+
+
   });
 
   // Test Case 1.1: Ensure the contract is initialized with the correct default state.
@@ -113,8 +150,8 @@ describe("Wizards - State Variables & Initialization", function() {
     const culler = await wizards.culler();
     expect(culler).to.equal(owner.address);
 
-    const appointer = await wizards.appointer();
-    expect(appointer).to.equal(owner.address);
+    const appAddr = await wizards.appointer();
+    expect(appAddr).to.equal(appointer.address);
 
   });
 
@@ -184,8 +221,6 @@ describe("Wizards - State Variables & Initialization", function() {
         expect(myPhaseThree).to.equal(0);
       });
 
-
-
       // Test Case 2.4: Testing the _isValidWizard function.
       it("should revert for invalid wizards", async function() {
         await expect(wizards.isActive(9999)).to.be.reverted;
@@ -194,8 +229,580 @@ describe("Wizards - State Variables & Initialization", function() {
     });
 
 
+    describe("Wizards - Reputation and Roles", function() {
+
+      // ... (previous setup code remains unchanged)
+
+      // Test Case 3.1: Testing the getReputation function.
+// todo -- create reputation smart contract
+// tasks completed
+// tasks failed
+// seconds added
+// exiled
+// lifespan
+// accolades
+// tokens earned
+
+//      it("should fetch the correct reputation for a given wizard", async function() {
+//        expect(true).to.equal(false);
+//        const wizardId = 4;  // This would be a known wizard ID for testing
+//        const expectedReputation = 10;  // This would be a mock expected reputation value for testing
+//
+//        const reputation = await wizards.getReputation(wizardId);
+//        expect(reputation).to.equal(expectedReputation);
+//      });
+
+      // Test Case 3.2: Testing the appointRole function (Role assignment).
+      it("should assign a role to a wizard correctly", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+
+        // assign creatorWizardId to creator Role
+        let tx = await appointer.createRole("first_creator", true, 1, []);
+        let receipt = await tx.wait();
+        let event = receipt.events?.find(e => e.event === 'RoleCreated');
+        let creatorRoleId = event.args.roleId;
+
+        tx = await appointer.connect(owner).appointAsAdmin(wizardId, creatorRoleId);
+        await tx.wait();
+
+        // await wizards.appointRole(wizardId, roleId);
+
+        const wizardStats = await wizards.getStatsGivenId(wizardId);
+        expect(wizardStats.role).to.equal(creatorRoleId);
+      });
+    });
 
 
+    describe("Wizards - Contract Settings and Admin Functions", function() {
+      // Test Case 4.1: Testing the modifyContractSettings function.
+      it("should modify contract settings correctly", async function() {
+        const newImageBaseURI = "https://new.base.uri/";
+        const newPhaseDuration = 7200;
+        const newProtectionTimeExtension = 2 * 24 * 60 * 60;  // 2 days
+        const newMintCost = 7;
+        const newInitiationCost = 15;
+        const newMaturityThreshold = 1;
+
+        await wizards.modifyContractSettings(newImageBaseURI, newPhaseDuration, newProtectionTimeExtension, newMintCost, newInitiationCost, newMaturityThreshold);
+
+        const settings = await wizards.contractSettings();
+        expect(settings.imageBaseURI).to.equal(newImageBaseURI);
+        expect(settings.phaseDuration).to.equal(newPhaseDuration);
+        expect(settings.protectionTimeExtension).to.equal(newProtectionTimeExtension);
+        expect(settings.mintCost).to.equal(newMintCost);
+        expect(settings.initiationCost).to.equal(newInitiationCost);
+        expect(settings.maturityThreshold).to.equal(newMaturityThreshold);
+      });
+
+      // Test Case 4.2: Testing the admin functions (updateCuller, updateVerifier, updateAppointer).
+      it("should update the addresses for culler, verifier, and appointer correctly", async function() {
+        const newCuller = addrs[1].address;
+        const newVerifier = addrs[2].address;
+        const newAppointer = addrs[3].address;
+
+        await wizards.updateCuller(newCuller);
+        await wizards.updateVerifier(newVerifier);
+        await wizards.updateAppointer(newAppointer);
+
+        expect(await wizards.culler()).to.equal(newCuller);
+        expect(await wizards.verifier()).to.equal(newVerifier);
+        expect(await wizards.appointer()).to.equal(newAppointer);
+      });
+
+      // Test Case 4.3: Testing the withdraw function.
+      it("Owner can withdraw accumulated fees", async function() {
+        const initialBalance = await ethers.provider.getBalance(owner.address);
+        let tx = await wizards.withdraw();
+        receipt = await tx.wait();
+        const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+        const finalBalance = await await ethers.provider.getBalance(owner.address);
+        expect(finalBalance.add(ethSpentOnGas).gt(initialBalance)).to.be.true;
+      });
+
+      // Test Case 4.4: Testing the withdraw function.
+      it("should allow only the owner to withdraw the accumulated fees", async function() {
+        await expect(wizards.connect(addr2).withdraw()).to.be.reverted;
+      });
+
+    });
+
+
+    describe("Wizards - Wizards Life Cycle", function() {
+      // Test Case 5.1: Testing the mint function.
+      it("should mint a new wizard correctly", async function() {
+        const uplineId = 1;  // Mock upline ID for testing
+        const initialSupply = await wizards.totalSupply();
+
+        await wizards.mint(uplineId);
+
+        const newSupply = await wizards.totalSupply();
+        expect(newSupply - initialSupply).to.equal(1);
+      });
+
+      // Test Case 5.2: Testing the initiate function.
+      it("should initiate a wizard correctly", async function() {
+        const wizardId = 3;  // This would be a known wizard ID for testing
+
+        await wizards.connect(addr3).initiate(wizardId, { value: initialContractSettings.initiationCost });
+
+        const wizardStats = await wizards.getStatsGivenId(wizardId);
+        expect(wizardStats.initiationTimestamp).to.not.equal(0);
+      });
+
+      // Test Case 5.2: Testing the initiate function.
+      it("non-owner can't initiate", async function() {
+        const wizardId = 3;  // This would be a known wizard ID for testing
+
+        await expect(wizards.connect(addr2).initiate(wizardId, { value: initialContractSettings.initiationCost })).to.be.reverted;
+        await expect(wizards.connect(owner).initiate(wizardId, { value: initialContractSettings.initiationCost })).to.be.reverted;
+      });
+
+
+      // Test Case 5.2: Testing the initiate function.
+      it("Can't initiate twice", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+
+        await expect(wizards.connect(addr1).initiate(wizardId, { value: initialContractSettings.initiationCost })).to.be.reverted;
+      });
+
+
+      // Test Case 5.3: Testing the exile and cull functions.
+      it("should exile a wizard correctly", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+
+        // expect to revert
+        await expect(wizards.connect(addr3).exile(1)).to.be.reverted;
+
+        // advance time to when wizard is inactive
+        await advanceTime(1000000);
+
+        // expect to not be active, deserted
+        expect (await wizards.connect(addr3).isActive(1)).to.equal(false);
+        expect (await wizards.connect(addr3).hasDeserted(1)).to.equal(true);
+
+        // exile
+        await wizards.exile(wizardId);
+        let isExiled = await wizards.isExiled(wizardId);
+        expect(isExiled).to.equal(true);
+
+        // can't exile again -- expect to revert
+        await expect(wizards.connect(addr3).exile(1)).to.be.reverted;
+        await expect(wizards.connect(owner).cull(1)).to.be.reverted;
+        await expect(wizards.connect(addr1).initiate(1, { value: initialContractSettings.initiationCost })).to.be.reverted;
+
+        // advance time to when wizard is inactive
+        await advanceTime(initialContractSettings.exileTimePenalty + 1);
+
+        isExiled = await wizards.isExiled(wizardId);
+        expect(isExiled).to.equal(true);
+
+        await wizards.connect(addr1).initiate(1, { value: initialContractSettings.initiationCost });
+
+        const wizardStats = await wizards.getStatsGivenId(wizardId);
+        expect(wizardStats.initiationTimestamp).to.not.equal(0);
+
+        await wizards.cull(wizardId);
+        const isExiledAfterCull = await wizards.isExiled(wizardId);
+        expect(isExiledAfterCull).to.equal(true);
+      });
+
+
+      // Test Case 5.3.b: Testing the exile and cull functions.
+      it("should exile a wizard correctly", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+
+
+        await wizards.connect(owner).cull(wizardId);
+        const isExiledAfterCull = await wizards.isExiled(wizardId);
+        expect(isExiledAfterCull).to.equal(true);
+
+        // can't exile again -- expect to revert
+        await expect(wizards.connect(addr3).exile(1)).to.be.reverted;
+        await expect(wizards.connect(owner).cull(1)).to.be.reverted;
+        await expect(wizards.connect(addr1).initiate(1, { value: initialContractSettings.initiationCost })).to.be.reverted;
+
+        // advance time to when wizard is inactive
+        await advanceTime(initialContractSettings.exileTimePenalty + 1);
+
+        let isExiled = await wizards.isExiled(wizardId);
+        expect(isExiled).to.equal(true);
+
+        await wizards.connect(addr1).initiate(1, { value: initialContractSettings.initiationCost });
+
+        const wizardStats = await wizards.getStatsGivenId(wizardId);
+        expect(wizardStats.initiationTimestamp).to.not.equal(0);
+      });
+
+
+      // Test Case 5.4: Testing the transferFrom function.
+      it("should transfer a wizard and reset its statistics correctly", async function() {
+        const wizardId = 2;  // This would be a known wizard ID for testing
+        const recipient = addrs[5].address;  // Mock recipient for testing
+
+
+        // assign creatorWizardId to creator Role
+        let tx = await appointer.createRole("first_creator", true, 1, []);
+        let receipt = await tx.wait();
+        let event = receipt.events?.find(e => e.event === 'RoleCreated');
+        let creatorRoleId = event.args.roleId;
+
+        tx = await appointer.connect(owner).appointAsAdmin(wizardId, creatorRoleId);
+        const wizardStatsInitial = await wizards.getStatsGivenId(wizardId);
+
+        await wizards.connect(addr2).transferFrom(addr2.address, recipient, wizardId);
+
+        const newOwner = await wizards.ownerOf(wizardId);
+        expect(newOwner).to.equal(recipient);
+
+        const wizardStatsFinal = await wizards.getStatsGivenId(wizardId);
+        expect(wizardStatsFinal.initiationTimestamp).to.equal(0);
+        expect(wizardStatsFinal.protectedUntilTimestamp).to.equal(0);
+        expect(wizardStatsFinal.role).to.not.equal(wizardStatsInitial.role);
+        expect(wizardStatsFinal.role).to.equal(0);
+        expect(wizardStatsFinal.uplineId).to.equal(wizardStatsInitial.uplineId);
+
+
+      });
+    });
+
+    describe("Wizards - Verifier Functions", function() {
+
+      // ... (previous setup code remains unchanged)
+
+      // Test Case 6.1: Testing the increaseProtectedUntilTimestamp function by the verifier.
+      it("should increase the protectedUntilTimestamp correctly", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+        const timeReward = 3600;  // 1 hour for testing
+
+        const initialProtectionTimestamp = (await wizards.tokenIdToStats(wizardId)).protectedUntilTimestamp;
+
+        await wizards.connect(owner).increaseProtectedUntilTimestamp(wizardId, timeReward);
+
+        const finalProtectionTimestamp = (await wizards.tokenIdToStats(wizardId)).protectedUntilTimestamp;
+        expect(finalProtectionTimestamp - initialProtectionTimestamp).to.equal(timeReward);
+      });
+
+      it("non-verifier can not update timestamp", async function() {
+        const wizardId = 1;  // This would be a known wizard ID for testing
+        await expect(wizards.connect(addr1).increaseProtectedUntilTimestamp(wizardId, 3600)).to.be.reverted;
+        await expect(wizards.connect(addr2).increaseProtectedUntilTimestamp(wizardId, 3600)).to.be.reverted;
+      });
+
+      it("verifier can add 0 time without reverting", async function() { // todo -- could go either way
+        const wizardId = 1;  // This would be a known wizard ID for testing
+
+        const initialProtectionTimestamp = (await wizards.tokenIdToStats(wizardId)).protectedUntilTimestamp;
+        await wizards.connect(owner).increaseProtectedUntilTimestamp(wizardId, 0);
+        const finalProtectionTimestamp = (await wizards.tokenIdToStats(wizardId)).protectedUntilTimestamp;
+        expect(initialProtectionTimestamp).to.equal(finalProtectionTimestamp);
+      });
+
+    });
+
+    describe("Wizards - Modifiers", function() {
+
+      // ... (previous setup code remains unchanged)
+
+      // Test Case 8.1: Testing the onlyVerifier modifier.
+      it("should revert when a non-verifier tries to call a verifier-only function", async function() {
+        // An example function that requires the onlyVerifier modifier is increaseProtectedUntilTimestamp
+        const wizardId = 1;
+        const timeReward = 120;
+
+        // Assuming addrs[1] is not the verifier.
+        await expect(wizards.connect(addrs[1]).increaseProtectedUntilTimestamp(wizardId, timeReward))
+          .to.be.revertedWith("only verifier");
+      });
+
+      // Test Case 8.2: Testing the onlyAppointer modifier.
+      it("should revert when a non-appointer tries to call an appointer-only function", async function() {
+        // An example function that requires the onlyAppointer modifier is appointRole
+        const wizardId = 1;
+        const roleId = 2;
+
+        // Assuming addrs[1] is not the appointer.
+        await expect(wizards.connect(addrs[1]).appointRole(wizardId, roleId))
+          .to.be.revertedWith("only appointer");
+      });
+
+      // Test Case 8.3: Testing the onlyCuller modifier.
+      it("should revert when a non-culler tries to call a culler-only function", async function() {
+        // An example function that requires the onlyCuller modifier is cull
+        const wizardId = 1;
+
+        // Assuming addrs[1] is not the culler.
+        await expect(wizards.connect(addrs[1]).cull(wizardId))
+          .to.be.revertedWith("Only culler can call this function.");
+      });
+
+      // Test Case 8.4: Testing the saltNotSet modifier.
+      it("should revert when trying to set random number after it has already been set", async function() {
+        // The function setRandomNumber requires the saltNotSet modifier
+        const wizardSalt = 12345;
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(wizardSalt);
+
+        // Trying to set it again should revert
+        await expect(wizards.setRandomNumber(wizardSalt))
+          .to.be.revertedWith("Number is already set");
+      });
+
+      // Additional tests for this section can be added here
+
+    });
+
+    describe("Wizards - Admin Functions", function() {
+
+      // ... (previous setup code remains unchanged)
+
+      // Test Case 9.1: Testing the updateCuller function.
+      it("should allow owner to update the culler", async function() {
+        const newCuller = addrs[2];
+
+        // Update the culler
+        await wizards.updateCuller(newCuller);
+
+        // Validate the new culler address
+        expect(await wizards.culler()).to.equal(newCuller);
+      });
+
+      // Test Case 9.2: Testing the updateVerifier function.
+      it("should allow owner to update the verifier", async function() {
+        const newVerifier = addrs[3];
+
+        // Update the verifier
+        await wizards.updateVerifier(newVerifier);
+
+        // Validate the new verifier address
+        expect(await wizards.verifier()).to.equal(newVerifier);
+      });
+
+      // Test Case 9.3: Testing the updateAppointer function.
+      it("should allow owner to update the appointer", async function() {
+        const newAppointer = addrs[4];
+
+        // Update the appointer
+        await wizards.updateAppointer(newAppointer);
+
+        // Validate the new appointer address
+        expect(await wizards.appointer()).to.equal(newAppointer);
+      });
+
+      // Test Case 9.4: Testing the withdraw function.
+      it("should allow owner to withdraw ETH", async function() {
+        const initialBalance = await ethers.provider.getBalance(owner.address);
+
+        // Assuming some ether is present in the contract for simplicity
+        await wizards.withdraw();
+
+        const finalBalance = await ethers.provider.getBalance(owner.address);
+        expect(finalBalance).to.be.gt(initialBalance);
+      });
+
+      // Test Case 9.5: Testing the setReputationSmartContract function.
+      it("should allow owner to set the reputation smart contract address", async function() {
+        const reputationContractMock = addrs[5];
+
+        // Set the reputation smart contract address
+        await wizards.setReputationSmartContract(reputationContractMock);
+
+        // Validate the new reputation smart contract address
+        expect(await wizards.reputationSmartContract()).to.equal(reputationContractMock);
+      });
+
+      // Additional tests for this section can be added here
+
+    });
+
+
+    describe("Wizards - TokenURI", function() {
+
+      // Test Case 10.1: Testing the tokenURI function for placeholder URI
+      it("should generate correct token URI for placeholder", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 1;
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+        // Parse the JSON and extract the image link
+        const jsonObj = JSON.parse(uri);
+        const imageLink = jsonObj.image;
+
+        // Validation can be based on expected URIs or URI components
+        expect(uri).to.contain("placeholder.jpg");
+      });
+
+      // Test Case 10.2: uninitiated URI
+      it("should generate correct token URI for uninitiated", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 3;
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(22159);
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+        // Parse the JSON and extract the image link
+        const jsonObj = JSON.parse(uri);
+        const imageLink = jsonObj.image;
+
+        // Validation can be based on expected URIs or URI components
+        expect(imageLink).to.contain("uninitiated.jpg");
+      });
+
+
+      // Test Case 10.3: deserted URI
+      it("should generate correct token URI for deserted", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 1;
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(22159);
+
+        // Advance time beyond
+        await advanceTime(initialContractSettings.protectionTimeExtension + 1);
+
+//        const wizardStats = await wizards.getStatsGivenId(wizardId);
+//        console.log(wizardStats);
+
+//        console.log("Current timestamp:")
+//        const myTimestamp = await getBlockTimestamp();
+//        console.log(myTimestamp);
+//        console.log("-----------------");
+
+//        console.log("is current timestamp greater than protected till?")
+//        console.log(myTimestamp > wizardStats.protectedUntilTimestamp);
+
+//        const isActive = await wizards.isActive(wizardId);
+//        console.log("isActive:");
+//        console.log(isActive);
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+        // Parse the JSON and extract the image link
+        const jsonObj = JSON.parse(uri);
+        const imageLink = jsonObj.image;
+
+        // Validation can be based on expected URIs or URI components
+        expect(imageLink).to.contain("inactive.jpg"); // todo -- note discrepancy in  naming convention: inactive vs deserted
+      });
+
+
+      // Test Case 10.4: exiled URI
+      it("should generate correct token URI for exiled", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 3;
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(22159);
+
+        // Cull (exile)
+        await wizards.cull(wizardId);
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+        // Parse the JSON and extract the image link
+        const jsonObj = JSON.parse(uri);
+        const imageLink = jsonObj.image;
+
+        // Validation can be based on expected URIs or URI components
+        expect(imageLink).to.contain("exiled.jpg");
+      });
+
+
+      // Test Case 10.4: non-adult stages URI
+      it("should generate correct token URI for non adult", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 1;
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(22159);
+
+        // set protectUntil to beyond non-adult
+        await wizards.connect(owner).increaseProtectedUntilTimestamp(wizardId, initialContractSettings.phaseDuration*100)
+
+
+        for(let i=0; i< 4; i++){
+            // Fetch token URI for a wizard
+            const encodedUri = await wizards.tokenURI(wizardId);
+            // Decode the base64 string
+            const base64Data = encodedUri.split(",")[1];
+            const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+            // Parse the JSON and extract the image link
+            const jsonObj = JSON.parse(uri);
+            const imageLink = jsonObj.image;
+
+            // Validation can be based on expected URIs or URI components
+            expect(imageLink).to.contain(i.toString() + ".jpg");
+
+            // Advance time beyond
+            await advanceTime(initialContractSettings.phaseDuration);
+        }
+      });
+
+
+
+
+      // Test Case 10.5: Testing the tokenURI function for images of adult wizard.
+      it("should generate correct token URI adult wizard", async function() {
+        // This test can be expanded based on different states of a wizard - uninitiated, exiled, active, etc.
+
+        const wizardId = 1;
+
+
+        // Set the wizard salt for the first time
+        await wizards.setRandomNumber(22159);
+
+        // Advance time beyond
+        await advanceTime(initialContractSettings.phaseDuration*10);
+
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+
+        // Parse the JSON and extract the image link
+        const jsonObj = JSON.parse(uri);
+        const imageLink = jsonObj.image;
+
+        // Validation can be based on expected URIs or URI components
+        expect(imageLink).to.contain("data:image/svg+xml"); // As an example, check if it's a base64 encoded JSON
+      });
+
+      // Test Case 10.6: Testing the tokenURI function for misc.
+      it("should generate correct token URI adult wizard", async function() {
+        // todo
+//        expect(true).to.equal(false);
+      });
+
+
+    });
 
 
 
