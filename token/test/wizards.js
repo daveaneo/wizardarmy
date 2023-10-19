@@ -273,7 +273,7 @@ describe("Wizards - State Variables & Initialization", function() {
     });
 
 
-    describe("Wizards - Contract Settings and Admin Functions", function() {
+    describe("Wizards - Contract Settings", function() {
       // Test Case 4.1: Testing the modifyContractSettings function.
       it("should modify contract settings correctly", async function() {
         const newImageBaseURI = "https://new.base.uri/";
@@ -293,38 +293,6 @@ describe("Wizards - State Variables & Initialization", function() {
         expect(settings.initiationCost).to.equal(newInitiationCost);
         expect(settings.maturityThreshold).to.equal(newMaturityThreshold);
       });
-
-      // Test Case 4.2: Testing the admin functions (updateCuller, updateVerifier, updateAppointer).
-      it("should update the addresses for culler, verifier, and appointer correctly", async function() {
-        const newCuller = addrs[1].address;
-        const newVerifier = addrs[2].address;
-        const newAppointer = addrs[3].address;
-
-        await wizards.updateCuller(newCuller);
-        await wizards.updateVerifier(newVerifier);
-        await wizards.updateAppointer(newAppointer);
-
-        expect(await wizards.culler()).to.equal(newCuller);
-        expect(await wizards.verifier()).to.equal(newVerifier);
-        expect(await wizards.appointer()).to.equal(newAppointer);
-      });
-
-      // Test Case 4.3: Testing the withdraw function.
-      it("Owner can withdraw accumulated fees", async function() {
-        const initialBalance = await ethers.provider.getBalance(owner.address);
-        let tx = await wizards.withdraw();
-        receipt = await tx.wait();
-        const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
-
-        const finalBalance = await await ethers.provider.getBalance(owner.address);
-        expect(finalBalance.add(ethSpentOnGas).gt(initialBalance)).to.be.true;
-      });
-
-      // Test Case 4.4: Testing the withdraw function.
-      it("should allow only the owner to withdraw the accumulated fees", async function() {
-        await expect(wizards.connect(addr2).withdraw()).to.be.reverted;
-      });
-
     });
 
 
@@ -554,12 +522,9 @@ describe("Wizards - State Variables & Initialization", function() {
     });
 
     describe("Wizards - Admin Functions", function() {
-
-      // ... (previous setup code remains unchanged)
-
       // Test Case 9.1: Testing the updateCuller function.
       it("should allow owner to update the culler", async function() {
-        const newCuller = addrs[2];
+        const newCuller = addrs[2].address;
 
         // Update the culler
         await wizards.updateCuller(newCuller);
@@ -570,7 +535,7 @@ describe("Wizards - State Variables & Initialization", function() {
 
       // Test Case 9.2: Testing the updateVerifier function.
       it("should allow owner to update the verifier", async function() {
-        const newVerifier = addrs[3];
+        const newVerifier = addrs[3].address;
 
         // Update the verifier
         await wizards.updateVerifier(newVerifier);
@@ -581,7 +546,7 @@ describe("Wizards - State Variables & Initialization", function() {
 
       // Test Case 9.3: Testing the updateAppointer function.
       it("should allow owner to update the appointer", async function() {
-        const newAppointer = addrs[4];
+        const newAppointer = addrs[4].address;
 
         // Update the appointer
         await wizards.updateAppointer(newAppointer);
@@ -590,20 +555,9 @@ describe("Wizards - State Variables & Initialization", function() {
         expect(await wizards.appointer()).to.equal(newAppointer);
       });
 
-      // Test Case 9.4: Testing the withdraw function.
-      it("should allow owner to withdraw ETH", async function() {
-        const initialBalance = await ethers.provider.getBalance(owner.address);
-
-        // Assuming some ether is present in the contract for simplicity
-        await wizards.withdraw();
-
-        const finalBalance = await ethers.provider.getBalance(owner.address);
-        expect(finalBalance).to.be.gt(initialBalance);
-      });
-
-      // Test Case 9.5: Testing the setReputationSmartContract function.
+      // Test Case 9.4: Testing the setReputationSmartContract function.
       it("should allow owner to set the reputation smart contract address", async function() {
-        const reputationContractMock = addrs[5];
+        const reputationContractMock = addrs[5].address;
 
         // Set the reputation smart contract address
         await wizards.setReputationSmartContract(reputationContractMock);
@@ -612,7 +566,36 @@ describe("Wizards - State Variables & Initialization", function() {
         expect(await wizards.reputationSmartContract()).to.equal(reputationContractMock);
       });
 
-      // Additional tests for this section can be added here
+      // Test Case 4.2: Testing the admin functions (updateCuller, updateVerifier, updateAppointer).
+      it("should update the addresses for culler, verifier, and appointer correctly", async function() {
+        const newCuller = addrs[1].address;
+        const newVerifier = addrs[2].address;
+        const newAppointer = addrs[3].address;
+
+        await wizards.updateCuller(newCuller);
+        await wizards.updateVerifier(newVerifier);
+        await wizards.updateAppointer(newAppointer);
+
+        expect(await wizards.culler()).to.equal(newCuller);
+        expect(await wizards.verifier()).to.equal(newVerifier);
+        expect(await wizards.appointer()).to.equal(newAppointer);
+      });
+
+      // Test Case 9.5: Testing the withdraw function.
+      it("Owner can withdraw accumulated fees", async function() {
+        const initialBalance = await ethers.provider.getBalance(owner.address);
+        let tx = await wizards.withdraw();
+        receipt = await tx.wait();
+        const ethSpentOnGas = receipt.gasUsed.mul(receipt.effectiveGasPrice);
+
+        const finalBalance = await await ethers.provider.getBalance(owner.address);
+        expect(finalBalance.add(ethSpentOnGas).gt(initialBalance)).to.be.true;
+      });
+
+      // Test Case 9.6: Testing the withdraw function.
+      it("should allow only the owner to withdraw the accumulated fees", async function() {
+        await expect(wizards.connect(addr2).withdraw()).to.be.reverted;
+      });
 
     });
 
