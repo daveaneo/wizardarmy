@@ -1,6 +1,21 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
 
+/*  Test Categories
+    Wizards - State Variables & Initialization
+    Wizards - Wizard Management
+    Wizards - Reputation and Roles
+    Wizards - Contract Settings
+    Wizards - Wizards Life Cycle
+    Wizards - Verifier Functions
+    Wizards - Modifiers
+    Wizards - Admin Functions
+    Wizards - TokenURI
+    Wizards - Events
+    Wizards - Additional/Edge Tests
+*/
+
+
 const advanceTime = async (seconds) => {
     await network.provider.send("evm_increaseTime", [seconds])
     await ethers.provider.send("evm_mine");
@@ -17,6 +32,8 @@ async function getBlockTimestamp() {
     // Return the timestamp of the latest block
     return block.timestamp;
 }
+
+
 
 describe("Wizards - State Variables & Initialization", function() {
 
@@ -459,6 +476,40 @@ describe("Wizards - State Variables & Initialization", function() {
         await expect(wizards.isActive(nonExistingWizardId)).to.be.reverted;
         await expect(wizards.getUplineId(nonExistingWizardId)).to.be.reverted;
       });
+
+
+      // Test Case 5.8: Ensure minting costs are correct.
+      it("should revert if trying to mint with less than the required minting cost", async function() {
+        await expect(wizards.mint(0, {value: initialContractSettings.mintCost - 1})).to.be.reverted;
+      });
+
+
+      // Test Case 5.9: Ensure initiation costs are correct.
+      it("should revert if trying to initiate with less than the required initiation cost", async function() {
+        await expect(wizards.connect(addr3).initiate(1, {value: initialContractSettings.initiationCost - 1})).to.be.reverted;
+      });
+
+      // Test Case 5.10: Ensure that wizards that have been exiled cannot be initiated again immediately.
+      it("should revert if trying to initiate an exiled wizard before the required exile time has passed", async function() {
+        const wizardId = 1;
+        await wizards.connect(owner).cull(wizardId); // Assuming the wizard meets the criteria for exile.
+        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
+      });
+
+      // Test Case 511: Ensure wizards can't be initiated more than once.
+      it("should revert if trying to initiate an already initiated wizard", async function() {
+        const wizardId = 1;
+//        await wizards.connect(addr1).initiate(wizardId);
+        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
+      });
+
+      // Test Case 5.12: Ensure only the owner of a wizard can initiate it.
+      it("should revert if a non-owner tries to initiate a wizard", async function() {
+        const wizardId = 3;
+        const nonOwner = addrs[2];
+        await expect(wizards.connect(nonOwner).initiate(wizardId)).to.be.reverted;
+      });
+
 
 
     });
@@ -918,40 +969,8 @@ describe("Wizards - State Variables & Initialization", function() {
 
     });
 
-    // todo -- add to other sections
-    describe("Wizards - Additional/Edge Tests", function() {
-      // Test Case 17.1: Ensure minting costs are correct.
-      it("should revert if trying to mint with less than the required minting cost", async function() {
-        await expect(wizards.mint(0, {value: initialContractSettings.mintCost - 1})).to.be.reverted;
-      });
-
-      // Test Case 17.2: Ensure initiation costs are correct.
-      it("should revert if trying to initiate with less than the required initiation cost", async function() {
-        await expect(wizards.connect(addr3).initiate(1, {value: initialContractSettings.initiationCost - 1})).to.be.reverted;
-      });
-
-      // Test Case 17.3: Ensure that wizards that have been exiled cannot be initiated again immediately.
-      it("should revert if trying to initiate an exiled wizard before the required exile time has passed", async function() {
-        const wizardId = 1;
-        await wizards.connect(owner).cull(wizardId); // Assuming the wizard meets the criteria for exile.
-        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
-      });
-
-      // Test Case 17.4: Ensure wizards can't be initiated more than once.
-      it("should revert if trying to initiate an already initiated wizard", async function() {
-        const wizardId = 1;
-//        await wizards.connect(addr1).initiate(wizardId);
-        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
-      });
-
-      // Test Case 17.5: Ensure only the owner of a wizard can initiate it.
-      it("should revert if a non-owner tries to initiate a wizard", async function() {
-        const wizardId = 3;
-        const nonOwner = addrs[2];
-        await expect(wizards.connect(nonOwner).initiate(wizardId)).to.be.reverted;
-      });
-
-      // Test Case 21.2: Ensure that the contract does not accept Ether without a valid function call.
+    describe("Wizards - Security", function() {
+      // Test Case 21.1: Ensure that the contract does not accept Ether without a valid function call.
       it("should reject raw Ether transfers", async function() {
         await expect(addrs[1].sendTransaction({ to: wizards.address, value: ethers.utils.parseEther("1") })).to.be.reverted;
       });
