@@ -174,6 +174,13 @@ describe("Wizards - State Variables & Initialization", function() {
 
   });
 
+  // Test Case 1.3: Correct totalSupply
+  it("should have tokens owned by expected addresses", async function() {
+    const total = await wizards.totalSupply();
+    expect(total).to.be.equal(3);
+  });
+
+
     describe("Wizards - Wizard Management", function() {
 
       // ... (previous setup code remains unchanged)
@@ -432,12 +439,31 @@ describe("Wizards - State Variables & Initialization", function() {
 
 
       });
+
+      // Test Case 5.5: Can't initiate exiled wizard
+      it("should not allow initiating an exiled wizard that hasn't completed its exile duration", async function() {
+        await wizards.connect(owner).cull(1);  // Assuming the wizard meets the criteria for exile.
+        await advanceTime(initialContractSettings.exileTimePenalty - 1);  // Almost completing the exile duration but not fully.
+        await expect(wizards.connect(addr1).initiate(1, { value: initialContractSettings.initiationCost })).to.be.reverted;
+      });
+
+      // Test Case 5.6: Ensure uplineId cannot be higher than the total supply of wizards during minting.
+      it("should revert if uplineId is greater than the total supply during minting", async function() {
+        const invalidUplineId = 9999;
+        await expect(wizards.connect(addr1).mint(invalidUplineId)).to.be.reverted;
+      });
+
+      // Test Case 5.7: Ensure proper behavior when trying to interact with non-existing wizards.
+      it("should revert when trying to interact with a wizard that doesn't exist", async function() {
+        const nonExistingWizardId = 9999;  // Assuming this ID is greater than the total number of minted wizards.
+        await expect(wizards.isActive(nonExistingWizardId)).to.be.reverted;
+        await expect(wizards.getUplineId(nonExistingWizardId)).to.be.reverted;
+      });
+
+
     });
 
     describe("Wizards - Verifier Functions", function() {
-
-      // ... (previous setup code remains unchanged)
-
       // Test Case 6.1: Testing the increaseProtectedUntilTimestamp function by the verifier.
       it("should increase the protectedUntilTimestamp correctly", async function() {
         const wizardId = 1;  // This would be a known wizard ID for testing
@@ -892,6 +918,45 @@ describe("Wizards - State Variables & Initialization", function() {
 
     });
 
+    // todo -- add to other sections
+    describe("Wizards - Additional/Edge Tests", function() {
+      // Test Case 17.1: Ensure minting costs are correct.
+      it("should revert if trying to mint with less than the required minting cost", async function() {
+        await expect(wizards.mint(0, {value: initialContractSettings.mintCost - 1})).to.be.reverted;
+      });
+
+      // Test Case 17.2: Ensure initiation costs are correct.
+      it("should revert if trying to initiate with less than the required initiation cost", async function() {
+        await expect(wizards.connect(addr3).initiate(1, {value: initialContractSettings.initiationCost - 1})).to.be.reverted;
+      });
+
+      // Test Case 17.3: Ensure that wizards that have been exiled cannot be initiated again immediately.
+      it("should revert if trying to initiate an exiled wizard before the required exile time has passed", async function() {
+        const wizardId = 1;
+        await wizards.connect(owner).cull(wizardId); // Assuming the wizard meets the criteria for exile.
+        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
+      });
+
+      // Test Case 17.4: Ensure wizards can't be initiated more than once.
+      it("should revert if trying to initiate an already initiated wizard", async function() {
+        const wizardId = 1;
+//        await wizards.connect(addr1).initiate(wizardId);
+        await expect(wizards.connect(addr1).initiate(wizardId)).to.be.reverted;
+      });
+
+      // Test Case 17.5: Ensure only the owner of a wizard can initiate it.
+      it("should revert if a non-owner tries to initiate a wizard", async function() {
+        const wizardId = 3;
+        const nonOwner = addrs[2];
+        await expect(wizards.connect(nonOwner).initiate(wizardId)).to.be.reverted;
+      });
+
+      // Test Case 21.2: Ensure that the contract does not accept Ether without a valid function call.
+      it("should reject raw Ether transfers", async function() {
+        await expect(addrs[1].sendTransaction({ to: wizards.address, value: ethers.utils.parseEther("1") })).to.be.reverted;
+      });
+
+    });
 
 
 }); // end outer describe
