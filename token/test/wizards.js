@@ -12,7 +12,7 @@ const { ethers } = require("hardhat");
     Wizards - Admin Functions
     Wizards - TokenURI
     Wizards - Events
-    Wizards - Additional/Edge Tests
+    Wizards - Security
 */
 
 
