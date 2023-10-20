@@ -74,7 +74,7 @@ library TokenURILibrary {
     function formatTokenURI(uint256 _wizardId, string memory imageURI, CommonDefinitions.WizardStats memory attributes, uint256 _wizardSalt) external pure returns (string memory) {
         string memory geneString = GeneLogic.getMagicGenesString(_wizardId, _wizardSalt);
         string memory json_str = string(abi.encodePacked(
-            '{"description": "WizardArmy"',
+            '{"description": "Wizard Army DAO"',
             ', "external_url": "https://www.wizards.club"',
             ', "image": "', imageURI, '"',
             ', "name": "Wizard"',

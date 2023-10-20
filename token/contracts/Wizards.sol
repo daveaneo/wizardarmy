@@ -58,7 +58,7 @@ contract Wizards is ERC721Enumerable, Ownable {
     event NewVerifier(address verifier);
     event NewCuller(address culler);
     event NewAppointer(address appointer);
-    event Initiated(address initiater, uint256 indexed wizardId, uint256 timestamp);
+    event Initiated(address initiator, uint256 indexed wizardId, uint256 timestamp);
     event Exiled(address exilee, uint256 indexed wizardId, uint256 timestamp);
 
 
@@ -276,6 +276,9 @@ contract Wizards is ERC721Enumerable, Ownable {
         require(!isExiled(_wizardId)); // dev: "wiz already in exile"
         tokenIdToStats[_wizardId].protectedUntilTimestamp = uint40(block.timestamp); // this saves the time of exile started
         tokenIdToStats[_wizardId].initiationTimestamp = 0;
+
+        emit Exiled(ownerOf(_wizardId), _wizardId, block.timestamp);
+
     }
 
 

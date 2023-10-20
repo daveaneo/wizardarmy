@@ -517,8 +517,50 @@ describe("Wizards - State Variables & Initialization", function() {
           .to.be.revertedWith("Number is already set");
       });
 
-      // Additional tests for this section can be added here
 
+      // Test Case 8.: Testing the onlyVerifier modifier.
+      it("should restrict non-verifiers from accessing verifier functions", async function() {
+        const nonVerifier = addrs[1];
+        const _wizardId = 1;
+        const _timeReward = 1000;
+
+        // Attempt to access a function with the onlyVerifier modifier using a non-verifier account
+        await expect(wizards.connect(nonVerifier).increaseProtectedUntilTimestamp(_wizardId, _timeReward))
+          .to.be.revertedWith("only verifier");
+      });
+
+      // Test Case 8.: Testing the onlyAppointer modifier.
+      it("should restrict non-appointers from accessing appointer functions", async function() {
+        const nonAppointer = addrs[2];
+        const _wizardId = 1;
+        const _roleId = 5;
+
+        // Attempt to access a function with the onlyAppointer modifier using a non-appointer account
+        await expect(wizards.connect(nonAppointer).appointRole(_wizardId, _roleId))
+          .to.be.revertedWith("only appointer");
+      });
+
+      // Test Case 8.: Testing the onlyCuller modifier.
+      it("should restrict non-cullers from accessing culler functions", async function() {
+        const nonCuller = addrs[3];
+        const _wizardId = 1;
+
+        // Attempt to access a function with the onlyCuller modifier using a non-culler account
+        await expect(wizards.connect(nonCuller).cull(_wizardId))
+          .to.be.revertedWith("Only culler can call this function.");
+      });
+
+      // Test Case 8.: Testing the saltNotSet modifier.
+      it("should restrict setting random number when already set", async function() {
+        const _wizardSalt = 123456;
+
+        // Set the random number for the first time
+        await wizards.setRandomNumber(_wizardSalt);
+
+        // Attempt to set the random number again
+        await expect(wizards.setRandomNumber(_wizardSalt))
+          .to.be.revertedWith("Number is already set");
+      });
     });
 
     describe("Wizards - Admin Functions", function() {
@@ -658,21 +700,6 @@ describe("Wizards - State Variables & Initialization", function() {
         // Advance time beyond
         await advanceTime(initialContractSettings.protectionTimeExtension + 1);
 
-//        const wizardStats = await wizards.getStatsGivenId(wizardId);
-//        console.log(wizardStats);
-
-//        console.log("Current timestamp:")
-//        const myTimestamp = await getBlockTimestamp();
-//        console.log(myTimestamp);
-//        console.log("-----------------");
-
-//        console.log("is current timestamp greater than protected till?")
-//        console.log(myTimestamp > wizardStats.protectedUntilTimestamp);
-
-//        const isActive = await wizards.isActive(wizardId);
-//        console.log("isActive:");
-//        console.log(isActive);
-
         // Fetch token URI for a wizard
         const encodedUri = await wizards.tokenURI(wizardId);
         // Decode the base64 string
@@ -778,15 +805,93 @@ describe("Wizards - State Variables & Initialization", function() {
         expect(imageLink).to.contain("data:image/svg+xml"); // As an example, check if it's a base64 encoded JSON
       });
 
+
       // Test Case 10.6: Testing the tokenURI function for misc.
-      it("should generate correct token URI adult wizard", async function() {
-        // todo
-//        expect(true).to.equal(false);
+      it("Should generate correct metadata about project", async function() {
+        const wizardId = 1;
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+        const jsonObj = JSON.parse(uri);
+
+        // todo -- confirm this is what we want
+        expect(jsonObj.name).to.be.equal("Wizard");
+        expect(jsonObj.description).to.be.equal("Wizard Army DAO");
+        expect(jsonObj.external_url).to.be.equal("https://www.wizards.club");
       });
 
+      // Test Case 10.7: Testing the tokenURI function for misc.
+      it("Should generate correct metadata about token", async function() {
+        const wizardId = 1;
+
+        // Fetch token URI for a wizard
+        const encodedUri = await wizards.tokenURI(wizardId);
+        // Decode the base64 string
+        const base64Data = encodedUri.split(",")[1];
+        const uri = Buffer.from(base64Data, 'base64').toString('utf-8');
+        const jsonObj = JSON.parse(uri);
+
+        // todo -- confirm these are the names we want and formatting
+        const traitsToCheck = ["magic genes", "role", "upline id", "initiation timestamp", "protected until timestamp", "initiation timestamp"];
+
+        traitsToCheck.forEach(trait => {
+            expect(jsonObj.attributes.some(attr => attr.trait_type === trait), `Trait not found: ${trait}`).to.be.true;
+        });
+
+      });
+
+    }); // end inner describe
+
+    describe("Wizards - Events", function() {
+      // Test Case 14.1: Testing NewVerifier event.
+      it("should emit NewVerifier event when the verifier is updated", async function() {
+        const newVerifier = addrs[0].address;
+
+        await expect(wizards.updateVerifier(newVerifier))
+          .to.emit(wizards, 'NewVerifier')
+          .withArgs(newVerifier);
+      });
+
+      // Test Case 14.2: Testing NewCuller event.
+      it("should emit NewCuller event when the culler is updated", async function() {
+        const newCuller = addrs[0].address;
+
+        await expect(wizards.updateCuller(newCuller))
+          .to.emit(wizards, 'NewCuller')
+          .withArgs(newCuller);
+      });
+
+      // Test Case 14.3: Testing NewAppointer event.
+      it("should emit NewAppointer event when the appointer is updated", async function() {
+        const newAppointer = addrs[0].address;
+
+        await expect(wizards.updateAppointer(newAppointer))
+          .to.emit(wizards, 'NewAppointer')
+          .withArgs(newAppointer);
+      });
+
+      // Test Case 14.4: Testing Initiated event.
+      it("should emit Initiated event when a wizard is initiated", async function() {
+        const wizardId = 3; // assuming a valid wizardId for this test
+
+        await expect(wizards.connect(addr3).initiate(wizardId, { value: initialContractSettings.initiationCost }))
+          .to.emit(wizards, 'Initiated')
+          .withNamedArgs({initiator: addr3.address, wizardId: wizardId});
+      });
+
+      // Test Case 14.5: Testing Exiled event.
+      it("should emit Exiled event when a wizard is exiled", async function() {
+        const wizardId = 1; // assuming a valid wizardId for this test
+
+        await expect(wizards.connect(owner).cull(wizardId))
+          .to.emit(wizards, 'Exiled')
+          .withNamedArgs({exilee: addr1.address, wizardId: wizardId});
+      });
 
     });
 
 
 
-});
+}); // end outer describe
