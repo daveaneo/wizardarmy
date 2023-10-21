@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.15;
 
+//import "./helpers/console.sol";
+
 //import "./helpers/ERC721.sol";
 import "./helpers/Ownable.sol";
 import "./helpers/ERC721Enumerable.sol";
@@ -123,11 +125,12 @@ contract Wizards is ERC721Enumerable, Ownable {
         return tokenIdToStats[_wizardId].role;
     }
 
+    /// @dev Fetching the reputation from the reputation contract.
     /// @notice A function in Wizards that uses the reputation contract.
     /// @param _wizardId The ID of the wizard whose reputation needs to be fetched.
     /// @return The reputation value of the specified wizard.
     function getReputation(uint256 _wizardId) external view returns (uint256) {
-        /// @dev Fetching the reputation from the reputation contract.
+        require(_isValidWizard(_wizardId)); // dev: "invalid wizard"
         return reputationSmartContract.getReputation(_wizardId);
     }
 

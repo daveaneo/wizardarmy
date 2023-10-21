@@ -13,6 +13,7 @@ const { ethers } = require("hardhat");
     Wizards - TokenURI
     Wizards - Events
     Wizards - Security
+    Wizards - getReputation function
 */
 
 
@@ -37,8 +38,8 @@ async function getBlockTimestamp() {
 
 describe("Wizards - State Variables & Initialization", function() {
 
-  let Wizards, WizardTower, Governance, Appointer, Token;
-  let wizards, wizardTower, governance, appointer, token;
+  let Wizards, WizardTower, Governance, Appointer, Token, Reputation;
+  let wizards, wizardTower, governance, appointer, token, reputation;
   let owner, addr1, addr2, addr3, addr4;
 
   const imageBaseURI = "https://raw.githubusercontent.com/daveaneo/wizardarmy/master/token/wizard_army_pinata";
@@ -132,6 +133,16 @@ describe("Wizards - State Variables & Initialization", function() {
     Appointer = await ethers.getContractFactory("Appointer");
     appointer = await Appointer.deploy(wizards.address);
 
+
+    // Now deploy the Wizards contract as before:
+    Reputation = await ethers.getContractFactory("Reputation");
+    reputation = await Reputation.deploy(wizards.address);
+
+    // Wait for the transaction to be confirmed
+    await reputation.deployTransaction.wait();
+
+    // Set the Reputation contract in Wizards
+    await wizards.setReputationSmartContract(reputation.address);
 
     [owner, addr1, addr2, addr3, addr4,  ...addrs] = await ethers.getSigners();
 
@@ -977,5 +988,61 @@ describe("Wizards - State Variables & Initialization", function() {
 
     });
 
+    describe("Wizards - getReputation function", async function() {
+        const oneDayInSeconds = 86400; // 24 hours
+
+        beforeEach(async function() {
+            //
+        });
+
+        it("should return increased reputation for an initialized wizard after advancing time", async function() {
+            const wizardId = 1; // Assuming this wizard is already minted and initiated
+            const initialReputation = await wizards.getReputation(wizardId);
+            const timeShift = oneDayInSeconds/2;
+
+            // Advance time by one day
+            await advanceTime(timeShift);
+
+            const newReputation = await wizards.getReputation(wizardId);
+            const repDifference = newReputation.sub(initialReputation);
+
+            await expect(newReputation.sub(initialReputation)).to.be.equal(timeShift, "Reputation didn't increase correctly after advancing time.");
+        });
+
+        it("reputation should not increase as it goes beyond protectedUntilTimestamp", async function() {
+            const wizardId = 1; // Assuming this wizard is already minted and initiated
+            const timeShift = oneDayInSeconds;
+
+            // Advance time to end of protection
+            await advanceTime(initialContractSettings.protectionTimeExtension);
+
+            // get reputation
+            const initialReputation = await wizards.getReputation(wizardId);
+
+            // Advance time by one day
+            await advanceTime(initialContractSettings.protectionTimeExtension);
+
+            const newReputation = await wizards.getReputation(wizardId);
+            const repDifference = newReputation.sub(initialReputation);
+
+            await expect(newReputation).to.be.equal(initialReputation, "Reputation should be the same.");
+        });
+
+
+
+        it("should return 0 reputation for an uninitialized wizard", async function() {
+            const wizardId = 3; // Assuming this wizard is minted but not initiated
+            const reputation = await wizards.getReputation(wizardId);
+            await expect(reputation).to.be.equal(0, "Reputation for an uninitialized wizard should be 0.");
+        });
+
+        it("should return 0 reputation for an exiled wizard", async function() {
+            const wizardId = 1;
+            await wizards.cull(wizardId);
+
+            const reputation = await wizards.getReputation(wizardId);
+            await expect(reputation).to.be.equal(0, "Reputation for an exiled wizard should be 0.");
+        });
+    });
 
 }); // end outer describe

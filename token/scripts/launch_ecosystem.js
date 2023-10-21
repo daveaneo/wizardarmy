@@ -68,6 +68,7 @@ async function saveContractAddresses(contracts) {
         wizardTower: contracts.wizardTower,
         appointer: contracts.appointer,
         governance: contracts.governance,
+        reputation: contracts.reputation,
     };
 
     // Write the updated data back to the file
@@ -150,6 +151,16 @@ async function deploy_new() {
     // Wait for the transaction to be confirmed
     await wizards.deployTransaction.wait();
 
+    // Now deploy the Wizards contract as before:
+    const Reputation = await ethers.getContractFactory("Reputation");
+    const reputation = await Reputation.deploy(wizards.address);
+    await reputation.deployed();
+    console.log("Reputation deployed to:", reputation.address);
+
+    // Wait for the transaction to be confirmed
+    await reputation.deployTransaction.wait();
+
+
     const WizardTower = await ethers.getContractFactory("WizardTower");
     const wizardTower = await WizardTower.deploy(token.address, wizards.address);
     await wizardTower.deployed();
@@ -184,13 +195,14 @@ async function deploy_new() {
         wizards: wizards.address,
         wizardTower: wizardTower.address,
         governance: governance.address,
-        appointer: appointer.address
+        appointer: appointer.address,
+        reputation: reputation.address
     };
 
 //    fs.writeFileSync(path.join(__dirname, 'deployed_contracts.json'), JSON.stringify(deployedContracts, null, 2));
     await saveContractAddresses(deployedContracts);
 
-    return { commonDefinitions, geneLogic, svgGenerator, tokenURILibrary, token, wizards, wizardTower, appointer };
+    return { commonDefinitions, geneLogic, svgGenerator, tokenURILibrary, token, wizards, wizardTower, appointer, reputation };
 }
 
 async function get_deployed() {
@@ -244,6 +256,13 @@ async function get_deployed() {
     const Appointer = await ethers.getContractFactory("Appointer");
     const appointer = Appointer.attach(addresses.appointer);
 
+    // Now deploy the Wizards contract as before:
+    const Reputation = await ethers.getContractFactory("Reputation");
+    const reputation = await Reputation.attach(addresses.reputation);
+
+    // Wait for the transaction to be confirmed
+    await reputation.deployTransaction.wait();
+
 
     const contracts = {
         commonDefinitions,
@@ -253,7 +272,8 @@ async function get_deployed() {
         token,
         wizards,
         wizardTower,
-        appointer
+        appointer,
+        reputation
     };
 
     // Logging contract names and addresses
@@ -274,10 +294,9 @@ async function main() {
         contracts = await deploy_new();
     }
 
-    const { commonDefinitions, geneLogic, svgGenerator, tokenURILibrary, token, wizards, wizardTower, appointer } = contracts;
+    const { commonDefinitions, geneLogic, svgGenerator, tokenURILibrary, token, wizards, wizardTower, appointer, reputation } = contracts;
 
-
-//    console.log("Deploying contracts with the account:", deployer.address);
+    wizards.connect(deployer).setReputationSmartContract(reputation.address);
 
     console.log("contracts exist. Minting...")
 
