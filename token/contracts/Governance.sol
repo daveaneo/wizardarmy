@@ -22,6 +22,8 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 
 // todo add nonreentrant guard
 // todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
+// todo -- brainstorm ways to protect DAO from adding too much time to wizards
+// todo -- wizards must 'buy' time, paying wizard tower so as not to dilute value
 
 interface IAppointer {
     function canRoleCreateTasks(uint256 _roleId) external view returns(bool);
