@@ -988,6 +988,8 @@ describe("Wizards - State Variables & Initialization", function() {
 
     });
 
+
+    // todo -- consider if we want the active time or how much they have protecteduntil for
     describe("Wizards - getReputation function", async function() {
         const oneDayInSeconds = 86400; // 24 hours
 
@@ -1027,8 +1029,6 @@ describe("Wizards - State Variables & Initialization", function() {
 
             await expect(newReputation).to.be.equal(initialReputation, "Reputation should be the same.");
         });
-
-
 
         it("should return 0 reputation for an uninitialized wizard", async function() {
             const wizardId = 3; // Assuming this wizard is minted but not initiated

@@ -31,14 +31,14 @@ contract Reputation {
             return 0;
         }
 
-        if (stats.protectedUntilTimestamp <= block.timestamp) {
-            return stats.protectedUntilTimestamp - stats.initiationTimestamp;
+        // todo -- review this. I think we can just return stats.protectedUntilTimestamp - stats.initiationTimestamp;
+        // we can also make it more advanced in that it always goes up. Give some for present time to initiated + half of the other:
+
+        uint256 reputation = block.timestamp - stats.initiationTimestamp;
+        if (stats.protectedUntilTimestamp > block.timestamp){
+            reputation += (stats.protectedUntilTimestamp - block.timestamp)/2;
         }
-        else if (stats.initiationTimestamp <= block.timestamp){
-            return block.timestamp - stats.initiationTimestamp;
-        }
-        else{
-            return 0; // this should never happen
-        }
+
+        return reputation;
     }
 }
