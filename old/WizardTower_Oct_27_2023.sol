@@ -26,31 +26,21 @@ contract WizardTower is ReentrancyGuard, Ownable {
 //    enum Wizards.ELEMENT {FIRE, WIND, WATER, EARTH}
 
 
-//    struct ContractSettings {
-//        uint64 dustThreshold; // min ecosystem tokens to do certain actions like auto withdraw
-//        address evictionProceedsReceiver; // Address to manage the Stake
-//        address evictor; // Address to manage the Stake
-//        uint40 startTimestamp;
-//        uint16 activeFloors;
-//        uint16 floorCap;
-//    }
-
     struct ContractSettings {
         uint64 dustThreshold; // min ecosystem tokens to do certain actions like auto withdraw
         address evictionProceedsReceiver; // Address to manage the Stake
         address evictor; // Address to manage the Stake
         uint40 startTimestamp;
-        uint40 lastUpdatedTimestamp;
-        uint32 rewardReleasePeriod;
         uint16 activeFloors;
         uint16 floorCap;
     }
-
     ContractSettings public contractSettings;
 
 
+    // todo -- combine mappings
     struct FloorInfo {
         uint40 lastWithdrawalTimestamp;
+//        uint16 occupyingWizardId;
     }
 
     mapping (uint256 => FloorInfo ) public wizardIdToFloorInfo; // floor 0 DNE
@@ -80,19 +70,16 @@ contract WizardTower is ReentrancyGuard, Ownable {
         return wizardIdToFloorInfo[_wizardId];
     }
 
-    // todo -- require valid floor
     function floorBalance(uint256 _wizardId) public view returns(uint256) {
-        if (_wizardId==0 || _wizardId > contractSettings.activeFloors){
-            return 0;
-        }
         return _floorBalance(_wizardId);
     }
 
     function _floorBalance(uint256 _wizardId) internal view returns(uint256) {
+//        require(isOnTheTower(_wizardId), "invalid wizardId or no occupant");
+//        if(_wizardId == 0 || )
+//        require(_wizardId !=0 && _wizardId <= wizardsNFT.totalSupply(), "invalid wizardId"); // wizardId and floor are interchangeable
         uint256 _totalFloorPower = totalFloorPower();
-//        return  _totalFloorPower == 0 ? 0 : floorPower(_wizardId) * token.balanceOf((address(this))) / _totalFloorPower;
-        uint256 affectivePower =  _totalFloorPower == 0 ? 0 : floorPower(_wizardId) *netAvailableBalance() / _totalFloorPower;
-        return affectivePower;
+        return _totalFloorPower == 0 ? 0 : floorPower(_wizardId) * token.balanceOf((address(this))) / _totalFloorPower;
     }
 
     //////////////
@@ -112,8 +99,6 @@ contract WizardTower is ReentrancyGuard, Ownable {
         contractSettings.startTimestamp = totalPowerSnapshotTimestamp;
         contractSettings.floorCap = 10000;
         contractSettings.dustThreshold = uint64(10**16);
-        contractSettings.lastUpdatedTimestamp = totalPowerSnapshotTimestamp; // todo -- this may be duplicate of totalPowerSnapshot
-        contractSettings.rewardReleasePeriod = 30 days;
     }
 
     // For migration
@@ -160,24 +145,6 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
         contractSettings.activeFloors -= 1;
         emit WizardEvicted(_wizardId);
-    }
-
-
-    /**
-     * @notice Calculates the net available balance for distribution across all wizards.
-     * @dev The reward is calculated proportionally based on the time elapsed with respect to the rewardReleasePeriod.
-     * If the elapsed time is less than the rewardReleasePeriod, a fraction of the total reward is returned.
-     * If the elapsed time is greater than or equal to the rewardReleasePeriod, the full balance of the contract is returned.
-     * @return The total available balance for distribution.
-     */
-    function netAvailableBalance() public view returns (uint256) {
-        uint256 timeElapsed = block.timestamp - contractSettings.lastUpdatedTimestamp;
-
-        if (timeElapsed >= contractSettings.rewardReleasePeriod) {
-            return token.balanceOf(address(this));
-        } else {
-            return timeElapsed * token.balanceOf(address(this)) / contractSettings.rewardReleasePeriod;
-        }
     }
 
 

@@ -261,6 +261,11 @@ describe("WizardTower", function() {
 
         let initialTowerBalance;
 
+        // notes
+        // wizards need to be mature for 1 month. That means they are unpaid and active wizards receive their payment
+        // todo -- in order to increaseTime, you must pay. This is handled in the wizardsSmartContract??
+        // what if wizardToewr migrates or has issues?
+
         beforeEach(async function() {
             // Transfer 10**18 tokens to the wizardTower contract
             initialTowerBalance = ethers.utils.parseEther("1");
@@ -273,11 +278,158 @@ describe("WizardTower", function() {
 
         it("should return correct balance for a given floor", async function() {
             const balance = await wizardTower.floorBalance(1);
-//            console.log("initial tower balance, floor balance");
-//            console.log(initialTowerBalance.toString())
-//            console.log(balance.toString())
+            // some time has passed, so balance should be non-zero
             expect(balance).to.be.gt(0).and.to.be.lte(initialTowerBalance), "Balance for a claimed floor should be greater than zero and less than or equal to initial tower balance";
         });
+
+        it("total floor balance increases over time -- before rewardReleasePeriod ends", async function() {
+            const contractSettings = await wizardTower.contractSettings();
+
+            // advance time until wizards are mature
+            let initBalance = await wizardTower.connect(addrs[0]).netAvailableBalance();
+
+            // advance more time
+            await advanceTime(contractSettings.rewardReleasePeriod/2);
+            let finalBalance = await wizardTower.connect(addrs[0]).netAvailableBalance();
+
+            expect(initBalance).to.be.lt(finalBalance), "final balance should increase";
+        });
+
+        it("total floor balance at max after waiting period", async function() {
+            const contractSettings = await wizardTower.contractSettings();
+
+            // advance time until wizards are mature
+            await advanceTime(contractSettings.rewardReleasePeriod);
+            let initBalance = await wizardTower.connect(addrs[0]).netAvailableBalance();
+
+            // advance more time
+            await advanceTime(contractSettings.rewardReleasePeriod);
+            let finalBalance = await wizardTower.connect(addrs[0]).netAvailableBalance();
+
+            expect(initBalance).to.be.equal(finalBalance), "balance should not increase after rewardReleasePeriod --without updates";
+        });
+
+        // withdraw recalculates timestamp correctly
+
+        it("floor balance should be 0 immediately after claiming", async function() {
+            // initialize wizard and give him extra protection (equal to needed time for maturity)
+            await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
+            await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            // advance time until wizards are mature
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+
+            await wizardTower.connect(addr3).claimFloor(3);
+            const balance = await wizardTower.floorBalance(3);
+            expect(balance).to.be.equal(0), "Initial balance should be 0";
+        });
+
+
+        it("adding more wizards to tower does not decrease existing wizards balance", async function() {
+            // initialize wizard and give him extra protection (equal to needed time for maturity)
+            await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
+            await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            // advance time until wizards are mature
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+
+            const initBalOne = await wizardTower.floorBalance(1);
+            await wizardTower.connect(addr3).claimFloor(3);
+            const finalBalOne = await wizardTower.floorBalance(1);
+
+            expect(finalBalOne).to.be.gte(initBalOne), "Balance of other wizards should increase";
+        });
+
+        it("adding more wizards to tower decreases rate for existing wizards", async function() {
+            // initialize wizard and give him extra protection (equal to needed time for maturity)
+            await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
+            await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            // advance time until wizards are mature
+
+            // get initial rate before adding new wizard
+            let initBalOne = await wizardTower.floorBalance(1);
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            let finalBalOne = await wizardTower.floorBalance(1);
+            const initRateOne = (finalBalOne.sub(initBalOne).div(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold))
+
+
+            // add new wizard
+            await wizardTower.connect(addr3).claimFloor(3);
+
+            // get new rate after adding new wizard
+            initBalOne = await wizardTower.floorBalance(1);
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            finalBalOne = await wizardTower.floorBalance(1);
+            finalRateOne = (finalBalOne.sub(initBalOne).div(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold))
+
+            expect(finalRateOne).to.be.lt(initRateOne), "Reward rate should decrease";
+        });
+
+        it("adding 1 wizard from 2 to tower changes reward rate to 2/3", async function() {
+            // initialize wizard and give him extra protection (equal to needed time for maturity)
+            await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
+            await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            // advance time until wizards are mature
+
+            // get initial rate before adding new wizard
+            let initBalOne = await wizardTower.floorBalance(1);
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            let finalBalOne = await wizardTower.floorBalance(1);
+            const initRateOne = (finalBalOne.sub(initBalOne).div(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold))
+
+
+//            console.log('initBalOne:')
+//            console.log(initBalOne.toString())
+//            console.log('finalBalOne:')
+//            console.log(finalBalOne.toString())
+//            console.log('initRateOne:')
+//            console.log(initRateOne.toString())
+
+
+            // add new wizard
+            await wizardTower.connect(addr3).claimFloor(3);
+
+            // get new rate after adding new wizard
+            initBalOne = await wizardTower.floorBalance(1);
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            finalBalOne = await wizardTower.floorBalance(1);
+            finalRateOne = (finalBalOne.sub(initBalOne).div(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold))
+
+
+//            console.log('initBalOne:')
+//            console.log(initBalOne.toString())
+//            console.log('finalBalOne:')
+//            console.log(finalBalOne.toString())
+//            console.log('finalRateOne:')
+//            console.log(finalRateOne.toString())
+
+
+            expect(finalRateOne.mul(2)).to.be.equal(initRateOne.div(3)), "Reward rate should 2/3 of initial rate";
+        });
+
+
+        it("all floors increase in value equally with time", async function() {
+            // initialize wizard and give him extra protection (equal to needed time for maturity)
+            await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
+            await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+            // advance time until wizards are mature
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+
+            await wizardTower.connect(addr3).claimFloor(3);
+            const initBalOne = await wizardTower.floorBalance(1);
+            const initBalTwo = await wizardTower.floorBalance(2);
+            const initBalThree = await wizardTower.floorBalance(3);
+
+            // advance time until wizards are mature
+            await advanceTime(initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
+
+            const finalBalOne = await wizardTower.floorBalance(1);
+            const finalBalTwo = await wizardTower.floorBalance(2);
+            const finalBalThree = await wizardTower.floorBalance(3);
+
+
+            expect(finalBalOne.sub(initBalOne)).to.be.equal(finalBalTwo.sub(initBalTwo)).and.to.be.equal(finalBalThree.sub(initBalThree)), "Balances should grow at same rate";
+        });
+
+
 
         it("wizard should have equal share after a long time.", async function() {
             await advanceTime(100000000000);
@@ -286,13 +438,17 @@ describe("WizardTower", function() {
         });
 
 
-        it("should throw an error for invalid floor numbers", async function() {
-            await expect(wizardTower.floorBalance(9999)).to.be.reverted, "Querying balance of an invalid floor should revert";
+        it("should return 0 for invalid floors", async function() {
+            expect(await wizardTower.floorBalance(9999)).to.be.equal(0), "Querying balance of an invalid floor should return 0"; // changed from revert
         });
 
         // This test may need specific conditions or simulation to validate the calculation's accuracy
-        it("should correctly calculate floor balance", async function() {
-            await advanceTime(5);
+        it("both floors should have equal, full shares after rewardReleasePeriod", async function() {
+            // advance time until wizards are mature
+            const contractSettings = await wizardTower.contractSettings();
+            await advanceTime(contractSettings.rewardReleasePeriod);
+            console.log("A");
+            // get balances
             const floor1Balance = await wizardTower.floorBalance(1);
             const floor2Balance = await wizardTower.floorBalance(2);
             console.log('bal1, bal2, sum');
@@ -300,7 +456,8 @@ describe("WizardTower", function() {
             console.log(floor2Balance.toString());
             console.log(floor1Balance.add(floor2Balance).toString());
 
-            expect(floor1Balance.add(floor2Balance)).to.be.equal(initialTowerBalance), "Sum of floor balances should equal initial tower balance";
+            expect(floor1Balance).to.be.equal(initialTowerBalance.div(2)), "Floor balances should equal half of initial tower balance";
+            expect(floor2Balance).to.be.equal(initialTowerBalance.div(2)), "Floor balances should equal half of initial tower balance";
         });
 
         it("should show balance growth rate over time", async function() {
