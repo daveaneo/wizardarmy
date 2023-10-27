@@ -21,6 +21,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
     uint128 public totalPowerSnapshot;
     uint40 public totalPowerSnapshotTimestamp;
+    uint40 public lastRewardTimestamp;
 //    address public evictionProceedsReceiver; // Address to manage the Stake
 
 //    enum Wizards.ELEMENT {FIRE, WIND, WATER, EARTH}
@@ -105,6 +106,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
         token = IERC20(_token);
         wizardsNFT = Wizards(_wizardsNFTAddress);
 //        totalPowerSnapshotTimestamp = uint40(block.timestamp);
+        lastRewardTimestamp = uint40(block.timestamp);
 
         // todo -- make one call
         contractSettings.evictionProceedsReceiver = msg.sender;
@@ -181,7 +183,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
      * @return The total available balance for distribution.
      */
     function netAvailableBalance() public view returns (uint256) {
-        uint256 timeElapsed = block.timestamp - totalPowerSnapshotTimestamp;
+        uint256 timeElapsed = block.timestamp - lastRewardTimestamp;
 
         if (timeElapsed >= contractSettings.rewardReleasePeriod) {
             return token.balanceOf(address(this));
