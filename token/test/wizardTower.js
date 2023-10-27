@@ -277,6 +277,8 @@ describe("WizardTower", function() {
         });
 
         it("should return correct balance for a given floor", async function() {
+            await advanceTime(100);
+
             const balance = await wizardTower.floorBalance(1);
             // some time has passed, so balance should be non-zero
             expect(balance).to.be.gt(0).and.to.be.lte(initialTowerBalance), "Balance for a claimed floor should be greater than zero and less than or equal to initial tower balance";
@@ -443,21 +445,16 @@ describe("WizardTower", function() {
         });
 
         // This test may need specific conditions or simulation to validate the calculation's accuracy
-        it("both floors should have equal, full shares after rewardReleasePeriod", async function() {
+        it("sum of floor balances should equal total tower balance after rewardReleasePeriod", async function() {
             // advance time until wizards are mature
             const contractSettings = await wizardTower.contractSettings();
-            await advanceTime(contractSettings.rewardReleasePeriod);
-            console.log("A");
+            await advanceTime(contractSettings.rewardReleasePeriod + 1);
+
             // get balances
             const floor1Balance = await wizardTower.floorBalance(1);
             const floor2Balance = await wizardTower.floorBalance(2);
-            console.log('bal1, bal2, sum');
-            console.log(floor1Balance.toString());
-            console.log(floor2Balance.toString());
-            console.log(floor1Balance.add(floor2Balance).toString());
-
-            expect(floor1Balance).to.be.equal(initialTowerBalance.div(2)), "Floor balances should equal half of initial tower balance";
-            expect(floor2Balance).to.be.equal(initialTowerBalance.div(2)), "Floor balances should equal half of initial tower balance";
+            expect(floor1Balance.add(floor2Balance)).to.be.closeTo(initialTowerBalance, 10), "Sum of floor balances should equal initial tower balance";
+            expect(floor2Balance).to.be.lt(floor1Balance), "Second flor balance should be slightly less than first floor";
         });
 
         it("should show balance growth rate over time", async function() {
@@ -468,6 +465,7 @@ describe("WizardTower", function() {
         });
 
         it("should update balance after withdrawals", async function() {
+            await advanceTime(3600); // Advance time by 1 hour
             const initialBalance = await wizardTower.floorBalance(1);
             await wizardTower.connect(addr1).withdraw(1);
             const postWithdrawBalance = await wizardTower.floorBalance(1);

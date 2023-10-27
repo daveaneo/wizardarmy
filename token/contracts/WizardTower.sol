@@ -104,15 +104,15 @@ contract WizardTower is ReentrancyGuard, Ownable {
 
         token = IERC20(_token);
         wizardsNFT = Wizards(_wizardsNFTAddress);
-        totalPowerSnapshotTimestamp = uint40(block.timestamp);
+//        totalPowerSnapshotTimestamp = uint40(block.timestamp);
 
         // todo -- make one call
         contractSettings.evictionProceedsReceiver = msg.sender;
         contractSettings.evictor = msg.sender;
-        contractSettings.startTimestamp = totalPowerSnapshotTimestamp;
+//        contractSettings.startTimestamp = totalPowerSnapshotTimestamp;
         contractSettings.floorCap = 10000;
         contractSettings.dustThreshold = uint64(10**16);
-        contractSettings.lastUpdatedTimestamp = totalPowerSnapshotTimestamp; // todo -- this may be duplicate of totalPowerSnapshot
+//        contractSettings.lastUpdatedTimestamp = totalPowerSnapshotTimestamp; // todo -- this may be duplicate of totalPowerSnapshot
         contractSettings.rewardReleasePeriod = 30 days;
     }
 
@@ -132,12 +132,20 @@ contract WizardTower is ReentrancyGuard, Ownable {
             , "must own mature, active wizardsNFT");
         require(wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp == 0, "already claimed");
         require(contractSettings.activeFloors < contractSettings.floorCap, "tower at max capacity");
+
+        // reset snapshot if initiating tower. Otherwise, update it
+        if(contractSettings.activeFloors==0){
+            totalPowerSnapshot = 0;
+            totalPowerSnapshotTimestamp = uint40(block.timestamp);
+        }
+        else{
+            _updateTotalPowerSnapshot(0);
+        }
+
+        // increase floors after snapshot
         contractSettings.activeFloors += 1;
-//        FloorInfo memory floorInfo;
-//        floorInfo.lastWithdrawalTimestamp = uint40(block.timestamp);
-//        wizardIdToFloorInfo[_wizardId] = floorInfo;
         wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp = uint40(block.timestamp);
-        _updateTotalPowerSnapshot(0);
+
         emit FloorClaimed(msg.sender, _wizardId);
     }
 
@@ -163,6 +171,8 @@ contract WizardTower is ReentrancyGuard, Ownable {
     }
 
 
+
+    // todo -- this function doesn't work. We need renewing balances, not a one-time graduation
     /**
      * @notice Calculates the net available balance for distribution across all wizards.
      * @dev The reward is calculated proportionally based on the time elapsed with respect to the rewardReleasePeriod.
@@ -171,7 +181,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
      * @return The total available balance for distribution.
      */
     function netAvailableBalance() public view returns (uint256) {
-        uint256 timeElapsed = block.timestamp - contractSettings.lastUpdatedTimestamp;
+        uint256 timeElapsed = block.timestamp - totalPowerSnapshotTimestamp;
 
         if (timeElapsed >= contractSettings.rewardReleasePeriod) {
             return token.balanceOf(address(this));
@@ -187,8 +197,10 @@ contract WizardTower is ReentrancyGuard, Ownable {
         }
 //        require(isOnTheTower(_wizardId)); // floor is same as wizardId
         FloorInfo memory floorInfo = wizardIdToFloorInfo[_wizardId]; // wizard id is same as floor id
-        require(floorInfo.lastWithdrawalTimestamp != 0, "ERROR -- THIS SHOULD NOT HAPPEN"); // todo -- remove this and startTimestamp
-        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? contractSettings.startTimestamp : floorInfo.lastWithdrawalTimestamp; // todo -- lastWithdrawalTimeStamp should never be 0
+//        require(floorInfo.lastWithdrawalTimestamp != 0, "ERROR -- THIS SHOULD NOT HAPPEN"); // todo -- remove this and startTimestamp
+//        uint256 timestamp = floorInfo.lastWithdrawalTimestamp == 0 ? contractSettings.startTimestamp : floorInfo.lastWithdrawalTimestamp; // todo -- lastWithdrawalTimeStamp should never be 0
+        uint256 timestamp = floorInfo.lastWithdrawalTimestamp;
+
         return uint128(block.timestamp - timestamp);
     }
 
