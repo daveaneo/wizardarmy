@@ -27,18 +27,19 @@ contract Reputation {
     /// @return The reputation value of the specified wizard.
     function getReputation(uint256 wizardId) external view returns (uint256) {
         CommonDefinitions.WizardStats memory stats = wizardsContract.getStatsGivenId(wizardId);
+
+        // If the wizard hasn't been initiated, its reputation is 0
         if (stats.initiationTimestamp == 0) {
             return 0;
         }
 
-        // todo -- review this. I think we can just return stats.protectedUntilTimestamp - stats.initiationTimestamp;
-        // we can also make it more advanced in that it always goes up. Give some for present time to initiated + half of the other:
-
-        uint256 reputation = block.timestamp - stats.initiationTimestamp;
-        if (stats.protectedUntilTimestamp > block.timestamp){
-            reputation += (stats.protectedUntilTimestamp - block.timestamp)/2;
+        // If the wizard is still under protection
+        if (stats.protectedUntilTimestamp > block.timestamp) {
+            return block.timestamp - stats.initiationTimestamp + (stats.protectedUntilTimestamp - block.timestamp) / 2;
         }
 
-        return reputation;
+        // If the protection period of the wizard has ended
+        return stats.protectedUntilTimestamp - stats.initiationTimestamp;
     }
+
 }
