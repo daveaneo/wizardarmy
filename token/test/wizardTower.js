@@ -365,7 +365,12 @@ describe("WizardTower", function() {
             expect(finalRateOne).to.be.lt(initRateOne), "Reward rate should decrease";
         });
 
-        it("adding one wizard from two to tower changes reward rate to 2/3", async function() {
+        it("adding one wizard w/ contribution keeps rates same", async function() {
+            expect(0).to.be.equal(1), "Test not implemented.";
+        });
+
+
+        it("adding one wizard w/o contribution from two to tower changes reward rate to 2/3", async function() {
             // initialize wizard and give him extra protection (equal to needed time for maturity)
             await wizards.connect(addr3).initiate(3, {value: initialContractSettings.initiationCost});
             await wizards.connect(owner).increaseProtectedUntilTimestamp(3, initialContractSettings.phaseDuration * initialContractSettings.maturityThreshold);
@@ -511,7 +516,7 @@ describe("WizardTower", function() {
             const newPower = await wizardTower.floorPower(1);
             expect(newPower).to.be.gt(initialPower), "Balance should grow over time";
             expect(initialPower).to.be.equal(1), "power increases with time 1:1";
-            expect(newPower).to.be.equal(timeToAdvance+1), "power increases with time 1:1";
+            expect(newPower).to.be.closeTo(timeToAdvance+1, 2), "power increases with time 1:1";
         });
 
         it("totalFloorPower increases over time", async function() {

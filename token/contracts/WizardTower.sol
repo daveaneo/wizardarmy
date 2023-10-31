@@ -12,7 +12,6 @@ import '../contracts/Wizards.sol';
 //import "../contracts/libraries/PRBMathSD59x18Typed.sol";
 
 
-// todo -- we can drop the idea of floors and just have wizards in the tower, since all "floors" are now equal
 // todo -- impliment timeToGold ration, a number that will be used to give time boosts at a cost
 
 contract WizardTower is ReentrancyGuard, Ownable {
@@ -27,14 +26,6 @@ contract WizardTower is ReentrancyGuard, Ownable {
 //    enum Wizards.ELEMENT {FIRE, WIND, WATER, EARTH}
 
 
-//    struct ContractSettings {
-//        uint64 dustThreshold; // min ecosystem tokens to do certain actions like auto withdraw
-//        address evictionProceedsReceiver; // Address to manage the Stake
-//        address evictor; // Address to manage the Stake
-//        uint40 startTimestamp;
-//        uint16 activeFloors;
-//        uint16 floorCap;
-//    }
 
     struct ContractSettings {
         uint64 dustThreshold; // min ecosystem tokens to do certain actions like auto withdraw
@@ -71,6 +62,11 @@ contract WizardTower is ReentrancyGuard, Ownable {
     ////    Get       //
     ////////////////////
 
+    function timeToGold(uint256 _wizardId) public view returns(bool) {
+        // return a number that aids in
+    }
+
+
     function isOnTheTower(uint256 _wizardId) public view returns(bool) {
         require(_wizardId !=0 && _wizardId <= wizardsNFT.totalSupply(), "invalid wizard");
         return wizardIdToFloorInfo[_wizardId].lastWithdrawalTimestamp != 0;
@@ -81,7 +77,7 @@ contract WizardTower is ReentrancyGuard, Ownable {
         return wizardIdToFloorInfo[_wizardId];
     }
 
-    // todo -- require valid floor
+    // todo -- require valid floor ?
     function floorBalance(uint256 _wizardId) public view returns(uint256) {
         if (_wizardId==0 || _wizardId > contractSettings.activeFloors){
             return 0;
