@@ -28,6 +28,7 @@ npm install --save-dev @nomiclabs/hardhat-ethers 'ethers@^5.0.0'
 npm install --save-dev @nomiclabs/hardhat-waffle@2.0.6  # This version is compatible with hardhat-ethers 2.2.3
 npm install --save-dev hardhat-contract-sizer
 npm install @nomicfoundation/hardhat-chai-matchers@1.0.6 --save-dev
+npm install --save-dev @nomiclabs/hardhat-etherscan
 
 
 echo "Installing OpenZeppelin contracts..."

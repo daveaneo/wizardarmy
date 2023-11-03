@@ -22,7 +22,7 @@ import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEnde
 
 // todo add nonreentrant guard
 // todo -- dApp -- add verified social media so as to better track. These get wiped with wizard transfers.
-// todo -- brainstorm ways to protect DAO from adding too much time to wizards
+// todo -- brainstorm ways to protect DAO from adding too much time to wizards: forced payment to wizardTower so not watering down of rewards
 // todo -- wizards must 'buy' time, paying wizard tower so as not to dilute value
 
 interface IAppointer {
