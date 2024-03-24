@@ -10,8 +10,8 @@ const settings = {
         enabled: true,
         runs: 100000,
     },
-        viaIR: true,
-    };
+    viaIR: true,
+};
 
 
 module.exports = {
@@ -22,15 +22,15 @@ module.exports = {
     strict: true,
   },
   solidity: {
-    compilers: [
+     compilers: [
       {
         version: "0.8.15",
         settings: settings,
       },
-      {
-        version: "0.8.20",
-//        settings: settings,
-      },
+//      {
+//        version: "0.8.20",
+////        settings: settings,
+//      },
     ],
   },
   etherscan: {
